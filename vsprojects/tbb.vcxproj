@@ -1,0 +1,140 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\deps\tbb\src\tbb\concurrent_hash_map.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\concurrent_queue.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\concurrent_vector.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\dynamic_link.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\itt_notify.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\cache_aligned_allocator.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\pipeline.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\queuing_mutex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\queuing_rw_mutex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\reader_writer_lock.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\spin_rw_mutex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\spin_mutex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\critical_section.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\task.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\tbb_misc.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\tbb_misc_ex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\mutex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\recursive_mutex.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\condition_variable.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\tbb_thread.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\concurrent_monitor.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\semaphore.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\private_server.cpp" />
+    <ClCompile Include="..\deps\tbb\src\rml\client\rml_tbb.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\task_group_context.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\governor.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\market.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\arena.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\scheduler.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\observer_proxy.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\tbb_statistics.cpp" />
+    <ClCompile Include="..\deps\tbb\src\tbb\tbb_main.cpp" />
+    <ClCompile Include="..\deps\tbb\src\old\concurrent_vector_v2.cpp" />
+    <ClCompile Include="..\deps\tbb\src\old\concurrent_queue_v2.cpp" />
+    <ClCompile Include="..\deps\tbb\src\old\spin_rw_mutex_v2.cpp" />
+    <ClCompile Include="..\deps\tbb\src\old\task_v2.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="..\deps\tbb\src\tbb\ia32-masm\atomic_support.asm" />
+    <MASM Include="..\deps\tbb\src\tbb\ia32-masm\lock_byte.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\deps\tbb\src\tbb\tbb_resource.rc" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{E05FA061-79C0-4FE0-A324-71E3731D39A6}</ProjectGuid>
+    <RootNamespace>tbb</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>..\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IntDir>$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <TargetName>$(ProjectName)_debug</TargetName>
+    <CustomBuildBeforeTargets>
+    </CustomBuildBeforeTargets>
+    <CustomBuildAfterTargets>BuildCompile</CustomBuildAfterTargets>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\deps\tbb\include;..\deps\tbb\build\vsproject;..\deps\tbb\src\rml\include;..\deps\tbb\src</AdditionalIncludeDirectories>
+      <AdditionalOptions>/c /MDd /Od /Ob0 /EHsc /GR /Zc:forScope /Zc:wchar_t /DTBB_USE_DEBUG /D__TBB_LIB_NAME=tbb_debug.lib /D_USE_RTM_VERSION /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0501 /D__TBB_BUILD=1 /W4</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>/nologo /DLL /MAP /DEBUG /fixed:no /INCREMENTAL:NO  /DEF:"Debug\tbb\tbb.def"</AdditionalOptions>
+    </Link>
+    <MASM>
+      <AdditionalOptions>/nologo /DUSE_FRAME_POINTER /c /coff /Zi</AdditionalOptions>
+    </MASM>
+    <CustomBuildStep>
+      <Command>cl /nologo /TP /EP ../deps/tbb/src/tbb/win32-tbb-export.def /MDd /Od /Ob0 /Zi /EHsc /GR /Zc:forScope /Zc:wchar_t /DTBB_USE_DEBUG /D__TBB_LIB_NAME=tbb_debug.lib /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0501  /D__TBB_BUILD=1 /W4   /I../deps/tbb/src /I../deps/tbb/include &gt; "Debug\tbb\tbb.def"</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Message>generating tbb.def file</Message>
+      <Outputs>Debug\tbb\tbb.def</Outputs>
+    </CustomBuildStep>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\deps\tbb\include;$(ProjectDir)..\deps\tbb\build\vsproject</AdditionalIncludeDirectories>
+      <AdditionalOptions>/Fo"Debug\tbb\%(Filename).res"  /I../deps/tbb/include /I../deps/tbb/build/vsproject /DTBB_USE_DEBUG /D__TBB_LIB_NAME=tbb_debug.lib /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0501 /D__TBB_BUILD=1 %(AdditionalOptions)</AdditionalOptions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>

@@ -1,0 +1,143 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{58B48752-2B3B-4071-936E-C9EEE0FDEFFC}</ProjectGuid>
+    <RootNamespace>messagehandler</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\messagehandler\ChangeRoomRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\ChangeRoomResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\CreateRoomReponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\CreateRoomRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\DisconnectedRequest.h" />
+    <ClInclude Include="..\src\messagehandler\GetZoneRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\GetZoneResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\HttpGetRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\InvidRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\JoinDefaultRoomRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\JoinRoomResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\JoinServerRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\JoinServerResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\MessageByNameRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\NetSpeedRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\NetSpeedResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\NewMessageNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\NewRoomNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\NewUserNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\PingIntervalRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\PluginNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\PluginRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\PluginResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\PolicyFileRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\PrivateMessageRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\RoomListNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\RoomMessageRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\RoomPropertyUpdateNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\RoomRemoveNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\ServerErrorResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\ServerMessageRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\ServerTimeResponseHandler.h" />
+    <ClInclude Include="..\src\messagehandler\UserLeaveNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\UserListNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\UserPropertyUpdateNoticeHandler.h" />
+    <ClInclude Include="..\src\messagehandler\UserPropertyUpdateRequestHandler.h" />
+    <ClInclude Include="..\src\messagehandler\ZoneMessageRequestHandler.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\messagehandler\ChangeRoomRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\ChangeRoomResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\CreateRoomReponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\CreateRoomRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\DisconnectedRequest.cpp" />
+    <ClCompile Include="..\src\messagehandler\GetZoneRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\GetZoneResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\HttpGetRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\InvidRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\JoinDefaultRoomRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\JoinRoomResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\JoinServerRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\JoinServerResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\MessageByNameRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\NetSpeedRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\NetSpeedResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\NewMessageNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\NewRoomNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\NewUserNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\PingIntervalRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\PluginNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\PluginRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\PluginResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\PolicyFileRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\PrivateMessageRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\RoomListNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\RoomMessageRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\RoomPropertyUpdateNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\RoomRemoveNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\ServerErrorResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\ServerMessageRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\ServerTimeResponseHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\UserLeaveNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\UserListNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\UserPropertyUpdateNoticeHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\UserPropertyUpdateRequestHandler.cpp" />
+    <ClCompile Include="..\src\messagehandler\ZoneMessageRequestHandler.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

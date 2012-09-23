@@ -1,0 +1,123 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\deps\uv\src\fs-poll.c" />
+    <ClCompile Include="..\deps\uv\src\inet.c" />
+    <ClCompile Include="..\deps\uv\src\uv-common.c" />
+    <ClCompile Include="..\deps\uv\src\win\async.c" />
+    <ClCompile Include="..\deps\uv\src\win\core.c" />
+    <ClCompile Include="..\deps\uv\src\win\dl.c" />
+    <ClCompile Include="..\deps\uv\src\win\error.c" />
+    <ClCompile Include="..\deps\uv\src\win\fs-event.c" />
+    <ClCompile Include="..\deps\uv\src\win\fs.c" />
+    <ClCompile Include="..\deps\uv\src\win\getaddrinfo.c" />
+    <ClCompile Include="..\deps\uv\src\win\handle.c" />
+    <ClCompile Include="..\deps\uv\src\win\loop-watcher.c" />
+    <ClCompile Include="..\deps\uv\src\win\pipe.c" />
+    <ClCompile Include="..\deps\uv\src\win\poll.c" />
+    <ClCompile Include="..\deps\uv\src\win\process-stdio.c" />
+    <ClCompile Include="..\deps\uv\src\win\process.c" />
+    <ClCompile Include="..\deps\uv\src\win\req.c" />
+    <ClCompile Include="..\deps\uv\src\win\signal.c" />
+    <ClCompile Include="..\deps\uv\src\win\stream.c" />
+    <ClCompile Include="..\deps\uv\src\win\tcp.c" />
+    <ClCompile Include="..\deps\uv\src\win\thread.c" />
+    <ClCompile Include="..\deps\uv\src\win\threadpool.c" />
+    <ClCompile Include="..\deps\uv\src\win\timer.c" />
+    <ClCompile Include="..\deps\uv\src\win\tty.c" />
+    <ClCompile Include="..\deps\uv\src\win\udp.c" />
+    <ClCompile Include="..\deps\uv\src\win\util.c" />
+    <ClCompile Include="..\deps\uv\src\win\winapi.c" />
+    <ClCompile Include="..\deps\uv\src\win\winsock.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\deps\uv\include\uv-private\ngx-queue.h" />
+    <ClInclude Include="..\deps\uv\include\uv-private\tree.h" />
+    <ClInclude Include="..\deps\uv\include\uv-private\uv-win.h" />
+    <ClInclude Include="..\deps\uv\include\uv.h" />
+    <ClInclude Include="..\deps\uv\src\uv-common.h" />
+    <ClInclude Include="..\deps\uv\src\win\atomicops-inl.h" />
+    <ClInclude Include="..\deps\uv\src\win\handle-inl.h" />
+    <ClInclude Include="..\deps\uv\src\win\internal.h" />
+    <ClInclude Include="..\deps\uv\src\win\req-inl.h" />
+    <ClInclude Include="..\deps\uv\src\win\stream-inl.h" />
+    <ClInclude Include="..\deps\uv\src\win\winapi.h" />
+    <ClInclude Include="..\deps\uv\src\win\winsock.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8ABEA86A-7F70-4F69-AF2F-E02E7313A9C0}</ProjectGuid>
+    <RootNamespace>libuv</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IntDir>$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>$(ProjectName)_debug</TargetName>
+    <OutDir>..\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath>$(ProjectDir)\..\deps\libuv\src\ares\config_win32;$(ProjectDir)\..\deps\libuv\include;$(IncludePath)</IncludePath>
+    <OutDir>..\lib\</OutDir>
+    <IntDir>Release</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\deps\uv\include;$(ProjectDir)..\deps\uv\include\uv-private</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;HAVE_CONFIG_H;_WIN32_WINNT=0x0600;EIO_STACKSIZE=262144;_GNU_SOURCE;</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>ws2_32.lib;psapi.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\deps\uv\include;$(ProjectDir)..\deps\uv\include\uv-private</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;HAVE_CONFIG_H;_WIN32_WINNT=0x0600;EIO_STACKSIZE=262144;_GNU_SOURCE;</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,5 +1,7 @@
-Rudder Multiuser Server lets you create connected cross platform projects easily.
-Let e.g. Macromedia Flash clients interact with iOS/Android based mobile clients utilising easy to use platform optimised APIs.
-The Rudder Server is programmed completely in Java and uses special features of JDK1.7,
-which for the first time permits highly performant and scaleable networking on a Java server.
-The server works on every platform running JDK1.7, e.g. Windows, MacOS X, Linux, Solaris 
+Orce is a lightweight multiplayer online game server framework.
+Technically it uses a lock-free programming techniques, such as:
+atomic, spinlock, concurrent container, no-block queue, scalable 
+memory allocator to achieve the high performance of the engine.
+The Orce using protobuf as a communication protocol can achieve 
+the connection of a variety of clients, including iOS, android, 
+flash, html5, unity3d.
