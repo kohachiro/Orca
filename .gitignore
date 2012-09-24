@@ -1,0 +1,8 @@
+/vsprojects/*.opensdf
+/vsprojects/*.sdf
+/vsprojects/*.user
+
+/vsprojects/Debug
+/vsprojects/Release
+/lib
+/Debug
