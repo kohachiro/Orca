@@ -1,8 +1,16 @@
 /vsprojects/*.opensdf
 /vsprojects/*.sdf
 /vsprojects/*.user
-
+/vsprojects/*.suo
+/vsprojects/ipch
 /vsprojects/Debug
 /vsprojects/Release
 /lib
 /Debug
+/deps/ace/.svn
+/deps/uv/.svn
+/deps/protobuf/.svn
+/deps/protobuf/gtest/.svn
+/deps/v8/.svn
+/deps/tbb/.svn
+
