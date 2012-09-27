@@ -1,10 +1,19 @@
-#pragma once
-#include "common.h"
+/*
+ * Region.h
+ *
+ *  Created on: 2012-9-26
+ *      Author: kohachiro
+ */
 
-class Region
-{
+#ifndef REGION_H_
+#define REGION_H_
+
+#include "../common.h"
+
+class Region {
 public:
-	Region(int id,int maxRoom,int sendRoomChangeTo,boolean createRoom,boolean sendUserCountChange);
+	Region(int id, int maxRoom, int sendRoomChangeTo, boolean createRoom,
+			boolean sendUserCountChange);
 	virtual ~Region(void);
 private:
 	const int id;
@@ -16,3 +25,5 @@ private:
 	const boolean sendUserCountChange;
 	const ConcurrentVector<Integer> roomList;
 };
+
+#endif /* REGION_H_ */

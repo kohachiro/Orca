@@ -1,10 +1,9 @@
 #pragma once
 #include "tbb_string.h"
-#include "tbb/atomic.h"
-
-#include "tbb/concurrent_vector.h"
-#include "tbb/concurrent_hash_map.h"
-#include "tbb/tbbmalloc_proxy.h"
+#include "../deps/tbb/include/tbb/atomic.h"
+#include "../deps/tbb/include/tbb/concurrent_vector.h"
+#include "../deps/tbb/include/tbb/concurrent_hash_map.h"
+#include "../deps/tbb/include/tbb/tbbmalloc_proxy.h"
 
 typedef tbb::atomic<int> AtomicInteger;
 typedef tbb::atomic<bool> AtomicBoolean;
