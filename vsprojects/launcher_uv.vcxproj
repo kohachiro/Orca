@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\framework\LauncherUv.cpp" />
+    <ClCompile Include="..\src\launcher\launcheruv.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F700DFE1-D560-44D5-89DF-4AE8EC2A9396}</ProjectGuid>
