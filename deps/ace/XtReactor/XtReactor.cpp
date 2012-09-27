@@ -1,4 +1,4 @@
-// $Id: XtReactor.cpp 91813 2010-09-17 07:52:52Z johnnyw $
+// $Id: XtReactor.cpp 95528 2012-02-07 12:57:33Z johnnyw $
 
 #include "ace/XtReactor/XtReactor.h"
 
@@ -323,7 +323,7 @@ ACE_XtReactor::synchronize_XtInput(ACE_HANDLE handle)
   // Finally, add input handler.
   (*XtID)->id_ = ::XtAppAddInput (this->context_,
                                   (int) handle,
-                                  (XtPointer) condition,
+                                  reinterpret_cast <XtPointer> (condition),
                                   InputCallbackProc,
                                   (XtPointer) this);
 }

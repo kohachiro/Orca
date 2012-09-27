@@ -4,7 +4,7 @@
 /**
  *  @file    QtReactor.h
  *
- *  $Id: QtReactor.h 82723 2008-09-16 09:35:44Z johnnyw $
+ *  $Id: QtReactor.h 94053 2011-05-11 13:44:41Z mhengstmengel $
  *
  *  @author Hamish Friedlander <ullexco@wave.co.nz>
  *  @author Balachandran Natarajan <bala@cs.wustl.edu>
@@ -26,23 +26,14 @@
 #include "ace/Map_Manager.h"
 
 #if defined (ACE_HAS_QT4)
-# include "Qt/qglobal.h"
-#else
-# include "qglobal.h"
+# include "QtCore/qglobal.h"
 #endif
 
 // QT toolkit specific includes.
-#if QT_VERSION < 0x040000
-#include /**/ <qapplication.h>
-#include /**/ <qobject.h>
-#include /**/ <qsocketnotifier.h>
-#include /**/ <qtimer.h>
-#else
 #include /**/ <QtGui/QApplication>
 #include /**/ <QtCore/QObject>
 #include /**/ <QtCore/QSocketNotifier>
 #include /**/ <QtCore/QTimer>
-#endif
 
 ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
@@ -225,7 +216,7 @@ private slots:
     /// Dispatch an exception event
     void exception_event (int FD);
 
-    /// Dispach a timeout event
+    /// Dispatch a timeout event
     void timeout_event (void);
 };
 

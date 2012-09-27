@@ -1,4 +1,4 @@
-// $Id: Packets_Received_Monitor.cpp 91813 2010-09-17 07:52:52Z johnnyw $
+// $Id: Packets_Received_Monitor.cpp 95533 2012-02-14 22:59:17Z wotte $
 
 #include "ace/Monitor_Control/Packets_Received_Monitor.h"
 
@@ -18,7 +18,7 @@ namespace ACE
 #if defined (ACE_HAS_WIN32_PDH)
       , Windows_Multi_Instance_Monitor (
             ACE_TEXT ("\\Network Interface(*)\\Packets Received/sec"))
-#elif defined (linux) || defined (AIX)
+#elif defined (ACE_LINUX) || defined (AIX)
       , Linux_Network_Interface_Monitor (
             " %*[^:]: %*u %lu %*u %*u %*u %*u %*u %*u %*u %*u")
             /// Scan format for /proc/net/dev

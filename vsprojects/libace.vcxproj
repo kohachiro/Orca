@@ -412,6 +412,7 @@
     <None Include="..\deps\ace\XTI_ATM_Mcast.inl" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\deps\ace\PrecompiledHeaders/WinAcePCH.cpp" />
     <ClCompile Include="..\deps\ace\ACE.cpp" />
     <ClCompile Include="..\deps\ace\ACE_crc32.cpp" />
     <ClCompile Include="..\deps\ace\ACE_crc_ccitt.cpp" />
@@ -447,6 +448,7 @@
     <ClCompile Include="..\deps\ace\Codeset_IBM1047.cpp" />
     <ClCompile Include="..\deps\ace\Codeset_Registry.cpp" />
     <ClCompile Include="..\deps\ace\Codeset_Registry_db.cpp" />
+    <ClCompile Include="..\deps\ace\Condition_Attributes.cpp" />
     <ClCompile Include="..\deps\ace\Condition_Recursive_Thread_Mutex.cpp" />
     <ClCompile Include="..\deps\ace\Condition_Thread_Mutex.cpp" />
     <ClCompile Include="..\deps\ace\Configuration.cpp" />
@@ -454,7 +456,6 @@
     <ClCompile Include="..\deps\ace\Connection_Recycling_Strategy.cpp" />
     <ClCompile Include="..\deps\ace\Containers.cpp" />
     <ClCompile Include="..\deps\ace\Copy_Disabled.cpp" />
-    <ClCompile Include="..\deps\ace\Countdown_Time.cpp" />
     <ClCompile Include="..\deps\ace\Date_Time.cpp" />
     <ClCompile Include="..\deps\ace\DEV.cpp" />
     <ClCompile Include="..\deps\ace\DEV_Addr.cpp" />
@@ -474,6 +475,7 @@
     <ClCompile Include="..\deps\ace\Encoding_Converter_Factory.cpp" />
     <ClCompile Include="..\deps\ace\Event.cpp" />
     <ClCompile Include="..\deps\ace\Event_Handler.cpp" />
+    <ClCompile Include="..\deps\ace\Event_Handler_Handle_Timeout_Upcall.cpp" />
     <ClCompile Include="..\deps\ace\FIFO.cpp" />
     <ClCompile Include="..\deps\ace\FIFO_Recv.cpp" />
     <ClCompile Include="..\deps\ace\FIFO_Recv_Msg.cpp" />
@@ -490,7 +492,6 @@
     <ClCompile Include="..\deps\ace\Functor.cpp" />
     <ClCompile Include="..\deps\ace\Functor_String.cpp" />
     <ClCompile Include="..\deps\ace\Get_Opt.cpp" />
-    <ClCompile Include="..\deps\ace\gethrtime.cpp" />
     <ClCompile Include="..\deps\ace\Handle_Ops.cpp" />
     <ClCompile Include="..\deps\ace\Handle_Set.cpp" />
     <ClCompile Include="..\deps\ace\Hashable.cpp" />
@@ -594,7 +595,6 @@
     <ClCompile Include="..\deps\ace\OS_NS_time.cpp" />
     <ClCompile Include="..\deps\ace\OS_NS_unistd.cpp" />
     <ClCompile Include="..\deps\ace\OS_NS_wchar.cpp" />
-    <ClCompile Include="..\deps\ace\OS_NS_wctype.cpp" />
     <ClCompile Include="..\deps\ace\OS_QoS.cpp" />
     <ClCompile Include="..\deps\ace\OS_Thread_Adapter.cpp" />
     <ClCompile Include="..\deps\ace\OS_TLI.cpp" />
@@ -691,6 +691,7 @@
     <ClCompile Include="..\deps\ace\Thread_Mutex.cpp" />
     <ClCompile Include="..\deps\ace\Thread_Semaphore.cpp" />
     <ClCompile Include="..\deps\ace\Throughput_Stats.cpp" />
+    <ClCompile Include="..\deps\ace\Time_Policy.cpp" />
     <ClCompile Include="..\deps\ace\Time_Value.cpp" />
     <ClCompile Include="..\deps\ace\Timeprobe.cpp" />
     <ClCompile Include="..\deps\ace\TLI.cpp" />

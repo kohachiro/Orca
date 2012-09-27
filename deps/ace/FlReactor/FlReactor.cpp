@@ -1,4 +1,4 @@
-// $Id: FlReactor.cpp 91368 2010-08-16 13:03:34Z mhengstmengel $
+// $Id: FlReactor.cpp 95511 2012-01-27 09:40:38Z johnnyw $
 
 #include "ace/FlReactor/FlReactor.h"
 
@@ -256,7 +256,7 @@ ACE_FlReactor::reset_timer_interval
   ACE_TRACE ("ACE_FlReactor::reset_timer_interval");
   ACE_MT (ACE_GUARD_RETURN (ACE_Select_Reactor_Token, ace_mon, this->token_, -1));
 
-  int result =
+  int const result =
     ACE_Select_Reactor::reset_timer_interval (timer_id,
                                               interval);
 

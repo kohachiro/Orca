@@ -4,7 +4,7 @@
 /**
  *  @file   FoxReactor.h
  *
- *  $Id: FoxReactor.h 88996 2010-02-15 09:36:07Z johnnyw $
+ *  $Id: FoxReactor.h 93117 2011-01-20 12:11:28Z mcorino $
  *
  *  @author Dmitriy Nikitinskiy <nick@bel.ru>
  *  @author Based in part in the ACE_XtReactor implementation by
@@ -38,7 +38,7 @@
  * toolkit with ACE and/or TAO.
  *
  */
-class ACE_FoxReactor_Export ACE_FoxReactor : public FXObject , public ACE_Select_Reactor
+class ACE_FoxReactor_Export ACE_FoxReactor : public FXObject, public ACE_Select_Reactor
 {
   FXDECLARE(ACE_FoxReactor)
 public:

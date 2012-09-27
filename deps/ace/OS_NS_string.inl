@@ -1,17 +1,11 @@
 // -*- C++ -*-
 //
-// $Id: OS_NS_string.inl 92069 2010-09-28 11:38:59Z johnnyw $
+// $Id: OS_NS_string.inl 93549 2011-03-15 19:50:24Z olli $
 
 // OS_NS_wchar.h is only needed to get the emulation methods.
 // Perhaps they should be moved.  dhinton
 #include "ace/OS_NS_wchar.h"
 #include "ace/os_include/os_string.h"
-
-// MaNGOS include begin
-#if defined (_MSC_VER)
-#  pragma warning(disable:4996)
-#endif
-// MaNGOS include end
 
 ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
@@ -532,11 +526,11 @@ ACE_OS::strtok_r (char *s, const char *tokens, char **lasts)
 {
 #if defined (ACE_HAS_TR24731_2005_CRT)
   return strtok_s (s, tokens, lasts);
-#elif defined (ACE_HAS_REENTRANT_FUNCTIONS) && !defined (ACE_LACKS_STRTOK_R)
-  return ::strtok_r (s, tokens, lasts);
-#else
+#elif defined (ACE_LACKS_STRTOK_R)
   return ACE_OS::strtok_r_emulation (s, tokens, lasts);
-#endif /* (ACE_HAS_REENTRANT_FUNCTIONS) */
+#else
+  return ::strtok_r (s, tokens, lasts);
+#endif /* ACE_HAS_TR24731_2005_CRT */
 }
 
 #if defined (ACE_HAS_WCHAR)

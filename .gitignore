@@ -15,3 +15,5 @@
 /deps/tbb/.svn
 
 /.metadata
+/src/launcher/*.o
+/deps/ACE_wrappers/.svn

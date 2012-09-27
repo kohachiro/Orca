@@ -4,7 +4,7 @@
 /**
  * @file CPU_Load_Monitor.h
  *
- * $Id: CPU_Load_Monitor.h 91743 2010-09-13 18:24:51Z johnnyw $
+ * $Id: CPU_Load_Monitor.h 95533 2012-02-14 22:59:17Z wotte $
  *
  * @author Jeff Parsons <j.parsons@vanderbilt.edu>
  */
@@ -65,7 +65,7 @@ namespace ACE
       void init (void);
 
     private:
-#if defined (linux)
+#if defined (ACE_LINUX)
       void access_proc_stat (unsigned long *which_idle);
 #endif
 
@@ -77,7 +77,7 @@ namespace ACE
       static const char* default_name_;
 
       /// Common to Linux and Solaris implementations.
-#if defined (linux) || defined (ACE_HAS_KSTAT)
+#if defined (ACE_LINUX) || defined (ACE_HAS_KSTAT)
       unsigned long user_;
       unsigned long wait_;
       unsigned long kernel_;
@@ -85,7 +85,7 @@ namespace ACE
       unsigned long prev_idle_;
       double prev_total_;
 #endif
-#if defined (linux)
+#if defined (ACE_LINUX)
       FILE *file_ptr_;
       char buf_[1024];
 #elif defined (ACE_HAS_KSTAT)

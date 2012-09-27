@@ -1,4 +1,4 @@
-// $Id: Monitor_Group.cpp 91813 2010-09-17 07:52:52Z johnnyw $
+// $Id: Monitor_Group.cpp 93390 2011-02-15 14:44:58Z johnnyw $
 
 #include "ace/Monitor_Control/Monitor_Group.h"
 
@@ -54,7 +54,7 @@ namespace ACE
     {
       for (MEMBERS_ITERATOR i (this->members_); !i.done (); i.advance ())
         {
-          Monitor_Base **member;
+          Monitor_Base **member = 0;
           i.next (member);
           (*member)->clear ();
         }

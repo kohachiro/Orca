@@ -5,11 +5,11 @@
 #include <stddef.h>
 #include <assert.h>
 
-#include "Channel.h"
-#include "Buffer.h"
-#include "tbb_string.h"
-#include "ServerHandler.h"
-#include "core/AbstractServer.h"
+#include "../Channel.h"
+#include "../Buffer.h"
+#include "../tbb_string.h"
+#include "../ServerHandler.h"
+#include "../core/AbstractServer.h"
 #include "uv/include/uv.h"
 
 #define container_of(ptr, type, member) ((type *) ((char *) (ptr) - offsetof(type, member)))

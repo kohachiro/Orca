@@ -1,4 +1,4 @@
-// $Id: Bytes_Sent_Monitor.cpp 91813 2010-09-17 07:52:52Z johnnyw $
+// $Id: Bytes_Sent_Monitor.cpp 95533 2012-02-14 22:59:17Z wotte $
 
 #include "ace/Monitor_Control/Bytes_Sent_Monitor.h"
 
@@ -18,7 +18,7 @@ namespace ACE
 #if defined (ACE_HAS_WIN32_PDH)
       , Windows_Multi_Instance_Monitor (
             ACE_TEXT ("\\Network Interface(*)\\Bytes Sent/sec"))
-#elif defined (linux) || defined (AIX)
+#elif defined (ACE_LINUX) || defined (AIX)
       , Linux_Network_Interface_Monitor (
             " %*[^:]: %*u %*u %*u %*u %*u %*u %*u %*u %lu %*u")
             /// Scan format for /proc/net/dev

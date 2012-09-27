@@ -1,4 +1,4 @@
-// $Id: Configuration_Import_Export.cpp 84565 2009-02-23 08:20:39Z johnnyw $
+// $Id: Configuration_Import_Export.cpp 96017 2012-08-08 22:18:09Z mitza $
 
 #include "ace/Configuration_Import_Export.h"
 #include "ace/OS_Errno.h"
@@ -138,7 +138,8 @@ ACE_Registry_ImpExp::import_config (const ACE_TCHAR* filename)
               // number type
               ACE_TCHAR* endptr = 0;
               unsigned long value = ACE_OS::strtoul (end + 6, &endptr, 16);
-              if (config_.set_integer_value (section, name, value))
+              if (config_.set_integer_value (section, name,
+                                             static_cast<u_int> (value)))
                 {
                   ACE_OS::fclose (in);
                   delete [] buffer;
@@ -410,13 +411,6 @@ ACE_Ini_ImpExp::import_config (const ACE_TCHAR* filename)
   FILE* in = ACE_OS::fopen (filename, ACE_TEXT ("r"));
   if (!in)
     return -1;
-
-  // MaNGOS addition: Try read utf8 header and skip it if exist for support utf8 format file
-  ACE_UINT32 utf8header = 0;
-  fgets((char*)&utf8header, 4, in);                         // Try read header
-  if (utf8header != ACE_UINT32(0x00BFBBEF))                 // If not found
-      fseek(in, 0, SEEK_SET);                               // Reset read position
-  // MaNGOS addition - end
 
   // @@ Make this a dynamic size!
   ACE_TCHAR buffer[4096];
