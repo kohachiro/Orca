@@ -55,10 +55,10 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalOptions>/nologo /DLL /MAP /DEBUG /fixed:no /INCREMENTAL:NO /DEF:"Debug\tbb\tbbmalloc.def"</AdditionalOptions>
+      <AdditionalOptions>/nologo /DLL /MAP /DEBUG /fixed:no /INCREMENTAL:NO /DEF:"Debug\tbbmalloc\tbbmalloc.def"</AdditionalOptions>
     </Link>
     <CustomBuildStep>
-      <Command>cl /nologo /TC /EP ../deps/tbb/src/tbbmalloc/win32-tbbmalloc-export.def /DTBB_USE_DEBUG /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0400 /D__TBB_BUILD=1 &gt; "Debug\tbb\tbbmalloc.def"</Command>
+      <Command>cl /nologo /TC /EP ../deps/tbb/src/tbbmalloc/win32-tbbmalloc-export.def /DTBB_USE_DEBUG /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0400 /D__TBB_BUILD=1 &gt; "Debug\tbbmalloc\tbbmalloc.def"</Command>
     </CustomBuildStep>
     <CustomBuildStep>
       <Message>generating tbbmalloc.def file</Message>

@@ -8,7 +8,13 @@
 #ifndef REGION_H_
 #define REGION_H_
 
-#include "../common.h"
+#include "boolean.h"
+#include "Integer.h"
+#include "tbbmalloc.h"
+#include "tbbstring.h"
+#include "ConcurrentVector.h"
+#include "ConcurrentHashMap.h"
+
 
 class Region {
 public:

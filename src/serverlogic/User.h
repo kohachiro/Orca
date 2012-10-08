@@ -8,8 +8,12 @@
 #ifndef USER_H_
 #define USER_H_
 
-#include "../common.h"
-#include "../Channel.h"
+#include "tbbmalloc.h"
+#include "tbbstring.h"
+#include "AtomicInteger.h"
+#include "ConcurrentHashMap.h"
+
+#include "Channel.h"
 
 class User {
 public:

@@ -7,9 +7,8 @@
 
 #include "AbstractServer.h"
 
-AbstractServer::AbstractServer() {
-	// TODO Auto-generated constructor stub
-
+AbstractServer::AbstractServer(ServerHandler* pServerHandler) {
+	//this->pServerHandler=pServerHandler;
 }
 
 AbstractServer::~AbstractServer() {
@@ -20,9 +19,11 @@ void AbstractServer::errorHandler(Channel channel) {
 }
 
 void AbstractServer::connected(Channel channel) {
+	cout << "connected" << endl;
 }
 
 void AbstractServer::disConnected(Channel channel) {
+	cout << "disConnected" << endl;
 }
 
 void AbstractServer::execute(Buffer buffer, Channel channel) {
@@ -31,4 +32,5 @@ void AbstractServer::execute(Buffer buffer, Channel channel) {
 int AbstractServer::port = 8089;
 String AbstractServer::ip = "0.0.0.0";
 String AbstractServer::name = "";
-String AbstractServer::framework = "";
+String AbstractServer::launcher = "";
+

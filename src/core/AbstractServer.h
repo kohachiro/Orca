@@ -8,13 +8,16 @@
 #ifndef ABSTRACTSERVER_H_
 #define ABSTRACTSERVER_H_
 
-#include "../tbb_string.h"
-#include "../Channel.h"
-#include "../Buffer.h"
+#include "tbbstring.h"
+#include "Channel.h"
+#include "Buffer.h"
+#include <iostream>
+#include "ServerHandler.h"
+using namespace std;
 
 class AbstractServer {
 public:
-	AbstractServer();
+	AbstractServer(ServerHandler* pServerHandler);
 	virtual ~AbstractServer();
 	static void errorHandler(Channel channel);
 	static void connected(Channel channel);
@@ -22,10 +25,10 @@ public:
 	static void execute(Buffer buffer, Channel channel);
 
 	static String name;
-	static String framework;
+	static String launcher;
 	static String ip;
 	static int port;
-
+	static ServerHandler* pServerHandler;
 private:
 };
 

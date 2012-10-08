@@ -8,7 +8,9 @@
 #ifndef TEMPLATE_H_
 #define TEMPLATE_H_
 
-#include "../common.h"
+#include "tbbmalloc.h"
+#include "tbbstring.h"
+#include "ConcurrentHashMap.h"
 
 class Template {
 public:

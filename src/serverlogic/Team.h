@@ -8,7 +8,11 @@
 #ifndef TEAM_H_
 #define TEAM_H_
 
-#include "../common.h"
+#include "Integer.h"
+#include "tbbmalloc.h"
+#include "tbbstring.h"
+#include "ConcurrentVector.h"
+#include "ConcurrentHashMap.h"
 
 class Team {
 public:

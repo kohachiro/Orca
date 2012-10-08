@@ -8,7 +8,14 @@
 #ifndef ROOM_H_
 #define ROOM_H_
 
-#include "../common.h"
+#include "boolean.h"
+#include "Integer.h"
+#include "tbbmalloc.h"
+#include "tbbstring.h"
+#include "AtomicInteger.h"
+#include "ConcurrentVector.h"
+#include "ConcurrentHashMap.h"
+
 #include "Region.h"
 class Room {
 public:
@@ -18,7 +25,7 @@ public:
 private:
 	const int id;
 	const String name;
-	const concurrent_hash_map<String, String> properties;
+	const ConcurrentHashMap<String, String> properties;
 
 	const int regionId;
 	const int createrId;
