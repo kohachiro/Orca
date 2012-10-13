@@ -11,15 +11,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\serverlogic\Guild.cpp" />
     <ClCompile Include="..\src\serverlogic\Region.cpp" />
     <ClCompile Include="..\src\serverlogic\Room.cpp" />
+    <ClCompile Include="..\src\serverlogic\Server.cpp" />
     <ClCompile Include="..\src\serverlogic\Team.cpp" />
     <ClCompile Include="..\src\serverlogic\Template.cpp" />
     <ClCompile Include="..\src\serverlogic\User.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\serverlogic\Guild.h" />
     <ClInclude Include="..\src\serverlogic\Region.h" />
     <ClInclude Include="..\src\serverlogic\Room.h" />
+    <ClInclude Include="..\src\serverlogic\Server.h" />
     <ClInclude Include="..\src\serverlogic\Team.h" />
     <ClInclude Include="..\src\serverlogic\Template.h" />
     <ClInclude Include="..\src\serverlogic\User.h" />

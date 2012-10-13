@@ -14,8 +14,8 @@
     <ClCompile Include="..\src\core\AbstractServer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\ServerHandler.h" />
     <ClInclude Include="..\src\core\AbstractServer.h" />
+    <ClInclude Include="..\src\ServerHandler.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3E4568E0-6D76-44F4-886E-2D1C21421515}</ProjectGuid>
