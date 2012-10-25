@@ -59,13 +59,9 @@
     </Link>
     <CustomBuildStep>
       <Command>cl /nologo /TC /EP ../deps/tbb/src/tbbmalloc/win32-tbbmalloc-export.def /DTBB_USE_DEBUG /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0400 /D__TBB_BUILD=1 &gt; "Debug\tbbmalloc\tbbmalloc.def"</Command>
-    </CustomBuildStep>
-    <CustomBuildStep>
       <Message>generating tbbmalloc.def file</Message>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Outputs>Debug\tbb\tbb.def</Outputs>
-    </CustomBuildStep>
+	  <Outputs>Debug\tbb\tbbmalloc.def</Outputs>
+	</CustomBuildStep>
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(ProjectDir)..\deps\tbb\include;$(ProjectDir)..\deps\tbb\build\vsproject;$(ProjectDir)..\deps\tbb\src</AdditionalIncludeDirectories>
       <AdditionalOptions>/Fo"Debug\tbbmalloc\%(Filename).res" /I../deps/tbb/src /I../deps/tbb/include /I../deps/tbb/build/vsproject  /DTBB_USE_DEBUG /D__TBB_LIB_NAME=tbb_debug.lib /DDO_ITT_NOTIFY /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE /D_WIN32_WINNT=0x0501 %(AdditionalOptions)</AdditionalOptions>
