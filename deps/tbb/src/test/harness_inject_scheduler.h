@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -61,9 +61,22 @@
 #include "../tbb/spin_rw_mutex.cpp"
 #include "../tbb/spin_mutex.cpp"
 #include "../tbb/private_server.cpp"
+#include "../tbb/concurrent_monitor.cpp"
 #if _WIN32||_WIN64
 #include "../tbb/semaphore.cpp"
 #endif
 #include "../rml/client/rml_tbb.cpp"
+
+#if HARNESS_USE_RUNTIME_LOADER
+#undef HARNESS_USE_RUNTIME_LOADER
+#include "harness.h"
+
+int TestMain () {
+    // Tests that directly include sources make no sense in runtime loader testing mode.
+    return Harness::Skipped;
+}
+// Renaming the TestMain function avoids conditional compilation around same function in the test file
+#define TestMain TestMainSkipped
+#endif
 
 #endif /* harness_inject_scheduler_H */

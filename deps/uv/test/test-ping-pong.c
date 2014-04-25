@@ -24,7 +24,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h> /* strlen */
 
 static int completed_pingers = 0;
 
@@ -48,14 +47,10 @@ typedef struct {
   char read_buffer[BUFSIZE];
 } pinger_t;
 
-void pinger_try_read(pinger_t* pinger);
 
-
-static uv_buf_t alloc_cb(uv_handle_t* handle, size_t size) {
-  uv_buf_t buf;
-  buf.base = (char*)malloc(size);
-  buf.len = size;
-  return buf;
+static void alloc_cb(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
+  buf->base = malloc(size);
+  buf->len = size;
 }
 
 
@@ -80,12 +75,14 @@ static void pinger_write_ping(pinger_t* pinger) {
   uv_write_t *req;
   uv_buf_t buf;
 
-  buf.base = (char*)&PING;
-  buf.len = strlen(PING);
+  buf = uv_buf_init(PING, sizeof(PING) - 1);
 
-  req = malloc(sizeof(uv_write_t));
-
-  if (uv_write(req, (uv_stream_t*)&pinger->stream.tcp, &buf, 1, pinger_after_write)) {
+  req = malloc(sizeof(*req));
+  if (uv_write(req,
+               (uv_stream_t*) &pinger->stream.tcp,
+               &buf,
+               1,
+               pinger_after_write)) {
     FATAL("uv_write failed");
   }
 
@@ -93,20 +90,19 @@ static void pinger_write_ping(pinger_t* pinger) {
 }
 
 
-static void pinger_read_cb(uv_stream_t* stream, ssize_t nread, uv_buf_t buf) {
+static void pinger_read_cb(uv_stream_t* stream,
+                           ssize_t nread,
+                           const uv_buf_t* buf) {
   ssize_t i;
   pinger_t* pinger;
 
   pinger = (pinger_t*)stream->data;
 
   if (nread < 0) {
-    ASSERT(uv_last_error(uv_default_loop()).code == UV_EOF);
+    ASSERT(nread == UV_EOF);
 
     puts("got EOF");
-
-    if (buf.base) {
-      free(buf.base);
-    }
+    free(buf->base);
 
     uv_close((uv_handle_t*)(&pinger->stream.tcp), pinger_on_close);
 
@@ -115,19 +111,24 @@ static void pinger_read_cb(uv_stream_t* stream, ssize_t nread, uv_buf_t buf) {
 
   /* Now we count the pings */
   for (i = 0; i < nread; i++) {
-    ASSERT(buf.base[i] == PING[pinger->state]);
+    ASSERT(buf->base[i] == PING[pinger->state]);
     pinger->state = (pinger->state + 1) % (sizeof(PING) - 1);
-    if (pinger->state == 0) {
-      printf("PONG %d\n", pinger->pongs);
-      pinger->pongs++;
-      if (pinger->pongs < NUM_PINGS) {
-        pinger_write_ping(pinger);
-      } else {
-        uv_close((uv_handle_t*)(&pinger->stream.tcp), pinger_on_close);
-        return;
-      }
+
+    if (pinger->state != 0)
+      continue;
+
+    printf("PONG %d\n", pinger->pongs);
+    pinger->pongs++;
+
+    if (pinger->pongs < NUM_PINGS) {
+      pinger_write_ping(pinger);
+    } else {
+      uv_close((uv_handle_t*)(&pinger->stream.tcp), pinger_on_close);
+      break;
     }
   }
+
+  free(buf->base);
 }
 
 
@@ -138,9 +139,9 @@ static void pinger_on_connect(uv_connect_t *req, int status) {
 
   ASSERT(status == 0);
 
-  ASSERT(uv_is_readable(req->handle));
-  ASSERT(uv_is_writable(req->handle));
-  ASSERT(!uv_is_closing((uv_handle_t *)req->handle));
+  ASSERT(1 == uv_is_readable(req->handle));
+  ASSERT(1 == uv_is_writable(req->handle));
+  ASSERT(0 == uv_is_closing((uv_handle_t *) req->handle));
 
   pinger_write_ping(pinger);
 
@@ -149,12 +150,13 @@ static void pinger_on_connect(uv_connect_t *req, int status) {
 
 
 /* same ping-pong test, but using IPv6 connection */
-static void tcp_pinger_v6_new() {
+static void tcp_pinger_v6_new(void) {
   int r;
-  struct sockaddr_in6 server_addr = uv_ip6_addr("::1", TEST_PORT);
+  struct sockaddr_in6 server_addr;
   pinger_t *pinger;
 
-  pinger = (pinger_t*)malloc(sizeof(*pinger));
+  ASSERT(0 ==uv_ip6_addr("::1", TEST_PORT, &server_addr));
+  pinger = malloc(sizeof(*pinger));
   pinger->state = 0;
   pinger->pongs = 0;
 
@@ -165,8 +167,10 @@ static void tcp_pinger_v6_new() {
 
   /* We are never doing multiple reads/connects at a time anyway. */
   /* so these handles can be pre-initialized. */
-  r = uv_tcp_connect6(&pinger->connect_req, &pinger->stream.tcp, server_addr,
-      pinger_on_connect);
+  r = uv_tcp_connect(&pinger->connect_req,
+                     &pinger->stream.tcp,
+                     (const struct sockaddr*) &server_addr,
+                     pinger_on_connect);
   ASSERT(!r);
 
   /* Synchronous connect callbacks are not allowed. */
@@ -174,12 +178,13 @@ static void tcp_pinger_v6_new() {
 }
 
 
-static void tcp_pinger_new() {
+static void tcp_pinger_new(void) {
   int r;
-  struct sockaddr_in server_addr = uv_ip4_addr("127.0.0.1", TEST_PORT);
+  struct sockaddr_in server_addr;
   pinger_t *pinger;
 
-  pinger = (pinger_t*)malloc(sizeof(*pinger));
+  ASSERT(0 == uv_ip4_addr("127.0.0.1", TEST_PORT, &server_addr));
+  pinger = malloc(sizeof(*pinger));
   pinger->state = 0;
   pinger->pongs = 0;
 
@@ -190,8 +195,10 @@ static void tcp_pinger_new() {
 
   /* We are never doing multiple reads/connects at a time anyway. */
   /* so these handles can be pre-initialized. */
-  r = uv_tcp_connect(&pinger->connect_req, &pinger->stream.tcp, server_addr,
-      pinger_on_connect);
+  r = uv_tcp_connect(&pinger->connect_req,
+                     &pinger->stream.tcp,
+                     (const struct sockaddr*) &server_addr,
+                     pinger_on_connect);
   ASSERT(!r);
 
   /* Synchronous connect callbacks are not allowed. */
@@ -199,7 +206,7 @@ static void tcp_pinger_new() {
 }
 
 
-static void pipe_pinger_new() {
+static void pipe_pinger_new(void) {
   int r;
   pinger_t *pinger;
 
@@ -225,29 +232,32 @@ static void pipe_pinger_new() {
 
 TEST_IMPL(tcp_ping_pong) {
   tcp_pinger_new();
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(completed_pingers == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
 
 TEST_IMPL(tcp_ping_pong_v6) {
   tcp_pinger_v6_new();
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(completed_pingers == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
 
 TEST_IMPL(pipe_ping_pong) {
   pipe_pinger_new();
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(completed_pingers == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

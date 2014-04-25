@@ -1,22 +1,28 @@
-/*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
-
-    The source code contained or described herein and all documents related
-    to the source code ("Material") are owned by Intel Corporation or its
-    suppliers or licensors.  Title to the Material remains with Intel
-    Corporation or its suppliers and licensors.  The Material is protected
-    by worldwide copyright laws and treaty provisions.  No part of the
-    Material may be used, copied, reproduced, modified, published, uploaded,
-    posted, transmitted, distributed, or disclosed in any way without
-    Intel's prior express written permission.
-
-    No license under any patent, copyright, trade secret or other
-    intellectual property right is granted to or conferred upon you by
-    disclosure or delivery of the Materials, either expressly, by
-    implication, inducement, estoppel or otherwise.  Any license under such
-    intellectual property rights must be express and approved by Intel in
-    writing.
-*/
+; Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+;
+; This file is part of Threading Building Blocks.
+;
+; Threading Building Blocks is free software; you can redistribute it
+; and/or modify it under the terms of the GNU General Public License
+; version 2 as published by the Free Software Foundation.
+;
+; Threading Building Blocks is distributed in the hope that it will be
+; useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+; of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+; GNU General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with Threading Building Blocks; if not, write to the Free Software
+; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+;
+; As a special exception, you may use this file as part of a free software
+; library without restriction.  Specifically, if other files instantiate
+; templates or use macros or inline functions from this file, or you compile
+; this file and link it with other files to produce an executable, this
+; file does not by itself cause the resulting executable to be covered by
+; the GNU General Public License.  This exception does not however
+; invalidate any other reasons why the executable file might be covered by
+; the GNU General Public License.
 
 // This file is organized with a section for each .cpp file.
 // Each of these sections is in alphabetical order.
@@ -31,6 +37,9 @@ __TBB_SYMBOL( __TBB_machine_cmpswp2 )
 __TBB_SYMBOL( __TBB_machine_fetchadd2 )
 __TBB_SYMBOL( __TBB_machine_fetchstore2 )
 __TBB_SYMBOL( __TBB_machine_pause )
+__TBB_SYMBOL( __TBB_machine_try_lock_elided )
+__TBB_SYMBOL( __TBB_machine_unlock_elided )
+__TBB_SYMBOL( __TBB_machine_is_in_transaction )
 
 // cache_aligned_allocator.cpp
 __TBB_SYMBOL( ?NFS_Allocate@internal@tbb@@YAPEAX_K0PEAX@Z )
@@ -62,7 +71,19 @@ __TBB_SYMBOL( ?default_num_threads@task_scheduler_init@tbb@@SAHXZ )
 __TBB_SYMBOL( ?initialize@task_scheduler_init@tbb@@QEAAXH_K@Z )
 __TBB_SYMBOL( ?initialize@task_scheduler_init@tbb@@QEAAXH@Z )
 __TBB_SYMBOL( ?terminate@task_scheduler_init@tbb@@QEAAXXZ )
+#if __TBB_SCHEDULER_OBSERVER
 __TBB_SYMBOL( ?observe@task_scheduler_observer_v3@internal@tbb@@QEAAX_N@Z )
+#endif /* __TBB_SCHEDULER_OBSERVER */
+
+#if __TBB_TASK_ARENA
+/* arena.cpp */
+__TBB_SYMBOL( ?internal_current_slot@task_arena_base@internal@interface7@tbb@@KAHXZ )
+__TBB_SYMBOL( ?internal_initialize@task_arena_base@internal@interface7@tbb@@IEAAXXZ )
+__TBB_SYMBOL( ?internal_terminate@task_arena_base@internal@interface7@tbb@@IEAAXXZ )
+__TBB_SYMBOL( ?internal_enqueue@task_arena_base@internal@interface7@tbb@@IEBAXAEAVtask@4@_J@Z )
+__TBB_SYMBOL( ?internal_execute@task_arena_base@internal@interface7@tbb@@IEBAXAEAVdelegate_base@234@@Z )
+__TBB_SYMBOL( ?internal_wait@task_arena_base@internal@interface7@tbb@@IEBAXXZ )
+#endif /* __TBB_TASK_ARENA */
 
 #if !TBB_NO_LEGACY
 // task_v2.cpp
@@ -116,6 +137,13 @@ __TBB_SYMBOL( ?itt_store_pointer_with_release_v3@internal@tbb@@YAXPEAX0@Z )
 __TBB_SYMBOL( ?call_itt_notify_v5@internal@tbb@@YAXHPEAX@Z )
 __TBB_SYMBOL( ?itt_load_pointer_v3@internal@tbb@@YAPEAXPEBX@Z )
 __TBB_SYMBOL( ?itt_set_sync_name_v3@internal@tbb@@YAXPEAXPEB_W@Z )
+#if __TBB_ITT_STRUCTURE_API
+__TBB_SYMBOL( ?itt_make_task_group_v7@internal@tbb@@YAXW4itt_domain_enum@12@PEAX_K12W4string_index@12@@Z )
+__TBB_SYMBOL( ?itt_metadata_str_add_v7@internal@tbb@@YAXW4itt_domain_enum@12@PEAX_KW4string_index@12@PEBD@Z )
+__TBB_SYMBOL( ?itt_relation_add_v7@internal@tbb@@YAXW4itt_domain_enum@12@PEAX_KW4itt_relation@12@12@Z )
+__TBB_SYMBOL( ?itt_task_begin_v7@internal@tbb@@YAXW4itt_domain_enum@12@PEAX_K12W4string_index@12@@Z )
+__TBB_SYMBOL( ?itt_task_end_v7@internal@tbb@@YAXW4itt_domain_enum@12@@Z )
+#endif
 
 // pipeline.cpp
 __TBB_SYMBOL( ??_7pipeline@tbb@@6B@ )
@@ -177,6 +205,17 @@ __TBB_SYMBOL( ?internal_release_reader@spin_rw_mutex_v3@tbb@@AEAAXXZ )
 __TBB_SYMBOL( ?internal_release_writer@spin_rw_mutex_v3@tbb@@AEAAXXZ )
 __TBB_SYMBOL( ?internal_try_acquire_reader@spin_rw_mutex_v3@tbb@@AEAA_NXZ )
 __TBB_SYMBOL( ?internal_try_acquire_writer@spin_rw_mutex_v3@tbb@@AEAA_NXZ )
+
+#if TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+// x86_rtm_rw_mutex.cpp
+__TBB_SYMBOL( ?internal_acquire_writer@x86_rtm_rw_mutex@internal@interface7@tbb@@AEAAXAEAVscoped_lock@1234@_N@Z )
+__TBB_SYMBOL( ?internal_acquire_reader@x86_rtm_rw_mutex@internal@interface7@tbb@@AEAAXAEAVscoped_lock@1234@_N@Z )
+__TBB_SYMBOL( ?internal_upgrade@x86_rtm_rw_mutex@internal@interface7@tbb@@AEAA_NAEAVscoped_lock@1234@@Z )
+__TBB_SYMBOL( ?internal_downgrade@x86_rtm_rw_mutex@internal@interface7@tbb@@AEAAXAEAVscoped_lock@1234@@Z )
+__TBB_SYMBOL( ?internal_try_acquire_writer@x86_rtm_rw_mutex@internal@interface7@tbb@@AEAA_NAEAVscoped_lock@1234@@Z )
+__TBB_SYMBOL( ?release@scoped_lock@x86_rtm_rw_mutex@internal@interface7@tbb@@QEAAXXZ )
+__TBB_SYMBOL( ?internal_construct@x86_rtm_rw_mutex@internal@interface7@tbb@@AEAAXXZ )
+#endif
 
 // spin_mutex.cpp
 __TBB_SYMBOL( ?internal_construct@spin_mutex@tbb@@QEAAXXZ )

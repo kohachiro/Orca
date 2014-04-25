@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -215,7 +215,6 @@ void test_parallel(int nThreads) {
 }
 
 int TestMain() { 
-    current_executors = 0;
     if( MinThread<1 ) {
         REPORT("number of threads must be positive\n");
         exit(1);

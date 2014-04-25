@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -686,80 +686,9 @@ static const char* __itt_get_env_var(const char* name)
     return NULL;
 }
 
-#if ITT_PLATFORM==ITT_PLATFORM_WIN
-
-#include <Winreg.h>
-
-typedef LONG (APIENTRY* RegCloseKeyProcType)(HKEY);
-typedef LONG (APIENTRY* RegOpenKeyExAProcType)(HKEY, LPCTSTR, DWORD, REGSAM, PHKEY);
-typedef LONG (APIENTRY* RegGetValueAProcType)(HKEY, LPCTSTR, LPCTSTR, DWORD, LPDWORD, PVOID, LPDWORD);
-
-/* This function return value of registry key that placed into static buffer.
- * This was done to aviod dynamic memory allocation.
- */
-static const char* __itt_get_lib_name_registry(void)
-{
-#define MAX_REG_VALUE_SIZE 4086
-    static char reg_buff[MAX_REG_VALUE_SIZE];
-    DWORD size;
-    LONG  res;
-    HKEY  hKey;
-    RegCloseKeyProcType   pRegCloseKey;
-    RegOpenKeyExAProcType pRegOpenKeyExA;
-    RegGetValueAProcType  pRegGetValueA;
-    HMODULE h_advapi32 = LoadLibraryA("advapi32.dll");
-    DWORD autodetect = 0;
-
-    if (h_advapi32 == NULL)
-    {
-        return NULL;
-    }
-
-    pRegCloseKey   =   (RegCloseKeyProcType)GetProcAddress(h_advapi32, "CloseKey");
-    pRegOpenKeyExA = (RegOpenKeyExAProcType)GetProcAddress(h_advapi32, "RegOpenKeyExA");
-    pRegGetValueA  =  (RegGetValueAProcType)GetProcAddress(h_advapi32, "RegGetValueA");
-
-    if (pRegCloseKey   == NULL ||
-        pRegOpenKeyExA == NULL ||
-        pRegGetValueA  == NULL)
-    {
-        FreeLibrary(h_advapi32);
-        return NULL;
-    }
-
-    res = pRegOpenKeyExA(HKEY_CURRENT_USER, (LPCTSTR)"Software\\Intel Corporation\\ITT Environment\\Collector", 0, KEY_READ, &hKey);
-    if (res != ERROR_SUCCESS || hKey == 0)
-    {
-        FreeLibrary(h_advapi32);
-        return NULL;
-    }
-
-    size = sizeof(DWORD);
-    res = pRegGetValueA(hKey, (LPCTSTR)"AutoDetect", NULL, RRF_RT_REG_DWORD, NULL, (BYTE*)&autodetect, &size);
-    if (res != ERROR_SUCCESS || size == 0 || autodetect == 0)
-    {
-        pRegCloseKey(hKey);
-        FreeLibrary(h_advapi32);
-        return NULL;
-    }
-
-    size = MAX_REG_VALUE_SIZE-1;
-    res = pRegGetValueA(hKey, (LPCTSTR)ITT_TO_STR(LIB_VAR_NAME), NULL, REG_SZ, NULL, (BYTE*)&reg_buff, &size);
-    pRegCloseKey(hKey);
-    FreeLibrary(h_advapi32);
-
-    return (res == ERROR_SUCCESS && size > 0) ? reg_buff : NULL;
-}
-
-#endif /* ITT_PLATFORM==ITT_PLATFORM_WIN */
-
 static const char* __itt_get_lib_name(void)
 {
     const char* lib_name = __itt_get_env_var(ITT_TO_STR(LIB_VAR_NAME));
-#if ITT_PLATFORM==ITT_PLATFORM_WIN
-    if (lib_name == NULL)
-        lib_name = __itt_get_lib_name_registry();
-#endif /* ITT_PLATFORM==ITT_PLATFORM_WIN */
     return lib_name;
 }
 

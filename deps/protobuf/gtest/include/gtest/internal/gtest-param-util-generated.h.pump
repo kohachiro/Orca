@@ -39,7 +39,7 @@ $var maxtuple = 10  $$ Maximum number of Combine arguments we want to support.
 // and at most $maxtuple arguments in Combine. Please contact
 // googletestframework@googlegroups.com if you need more.
 // Please note that the number of arguments to Combine is limited
-// by the maximum arity of the implementation of tr1::tuple which is
+// by the maximum arity of the implementation of tuple which is
 // currently set at $maxtuple.
 
 #ifndef GTEST_INCLUDE_GTEST_INTERNAL_GTEST_PARAM_UTIL_GENERATED_H_
@@ -48,8 +48,8 @@ $var maxtuple = 10  $$ Maximum number of Combine arguments we want to support.
 // scripts/fuse_gtest.py depends on gtest's own header being #included
 // *unconditionally*.  Therefore these #includes cannot be moved
 // inside #if GTEST_HAS_PARAM_TEST.
-#include <gtest/internal/gtest-param-util.h>
-#include <gtest/internal/gtest-port.h>
+#include "gtest/internal/gtest-param-util.h"
+#include "gtest/internal/gtest-port.h"
 
 #if GTEST_HAS_PARAM_TEST
 
@@ -59,8 +59,8 @@ namespace testing {
 // include/gtest/gtest-param-test.h.
 template <typename ForwardIterator>
 internal::ParamGenerator<
-    typename ::std::iterator_traits<ForwardIterator>::value_type> ValuesIn(
-        ForwardIterator begin, ForwardIterator end);
+  typename ::testing::internal::IteratorTraits<ForwardIterator>::value_type>
+ValuesIn(ForwardIterator begin, ForwardIterator end);
 
 template <typename T, size_t N>
 internal::ParamGenerator<T> ValuesIn(const T (&array)[N]);
@@ -98,7 +98,7 @@ class ValueArray$i {
 
   template <typename T>
   operator ParamGenerator<T>() const {
-    const T array[] = {$for j, [[v$(j)_]]};
+    const T array[] = {$for j, [[static_cast<T>(v$(j)_)]]};
     return ValuesIn(array);
   }
 
@@ -115,7 +115,7 @@ $for j [[
 
 ]]
 
-#if GTEST_HAS_COMBINE
+# if GTEST_HAS_COMBINE
 // INTERNAL IMPLEMENTATION - DO NOT USE IN USER CODE.
 //
 // Generates values from the Cartesian product of values produced
@@ -128,9 +128,9 @@ $range k 2..i
 
 template <$for j, [[typename T$j]]>
 class CartesianProductGenerator$i
-    : public ParamGeneratorInterface< ::std::tr1::tuple<$for j, [[T$j]]> > {
+    : public ParamGeneratorInterface< ::testing::tuple<$for j, [[T$j]]> > {
  public:
-  typedef ::std::tr1::tuple<$for j, [[T$j]]> ParamType;
+  typedef ::testing::tuple<$for j, [[T$j]]> ParamType;
 
   CartesianProductGenerator$i($for j, [[const ParamGenerator<T$j>& g$j]])
       : $for j, [[g$(j)_(g$j)]] {}
@@ -269,8 +269,8 @@ class CartesianProductHolder$i {
 CartesianProductHolder$i($for j, [[const Generator$j& g$j]])
       : $for j, [[g$(j)_(g$j)]] {}
   template <$for j, [[typename T$j]]>
-  operator ParamGenerator< ::std::tr1::tuple<$for j, [[T$j]]> >() const {
-    return ParamGenerator< ::std::tr1::tuple<$for j, [[T$j]]> >(
+  operator ParamGenerator< ::testing::tuple<$for j, [[T$j]]> >() const {
+    return ParamGenerator< ::testing::tuple<$for j, [[T$j]]> >(
         new CartesianProductGenerator$i<$for j, [[T$j]]>(
 $for j,[[
 
@@ -291,7 +291,7 @@ $for j [[
 
 ]]
 
-#endif  // GTEST_HAS_COMBINE
+# endif  // GTEST_HAS_COMBINE
 
 }  // namespace internal
 }  // namespace testing

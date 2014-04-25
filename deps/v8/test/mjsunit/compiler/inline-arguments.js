@@ -25,7 +25,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Flags: --allow-natives-syntax
+// Flags: --allow-natives-syntax --max-opt-count=100
 
 function A() {
 }
@@ -115,9 +115,9 @@ F4(1);
 })();
 
 // Test arguments access from the inlined function.
+%NeverOptimizeFunction(uninlinable);
 function uninlinable(v) {
   assertEquals(0, v);
-  try { } catch (e) { }
   return 0;
 }
 
@@ -157,9 +157,8 @@ function test_toarr(toarr) {
 test_toarr(toarr1);
 test_toarr(toarr2);
 
+
 // Test that arguments access from inlined function uses correct values.
-// TODO(mstarzinger): Tests disabled, see bug 2261
-/*
 (function () {
   function inner(x, y) {
     "use strict";
@@ -204,4 +203,109 @@ test_toarr(toarr2);
   %OptimizeFunctionOnNextCall(outer);
   assertEquals(2, outer(1, 2));
 })();
-*/
+
+
+// Test inlining and deoptimization of functions accessing and modifying
+// the arguments object in strict mode with mismatched arguments count.
+(function () {
+  "use strict";
+  function test(outerCount, middleCount, innerCount) {
+    var forceDeopt = { deopt:false };
+    function inner(x,y) {
+      x = 0; y = 0;
+      forceDeopt.deopt;
+      assertSame(innerCount, arguments.length);
+      for (var i = 0; i < arguments.length; i++) {
+        assertSame(30 + i, arguments[i]);
+      }
+    }
+
+    function middle(x,y) {
+      x = 0; y = 0;
+      if (innerCount == 1) inner(30);
+      if (innerCount == 2) inner(30, 31);
+      if (innerCount == 3) inner(30, 31, 32);
+      assertSame(middleCount, arguments.length);
+      for (var i = 0; i < arguments.length; i++) {
+        assertSame(20 + i, arguments[i]);
+      }
+    }
+
+    function outer(x,y) {
+      x = 0; y = 0;
+      if (middleCount == 1) middle(20);
+      if (middleCount == 2) middle(20, 21);
+      if (middleCount == 3) middle(20, 21, 22);
+      assertSame(outerCount, arguments.length);
+      for (var i = 0; i < arguments.length; i++) {
+        assertSame(10 + i, arguments[i]);
+      }
+    }
+
+    for (var step = 0; step < 4; step++) {
+      if (outerCount == 1) outer(10);
+      if (outerCount == 2) outer(10, 11);
+      if (outerCount == 3) outer(10, 11, 12);
+      if (step == 1) %OptimizeFunctionOnNextCall(outer);
+      if (step == 2) delete forceDeopt.deopt;
+    }
+
+    %DeoptimizeFunction(outer);
+    %DeoptimizeFunction(middle);
+    %DeoptimizeFunction(inner);
+    %ClearFunctionTypeFeedback(outer);
+    %ClearFunctionTypeFeedback(middle);
+    %ClearFunctionTypeFeedback(inner);
+  }
+
+  for (var a = 1; a <= 3; a++) {
+    for (var b = 1; b <= 3; b++) {
+      for (var c = 1; c <= 3; c++) {
+        test(a,b,c);
+      }
+    }
+  }
+})();
+
+
+// Test materialization of arguments object with values in registers.
+(function () {
+  "use strict";
+  var forceDeopt = { deopt:false };
+  function inner(a,b,c,d,e,f,g,h,i,j) {
+    var args = arguments;
+    forceDeopt.deopt;
+    assertSame(10, args.length);
+    assertSame(a, args[0]);
+    assertSame(b, args[1]);
+    assertSame(c, args[2]);
+    assertSame(d, args[3]);
+    assertSame(e, args[4]);
+    assertSame(f, args[5]);
+    assertSame(g, args[6]);
+    assertSame(h, args[7]);
+    assertSame(i, args[8]);
+    assertSame(j, args[9]);
+  }
+
+  var a = 0.5;
+  var b = 1.7;
+  var c = 123;
+  function outer() {
+    inner(
+      a - 0.3,  // double in double register
+      b + 2.3,  // integer in double register
+      c + 321,  // integer in general register
+      c - 456,  // integer in stack slot
+      a + 0.1, a + 0.2, a + 0.3, a + 0.4, a + 0.5,
+      a + 0.6   // double in stack slot
+    );
+  }
+
+  outer();
+  outer();
+  %OptimizeFunctionOnNextCall(outer);
+  outer();
+  delete forceDeopt.deopt;
+  outer();
+})();

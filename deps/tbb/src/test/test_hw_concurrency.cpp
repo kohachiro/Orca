@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,24 +26,18 @@
     the GNU General Public License.
 */
 
+#include "harness_defs.h"
+
+#if __TBB_TEST_SKIP_AFFINITY
+#define HARNESS_NO_PARSE_COMMAND_LINE 1
 #include "harness.h"
+int TestMain() {
+    return Harness::Skipped;
+}
+#else /* affinity mask can be set and used by TBB */
 
-#include <limits.h>
-
-#if _WIN32||_WIN64
-#include "tbb/machine/windows_api.h"
-#elif __linux__
-#include <unistd.h>
-#include <sys/sysinfo.h>
-#include <string.h>
-#include <sched.h>
-#elif __FreeBSD__
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/param.h>  // Required by <sys/cpuset.h>
-#include <sys/cpuset.h>
-#endif
+#include "harness.h"
+#include "harness_concurrency.h"
 
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tbb_thread.h"
@@ -56,49 +50,15 @@
 tbb::enumerable_thread_specific<std::size_t> ets;
 
 int TestMain () {
-#if _WIN32||_WIN64 || __linux__ || __FreeBSD_version >= 701000
-#if _WIN32||_WIN64
-    SYSTEM_INFO si;
-    GetSystemInfo(&si);
-    if ( si.dwNumberOfProcessors < 2 )
-        return Harness::Skipped;
-    int availableProcs = (int)si.dwNumberOfProcessors / 2;
-    DWORD_PTR mask = 1;
-    for ( int i = 1; i < availableProcs; ++i )
-        mask |= mask << 1;
-    bool err = !SetProcessAffinityMask( GetCurrentProcess(), mask );
-#else /* !WIN */
-#if __linux__
-    int maxProcs = get_nprocs();
-    typedef cpu_set_t mask_t;
-#if __TBB_MAIN_THREAD_AFFINITY_BROKEN
-    #define setaffinity(mask) sched_setaffinity(0 /*get the mask of the calling thread*/, sizeof(mask_t), &mask)
-#else
-    #define setaffinity(mask) sched_setaffinity(getpid(), sizeof(mask_t), &mask)
-#endif
-#else /* __FreeBSD__ */
-    int maxProcs = sysconf(_SC_NPROCESSORS_ONLN);
-    typedef cpuset_t mask_t;
-#if __TBB_MAIN_THREAD_AFFINITY_BROKEN
-    #define setaffinity(mask) cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, sizeof(mask_t), &mask)
-#else
-    #define setaffinity(mask) cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, -1, sizeof(mask_t), &mask)
-#endif
-#endif /* __FreeBSD__ */
+    int maxProcs = Harness::GetMaxProcs();
+
     if ( maxProcs < 2 )
         return Harness::Skipped;
-    mask_t newMask;
-    CPU_ZERO(&newMask);
-    int availableProcs = min(maxProcs, (int)sizeof(mask_t) * CHAR_BIT) / 2;
-    for ( int i = 0; i < availableProcs; ++i )
-        CPU_SET( i, &newMask );
-    int err = setaffinity( newMask );
-#endif /* !WIN */
-    ASSERT( !err, "Setting process affinity failed" );
+
+    int availableProcs = maxProcs/2;
+    ASSERT( Harness::LimitNumberOfThreads( availableProcs ) == availableProcs, "LimitNumberOfThreads has not set the requested limitation." );
     ASSERT( tbb::task_scheduler_init::default_num_threads() == availableProcs, NULL );
     ASSERT( (int)tbb::tbb_thread::hardware_concurrency() == availableProcs, NULL );
     return Harness::Done;
-#else /* !(WIN || LIN || BSD) */
-    return Harness::Skipped;
-#endif /* !(WIN || LIN || BSD) */
 }
+#endif /* __TBB_TEST_SKIP_AFFINITY */

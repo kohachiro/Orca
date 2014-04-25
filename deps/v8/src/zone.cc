@@ -68,19 +68,95 @@ class Segment {
 
 
 Zone::Zone(Isolate* isolate)
-    : zone_excess_limit_(256 * MB),
+    : allocation_size_(0),
       segment_bytes_allocated_(0),
       position_(0),
       limit_(0),
-      scope_nesting_(0),
       segment_head_(NULL),
       isolate_(isolate) {
 }
-unsigned Zone::allocation_size_ = 0;
 
-ZoneScope::~ZoneScope() {
-  if (ShouldDeleteOnExit()) zone_->DeleteAll();
-  zone_->scope_nesting_--;
+
+Zone::~Zone() {
+  DeleteAll();
+  DeleteKeptSegment();
+
+  ASSERT(segment_bytes_allocated_ == 0);
+}
+
+
+void Zone::DeleteAll() {
+#ifdef DEBUG
+  // Constant byte value used for zapping dead memory in debug mode.
+  static const unsigned char kZapDeadByte = 0xcd;
+#endif
+
+  // Find a segment with a suitable size to keep around.
+  Segment* keep = NULL;
+  // Traverse the chained list of segments, zapping (in debug mode)
+  // and freeing every segment except the one we wish to keep.
+  for (Segment* current = segment_head_; current != NULL; ) {
+    Segment* next = current->next();
+    if (keep == NULL && current->size() <= kMaximumKeptSegmentSize) {
+      // Unlink the segment we wish to keep from the list.
+      keep = current;
+      keep->clear_next();
+    } else {
+      int size = current->size();
+#ifdef DEBUG
+      // Un-poison first so the zapping doesn't trigger ASan complaints.
+      ASAN_UNPOISON_MEMORY_REGION(current, size);
+      // Zap the entire current segment (including the header).
+      memset(current, kZapDeadByte, size);
+#endif
+      DeleteSegment(current, size);
+    }
+    current = next;
+  }
+
+  // If we have found a segment we want to keep, we must recompute the
+  // variables 'position' and 'limit' to prepare for future allocate
+  // attempts. Otherwise, we must clear the position and limit to
+  // force a new segment to be allocated on demand.
+  if (keep != NULL) {
+    Address start = keep->start();
+    position_ = RoundUp(start, kAlignment);
+    limit_ = keep->end();
+    // Un-poison so we can re-use the segment later.
+    ASAN_UNPOISON_MEMORY_REGION(start, keep->capacity());
+#ifdef DEBUG
+    // Zap the contents of the kept segment (but not the header).
+    memset(start, kZapDeadByte, keep->capacity());
+#endif
+  } else {
+    position_ = limit_ = 0;
+  }
+
+  // Update the head segment to be the kept segment (if any).
+  segment_head_ = keep;
+}
+
+
+void Zone::DeleteKeptSegment() {
+#ifdef DEBUG
+  // Constant byte value used for zapping dead memory in debug mode.
+  static const unsigned char kZapDeadByte = 0xcd;
+#endif
+
+  ASSERT(segment_head_ == NULL || segment_head_->next() == NULL);
+  if (segment_head_ != NULL) {
+    int size = segment_head_->size();
+#ifdef DEBUG
+    // Un-poison first so the zapping doesn't trigger ASan complaints.
+    ASAN_UNPOISON_MEMORY_REGION(segment_head_, size);
+    // Zap the entire kept segment (including the header).
+    memset(segment_head_, kZapDeadByte, size);
+#endif
+    DeleteSegment(segment_head_, size);
+    segment_head_ = NULL;
+  }
+
+  ASSERT(segment_bytes_allocated_ == 0);
 }
 
 
@@ -104,66 +180,6 @@ void Zone::DeleteSegment(Segment* segment, int size) {
 }
 
 
-void Zone::DeleteAll() {
-#ifdef DEBUG
-  // Constant byte value used for zapping dead memory in debug mode.
-  static const unsigned char kZapDeadByte = 0xcd;
-#endif
-
-  // Find a segment with a suitable size to keep around.
-  Segment* keep = segment_head_;
-  while (keep != NULL && keep->size() > kMaximumKeptSegmentSize) {
-    keep = keep->next();
-  }
-
-  // Traverse the chained list of segments, zapping (in debug mode)
-  // and freeing every segment except the one we wish to keep.
-  Segment* current = segment_head_;
-  while (current != NULL) {
-    Segment* next = current->next();
-    if (current == keep) {
-      // Unlink the segment we wish to keep from the list.
-      current->clear_next();
-    } else {
-      int size = current->size();
-#ifdef DEBUG
-      // Zap the entire current segment (including the header).
-      memset(current, kZapDeadByte, size);
-#endif
-      DeleteSegment(current, size);
-    }
-    current = next;
-  }
-
-  // If we have found a segment we want to keep, we must recompute the
-  // variables 'position' and 'limit' to prepare for future allocate
-  // attempts. Otherwise, we must clear the position and limit to
-  // force a new segment to be allocated on demand.
-  if (keep != NULL) {
-    Address start = keep->start();
-    position_ = RoundUp(start, kAlignment);
-    limit_ = keep->end();
-#ifdef DEBUG
-    // Zap the contents of the kept segment (but not the header).
-    memset(start, kZapDeadByte, keep->capacity());
-#endif
-  } else {
-    position_ = limit_ = 0;
-  }
-
-  // Update the head segment to be the kept segment (if any).
-  segment_head_ = keep;
-}
-
-
-void Zone::DeleteKeptSegment() {
-  if (segment_head_ != NULL) {
-    DeleteSegment(segment_head_, segment_head_->size());
-    segment_head_ = NULL;
-  }
-}
-
-
 Address Zone::NewExpand(int size) {
   // Make sure the requested size is already properly aligned and that
   // there isn't enough room in the Zone to satisfy the request.
@@ -175,25 +191,31 @@ Address Zone::NewExpand(int size) {
   // except that we employ a maximum segment size when we delete. This
   // is to avoid excessive malloc() and free() overhead.
   Segment* head = segment_head_;
-  int old_size = (head == NULL) ? 0 : head->size();
-  static const int kSegmentOverhead = sizeof(Segment) + kAlignment;
-  int new_size_no_overhead = size + (old_size << 1);
-  int new_size = kSegmentOverhead + new_size_no_overhead;
+  const size_t old_size = (head == NULL) ? 0 : head->size();
+  static const size_t kSegmentOverhead = sizeof(Segment) + kAlignment;
+  const size_t new_size_no_overhead = size + (old_size << 1);
+  size_t new_size = kSegmentOverhead + new_size_no_overhead;
+  const size_t min_new_size = kSegmentOverhead + static_cast<size_t>(size);
   // Guard against integer overflow.
-  if (new_size_no_overhead < size || new_size < kSegmentOverhead) {
+  if (new_size_no_overhead < static_cast<size_t>(size) ||
+      new_size < static_cast<size_t>(kSegmentOverhead)) {
     V8::FatalProcessOutOfMemory("Zone");
     return NULL;
   }
-  if (new_size < kMinimumSegmentSize) {
+  if (new_size < static_cast<size_t>(kMinimumSegmentSize)) {
     new_size = kMinimumSegmentSize;
-  } else if (new_size > kMaximumSegmentSize) {
+  } else if (new_size > static_cast<size_t>(kMaximumSegmentSize)) {
     // Limit the size of new segments to avoid growing the segment size
     // exponentially, thus putting pressure on contiguous virtual address space.
     // All the while making sure to allocate a segment large enough to hold the
     // requested size.
-    new_size = Max(kSegmentOverhead + size, kMaximumSegmentSize);
+    new_size = Max(min_new_size, static_cast<size_t>(kMaximumSegmentSize));
   }
-  Segment* segment = NewSegment(new_size);
+  if (new_size > INT_MAX) {
+    V8::FatalProcessOutOfMemory("Zone");
+    return NULL;
+  }
+  Segment* segment = NewSegment(static_cast<int>(new_size));
   if (segment == NULL) {
     V8::FatalProcessOutOfMemory("Zone");
     return NULL;
@@ -203,7 +225,10 @@ Address Zone::NewExpand(int size) {
   Address result = RoundUp(segment->start(), kAlignment);
   position_ = result + size;
   // Check for address overflow.
-  if (position_ < result) {
+  // (Should not happen since the segment is guaranteed to accomodate
+  // size bytes + header and alignment padding)
+  if (reinterpret_cast<uintptr_t>(position_)
+      < reinterpret_cast<uintptr_t>(result)) {
     V8::FatalProcessOutOfMemory("Zone");
     return NULL;
   }

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -38,18 +38,7 @@
     switching producer thread, and the check is repeated.
 */
 
-#if HARNESS_USE_PROXY
-
-// The test includes injects scheduler directly, so skip it when proxy tested.
-
-#undef HARNESS_USE_PROXY
-#include "harness.h"
-
-int TestMain () {
-    return Harness::Skipped;
-}
-
-#else // HARNESS_USE_PROXY
+#define HARNESS_DEFAULT_MIN_THREADS -1
 
 #define  __TBB_COUNT_TASK_NODES 1
 #include "harness_inject_scheduler.h"
@@ -71,6 +60,8 @@ const int NumProducerSwitches = 2;
 const int ProducerCheckTimeout = 10;
 //! Number of initial iteration used to collect statistics to be used in later checks
 const int InitialStatsIterations = 20;
+//! Inner iterations of RunTaskGenerators()
+const int TaskGeneratorsIterations = TBB_USE_DEBUG ? 30 : 100;
 
 tbb::atomic<int> Count;
 tbb::atomic<tbb::task*> Exchanger;
@@ -78,7 +69,6 @@ tbb::internal::scheduler* Producer;
 
 #include "tbb/task_scheduler_init.h"
 
-#define HARNESS_DEFAULT_MIN_THREADS -1
 #include "harness.h"
 
 using namespace tbb;
@@ -158,7 +148,7 @@ void RunTaskGenerators( bool switchProducer = false, bool checkProducer = false 
         tbb::task::spawn( *new( dummy_root->allocate_child() ) ChangeProducer );
     if( checkProducer && !Producer )
         REPORT("Warning: producer has not changed after 10 attempts; running on a single core?\n");
-    for( int j=0; j<100; ++j ) {
+    for( int j=0; j<TaskGeneratorsIterations; ++j ) {
         if( j&1 ) {
             tbb::task& t = *new( tbb::task::allocate_root() ) TaskGenerator(/*child_count=*/4, /*depth=*/6);
             tbb::task::spawn_root_and_wait(t);
@@ -288,6 +278,3 @@ int TestMain () {
     TestTaskReclamation();
     return Harness::Done;
 }
-
-#endif  // HARNESS_USE_PROXY
-

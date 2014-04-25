@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,9 +26,14 @@
     the GNU General Public License.
 */
 
+#include "harness.h"
+#if __TBB_MIC_OFFLOAD
+int TestMain () {
+    return Harness::Skipped;
+}
+#else
 #include "job_automaton.h"
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
-#include "harness.h"
 #include "harness_barrier.h"
 
 class State {
@@ -151,3 +156,5 @@ int TestMain () {
     CheckCoverage(true);
     return Harness::Done;
 }
+
+#endif /* __TBB_MIC_OFFLOAD */

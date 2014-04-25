@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -60,12 +60,23 @@ class governor {
     //! TLS for scheduler instances associated with individual threads
     static basic_tls<generic_scheduler*> theTLS;
 
-    //! Caches the maximal level of paralellism supported by the hardware
+    //! Caches the maximal level of parallelism supported by the hardware
     static unsigned DefaultNumberOfThreads;
 
     static rml::tbb_factory theRMLServerFactory;
 
     static bool UsePrivateRML;
+
+    //! Instance of task_scheduler_init that requested blocking termination.
+    static const task_scheduler_init *BlockingTSI;
+
+#if TBB_USE_ASSERT
+    static bool IsBlockingTermiantionInProgress;
+#endif
+
+#if __TBB_CPF_BUILD || TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+    static bool is_speculation_enabled;
+#endif
 
     //! Create key for thread-local storage and initialize RML.
     static void acquire_resources ();
@@ -92,10 +103,7 @@ public:
     static generic_scheduler* init_scheduler( unsigned num_threads, stack_size_type stack_size, bool auto_init = false );
 
     //! Processes scheduler termination request (possibly nested) in a master thread
-    static void terminate_scheduler( generic_scheduler* s );
-
-    //! Returns number of worker threads in the currently active arena.
-    inline static unsigned max_number_of_workers ();
+    static void terminate_scheduler( generic_scheduler* s, const task_scheduler_init *tsi_ptr );
 
     //! Register TBB scheduler instance in thread-local storage.
     static void sign_on(generic_scheduler* s);
@@ -130,18 +138,21 @@ public:
 
     static void initialize_rml_factory ();
 
+    static bool needsWaitWorkers () { return BlockingTSI!=NULL; }
+
+    //! Must be called before init_scheduler
+    static void setBlockingTerminate(const task_scheduler_init *tsi);
+
 #if __TBB_SURVIVE_THREAD_SWITCH
     static __cilk_tbb_retcode stack_op_handler( __cilk_tbb_stack_op op, void* );
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
+#if __TBB_CPF_BUILD || TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+    static bool speculation_enabled() { return is_speculation_enabled; }
+#endif
+
 }; // class governor
 
 } // namespace internal
 } // namespace tbb
-
-#include "scheduler.h"
-
-inline unsigned tbb::internal::governor::max_number_of_workers () {
-    return local_scheduler()->number_of_workers_in_my_arena();
-}
 
 #endif /* _TBB_governor_H */

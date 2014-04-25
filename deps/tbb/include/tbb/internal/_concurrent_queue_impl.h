@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -216,21 +216,21 @@ public:
 
 template<typename T>
 void micro_queue<T>::spin_wait_until_my_turn( atomic<ticket>& counter, ticket k, concurrent_queue_rep_base& rb ) const {
-    atomic_backoff backoff;
-    do {
-        backoff.pause();
-        if( counter&1 ) {
+    for( atomic_backoff b(true);;b.pause() ) {
+        ticket c = counter;
+        if( c==k ) return;
+        else if( c&1 ) {
             ++rb.n_invalid_entries;
             throw_exception( eid_bad_last_alloc );
         }
-    } while( counter!=k ) ;
+    }
 }
 
 template<typename T>
 void micro_queue<T>::push( const void* item, ticket k, concurrent_queue_base_v3<T>& base ) {
     k &= -concurrent_queue_rep_base::n_queue;
     page* p = NULL;
-    size_t index = k/concurrent_queue_rep_base::n_queue & (base.my_rep->items_per_page-1);
+    size_t index = modulo_power_of_two( k/concurrent_queue_rep_base::n_queue, base.my_rep->items_per_page);
     if( !index ) {
         __TBB_TRY {
             concurrent_queue_page_allocator& pa = base;
@@ -280,7 +280,7 @@ bool micro_queue<T>::pop( void* dst, ticket k, concurrent_queue_base_v3<T>& base
     call_itt_notify(acquired, &tail_counter);
     page& p = *head_page;
     __TBB_ASSERT( &p, NULL );
-    size_t index = k/concurrent_queue_rep_base::n_queue & (base.my_rep->items_per_page-1);
+    size_t index = modulo_power_of_two( k/concurrent_queue_rep_base::n_queue, base.my_rep->items_per_page );
     bool success = false;
     {
         micro_queue_pop_finalizer<T> finalizer( *this, base, k+concurrent_queue_rep_base::n_queue, index==base.my_rep->items_per_page-1 ? &p : NULL );
@@ -305,7 +305,7 @@ micro_queue<T>& micro_queue<T>::assign( const micro_queue<T>& src, concurrent_qu
         ticket g_index = head_counter;
         __TBB_TRY {
             size_t n_items  = (tail_counter-head_counter)/concurrent_queue_rep_base::n_queue;
-            size_t index = head_counter/concurrent_queue_rep_base::n_queue & (base.my_rep->items_per_page-1);
+            size_t index = modulo_power_of_two( head_counter/concurrent_queue_rep_base::n_queue, base.my_rep->items_per_page );
             size_t end_in_first_page = (index+n_items<base.my_rep->items_per_page)?(index+n_items):base.my_rep->items_per_page;
 
             head_page = make_copy( base, srcp, index, end_in_first_page, g_index );
@@ -318,7 +318,7 @@ micro_queue<T>& micro_queue<T>::assign( const micro_queue<T>& src, concurrent_qu
                 }
 
                 __TBB_ASSERT( srcp==src.tail_page, NULL );
-                size_t last_index = tail_counter/concurrent_queue_rep_base::n_queue & (base.my_rep->items_per_page-1);
+                size_t last_index = modulo_power_of_two( tail_counter/concurrent_queue_rep_base::n_queue, base.my_rep->items_per_page );
                 if( last_index==0 ) last_index = base.my_rep->items_per_page;
 
                 cur_page->next = make_copy( base, srcp, 0, last_index, g_index );
@@ -631,7 +631,7 @@ bool concurrent_queue_iterator_rep<T>::get_item( T*& item, size_t k ) {
     } else {
         typename concurrent_queue_base_v3<T>::page* p = array[concurrent_queue_rep<T>::index(k)];
         __TBB_ASSERT(p,NULL);
-        size_t i = k/concurrent_queue_rep<T>::n_queue & (my_queue.my_rep->items_per_page-1);
+        size_t i = modulo_power_of_two( k/concurrent_queue_rep<T>::n_queue, my_queue.my_rep->items_per_page );
         item = &micro_queue<T>::get_ref(*p,i);
         return (p->mask & uintptr_t(1)<<i)!=0;
     }
@@ -716,7 +716,7 @@ void concurrent_queue_iterator_base_v3<Value>::advance() {
     my_rep->get_item(tmp,k);
     __TBB_ASSERT( my_item==tmp, NULL );
 #endif /* TBB_USE_ASSERT */
-    size_t i = k/concurrent_queue_rep<Value>::n_queue & (queue.my_rep->items_per_page-1);
+    size_t i = modulo_power_of_two( k/concurrent_queue_rep<Value>::n_queue, queue.my_rep->items_per_page );
     if( i==queue.my_rep->items_per_page-1 ) {
         typename concurrent_queue_base_v3<Value>::page*& root = my_rep->array[concurrent_queue_rep<Value>::index(k)];
         root = root->next;

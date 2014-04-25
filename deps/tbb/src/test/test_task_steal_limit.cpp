@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -74,8 +74,14 @@ void TestStealingIsEnabled () {
 }
 
 int TestMain () {
-    if ( tbb::task_scheduler_init::default_num_threads() == 1 )
+#if !__TBB_THREAD_LOCAL_VARIABLES_PRESENT
+    REPORT( "Known issue: Test skipped because no compiler support for __thread keyword.\n" );
+    return Harness::Skipped;
+#endif
+    if ( tbb::task_scheduler_init::default_num_threads() == 1 ) {
+        REPORT( "Known issue: Test requires at least 2 hardware threads.\n" );
         return Harness::Skipped;
+    }
     TestStealingIsEnabled();
     return Harness::Done;
 }

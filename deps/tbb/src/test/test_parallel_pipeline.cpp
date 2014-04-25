@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -37,6 +37,7 @@ int filter_node_count = 0;
 #include <string.h>
 
 #include "tbb/tbb_allocator.h"
+#include "tbb/spin_mutex.h"
 
 const unsigned n_tokens = 8;
 // we can conceivably have two buffers used in the middle filter for every token in flight, so
@@ -50,20 +51,20 @@ static tbb::atomic<int> non_pointer_specialized_calls;
 static tbb::atomic<int> pointer_specialized_calls;
 static tbb::atomic<int> first_pointer_specialized_calls;
 static tbb::atomic<int> second_pointer_specialized_calls;
+static tbb::spin_mutex buffer_mutex;
 
 static int intbuffer[max_counter];  // store results for <int,int> parallel pipeline test
 static bool check_intbuffer;
 
 static void* buffers[n_buffers]; 
 static bool buf_available[n_buffers];
-static tbb::atomic<size_t> nextBuffer;
 
 void *fetchNextBuffer() {
+    tbb::spin_mutex::scoped_lock sl1(buffer_mutex);
     for(size_t icnt = 0; icnt < n_buffers; ++icnt) {
-        size_t indx = ++nextBuffer;
-        if(buf_available[indx%n_buffers]) {
-            buf_available[indx%n_buffers] = false;
-            return buffers[indx%n_buffers];
+        if(buf_available[icnt]) {
+            buf_available[icnt] = false;
+            return buffers[icnt];
         }
     }
     ASSERT(0, "Ran out of buffers");
@@ -350,7 +351,6 @@ typedef enum {
 void resetCounters() {
     output_counter = 0;
     input_counter = max_counter;
-    nextBuffer = 0;
     non_pointer_specialized_calls = 0;
     pointer_specialized_calls = 0;
     first_pointer_specialized_calls = 0;

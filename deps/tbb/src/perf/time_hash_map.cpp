@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -37,11 +37,11 @@
 #define OLDTABLEHEADER "tbb/concurrent_hash_map-5468.h"//-4329
 
 //! enable/disable experimental implementation tests (correct include file also)
-#define TESTTABLE 1
+#define TESTTABLE 0
 #define TESTTABLEHEADER "tbb/concurrent_unordered_map.h"
 
 //! avoid erase()
-#define TEST_ERASE 0
+#define TEST_ERASE 1
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -60,7 +60,9 @@
 #include "tbb/spin_rw_mutex.h"
 #include "tbb/aligned_space.h"
 #include "tbb/atomic.h"
+#define __TBB_concurrent_unordered_set_H
 #include "tbb/internal/_concurrent_unordered_impl.h"
+#undef __TBB_concurrent_unordered_set_H
 // for test
 #include "tbb/spin_mutex.h"
 #include "time_framework.h"
@@ -107,7 +109,7 @@ typedef version_new::tbb::concurrent_unordered_map<int,int> TestTable;
 ///////////////////////////////////////
 
 static const char *map_testnames[] = {
-    "1.insert", "2.count1st", "3.count2nd", "4.insert existing", "5.erase"
+    "1.insert", "2.count1st", "3.count2nd", "4.insert-exists", "5.erase "
 };
 
 template<typename TableType>
@@ -224,7 +226,7 @@ public:
 
 class test_hash_map : public TestProcessor {
 public:
-    test_hash_map() : TestProcessor("test_hash_map") {}
+    test_hash_map() : TestProcessor("time_hash_map") {}
     void factory(int value, int threads) {
         if(Verbose) printf("Processing with %d threads: %d...\n", threads, value);
         process( value, threads,
@@ -265,4 +267,3 @@ int main(int argc, char* argv[]) {
     }
     return 0;
 }
-

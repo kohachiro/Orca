@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,7 +27,7 @@
 */
 
 // All platform-specific threading support is encapsulated here. */
- 
+
 #ifndef __RML_thread_monitor_H
 #define __RML_thread_monitor_H
 
@@ -35,14 +35,17 @@
 #include <windows.h>
 #include <process.h>
 #include <malloc.h> //_alloca
-#include "tbb/tbb_misc.h" // NumberOfProcessorGroups, MoveThreadIntoProcessorGroup, FindProcessorGroupIndex
+#include "tbb/tbb_misc.h" // support for processor groups
+#if __TBB_WIN8UI_SUPPORT
+#include <thread>
+#endif
 #elif USE_PTHREAD
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
 #else
 #error Unsupported platform
-#endif 
+#endif
 #include <stdio.h>
 #include "tbb/itt_notify.h"
 #include "tbb/atomic.h"
@@ -63,7 +66,7 @@
     __TBB_ASSERT_EX(sink_for_alloca, "_alloca failed");
 #else
 // Linux thread allocators avoid 64K aliasing.
-#define AVOID_64K_ALIASING(idx)
+#define AVOID_64K_ALIASING(idx) tbb::internal::suppress_unused_warning(idx)
 #endif /* _WIN32||_WIN64 */
 
 namespace rml {
@@ -75,7 +78,7 @@ static const ::tbb::tchar *SyncType_RML = _T("%Constant");
 static const ::tbb::tchar *SyncObj_ThreadMonitor = _T("RML Thr Monitor");
 #endif /* DO_ITT_NOTIFY */
 
-//! Monitor with limited two-phase commit form of wait.  
+//! Monitor with limited two-phase commit form of wait.
 /** At most one thread should wait on an instance at a time. */
 class thread_monitor {
 public:
@@ -83,10 +86,10 @@ public:
         friend class thread_monitor;
         tbb::atomic<size_t> my_epoch;
     };
-    thread_monitor() : spurious(false) { 
-        my_cookie.my_epoch = 0; 
+    thread_monitor() : spurious(false) {
+        my_cookie.my_epoch = 0;
         ITT_SYNC_CREATE(&my_sema, SyncType_RML, SyncObj_ThreadMonitor);
-        in_wait = false; 
+        in_wait = false;
     }
     ~thread_monitor() {}
 
@@ -95,7 +98,7 @@ public:
     void notify();
 
     //! Begin two-phase wait.
-    /** Should only be called by thread that owns the monitor. 
+    /** Should only be called by thread that owns the monitor.
         The caller must either complete the wait or cancel it. */
     void prepare_wait( cookie& c );
 
@@ -106,22 +109,33 @@ public:
     void cancel_wait();
 
 #if USE_WINTHREAD
+    typedef HANDLE handle_type;
+
     #define __RML_DECL_THREAD_ROUTINE unsigned WINAPI
     typedef unsigned (WINAPI *thread_routine_type)(void*);
 
     //! Launch a thread
-    static void launch( thread_routine_type thread_routine, void* arg, size_t stack_size, const size_t* worker_index = NULL );
+    static handle_type launch( thread_routine_type thread_routine, void* arg, size_t stack_size, const size_t* worker_index = NULL );
 
 #elif USE_PTHREAD
+    typedef pthread_t handle_type;
+
     #define __RML_DECL_THREAD_ROUTINE void*
     typedef void*(*thread_routine_type)(void*);
 
     //! Launch a thread
-    static void launch( thread_routine_type thread_routine, void* arg, size_t stack_size );
+    static handle_type launch( thread_routine_type thread_routine, void* arg, size_t stack_size );
 #endif /* USE_PTHREAD */
 
+    //! Yield control to OS
+    /** Affects the calling thread. **/
     static void yield();
 
+    //! Join thread
+    static void join(handle_type handle);
+
+    //! Detach thread
+    static void detach_thread(handle_type handle);
 private:
     cookie my_cookie;
     tbb::atomic<bool>   in_wait;
@@ -138,29 +152,64 @@ private:
 #define STACK_SIZE_PARAM_IS_A_RESERVATION 0x00010000
 #endif
 
-inline void thread_monitor::launch( thread_routine_type thread_routine, void* arg, size_t stack_size, const size_t* worker_index ) {
+#if __TBB_WIN8UI_SUPPORT
+inline thread_monitor::handle_type thread_monitor::launch( thread_routine_type thread_function, void* arg, size_t, const size_t*) {
+//TODO: check that exception thrown from std::thread is not swallowed silently
+    std::thread* thread_tmp=new std::thread(thread_function, arg);
+    return thread_tmp->native_handle();
+}
+#else //__TBB_WIN8UI_SUPPORT
+inline thread_monitor::handle_type thread_monitor::launch( thread_routine_type thread_routine, void* arg, size_t stack_size, const size_t* worker_index ) {
     unsigned thread_id;
     int number_of_processor_groups = ( worker_index ) ? tbb::internal::NumberOfProcessorGroups() : 0;
     unsigned create_flags = ( number_of_processor_groups > 1 ) ? CREATE_SUSPENDED : 0;
-    uintptr_t status = _beginthreadex( NULL, unsigned(stack_size), thread_routine, arg, STACK_SIZE_PARAM_IS_A_RESERVATION | create_flags, &thread_id );
-    if( status==0 ) {
+    HANDLE h = (HANDLE)_beginthreadex( NULL, unsigned(stack_size), thread_routine, arg, STACK_SIZE_PARAM_IS_A_RESERVATION | create_flags, &thread_id );
+    if( !h ) {
         fprintf(stderr,"thread_monitor::launch: _beginthreadex failed\n");
-        exit(1); 
+        exit(1);
     }
     if ( number_of_processor_groups > 1 ) {
-        tbb::internal::MoveThreadIntoProcessorGroup( (HANDLE)status,
+        tbb::internal::MoveThreadIntoProcessorGroup( h,
                         tbb::internal::FindProcessorGroupIndex( static_cast<int>(*worker_index) ) );
-        ResumeThread( (HANDLE)status );
+        ResumeThread( h );
     }
-    CloseHandle( (HANDLE)status );
+    return h;
+}
+#endif //__TBB_WIN8UI_SUPPORT
+
+void thread_monitor::join(handle_type handle) {
+#if TBB_USE_ASSERT
+    DWORD res =
+#endif
+        WaitForSingleObjectEx(handle, INFINITE, FALSE);
+    __TBB_ASSERT( res==WAIT_OBJECT_0, NULL );
+#if TBB_USE_ASSERT
+    BOOL val =
+#endif
+        CloseHandle(handle);
+    __TBB_ASSERT( val, NULL );
+}
+
+void thread_monitor::detach_thread(handle_type handle) {
+#if TBB_USE_ASSERT
+    BOOL val =
+#endif
+        CloseHandle(handle);
+    __TBB_ASSERT( val, NULL );
 }
 
 inline void thread_monitor::yield() {
+// TODO: consider unification via __TBB_Yield or tbb::this_tbb_thread::yield
+#if !__TBB_WIN8UI_SUPPORT
     SwitchToThread();
+#else
+    std::this_thread::yield();
+#endif
 }
 #endif /* USE_WINTHREAD */
 
 #if USE_PTHREAD
+// TODO: can we throw exceptions instead of termination?
 inline void thread_monitor::check( int error_code, const char* routine ) {
     if( error_code ) {
         fprintf(stderr,"thread_monitor %s in %s\n", strerror(error_code), routine );
@@ -168,17 +217,25 @@ inline void thread_monitor::check( int error_code, const char* routine ) {
     }
 }
 
-inline void thread_monitor::launch( void* (*thread_routine)(void*), void* arg, size_t stack_size ) {
+inline thread_monitor::handle_type thread_monitor::launch( void* (*thread_routine)(void*), void* arg, size_t stack_size ) {
     // FIXME - consider more graceful recovery than just exiting if a thread cannot be launched.
-    // Note that there are some tricky situations to deal with, such that the thread is already 
-    // grabbed as part of an OpenMP team. 
+    // Note that there are some tricky situations to deal with, such that the thread is already
+    // grabbed as part of an OpenMP team.
     pthread_attr_t s;
     check(pthread_attr_init( &s ), "pthread_attr_init");
     if( stack_size>0 )
         check(pthread_attr_setstacksize( &s, stack_size ), "pthread_attr_setstack_size" );
     pthread_t handle;
     check( pthread_create( &handle, &s, thread_routine, arg ), "pthread_create" );
-    check( pthread_detach( handle ), "pthread_detach" );
+    return handle;
+}
+
+void thread_monitor::join(handle_type handle) {
+    check(pthread_join(handle, NULL), "pthread_join");
+}
+
+void thread_monitor::detach_thread(handle_type handle) {
+    check(pthread_detach(handle), "pthread_detach");
 }
 
 inline void thread_monitor::yield() {

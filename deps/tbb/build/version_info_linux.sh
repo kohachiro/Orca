@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -34,7 +34,7 @@ echo '#N": BUILD_OS'"\t\t"`lsb_release -sd 2>/dev/null | grep -ih '[a-z] ' - /et
 echo '#N": BUILD_KERNEL'"\t"`uname -srv`'" ENDL \'
 echo '#N": BUILD_GCC'"\t\t"`g++ -v </dev/null 2>&1 | grep 'gcc.*version '`'" ENDL \'
 [ -z "$COMPILER_VERSION" ] || echo '#N": BUILD_COMPILER'"\t"$COMPILER_VERSION'" ENDL \'
-echo '#N": BUILD_GLIBC'"\t"`getconf GNU_LIBC_VERSION | grep glibc | sed -e 's/^glibc //'`'" ENDL \'
+echo '#N": BUILD_LIBC'"\t"`getconf GNU_LIBC_VERSION | grep glibc | sed -e 's/^glibc //'`'" ENDL \'
 echo '#N": BUILD_LD'"\t\t"`ld -v 2>&1 | grep 'version'`'" ENDL \'
 echo '#N": BUILD_TARGET'"\t$arch on $runtime"'" ENDL \'
 echo '#N": BUILD_COMMAND'"\t"$*'" ENDL \'

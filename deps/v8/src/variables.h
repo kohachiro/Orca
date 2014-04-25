@@ -130,8 +130,8 @@ class Variable: public ZoneObject {
   bool is_arguments() const { return kind_ == ARGUMENTS; }
 
   // True if the variable is named eval and not known to be shadowed.
-  bool is_possibly_eval() const {
-    return IsVariable(FACTORY->eval_symbol());
+  bool is_possibly_eval(Isolate* isolate) const {
+    return IsVariable(isolate->factory()->eval_string());
   }
 
   Variable* local_if_not_shadowed() const {
@@ -168,7 +168,7 @@ class Variable: public ZoneObject {
 
   // If this field is set, this variable references the stored locally bound
   // variable, but it might be shadowed by variable bindings introduced by
-  // non-strict 'eval' calls between the reference scope (inclusive) and the
+  // sloppy 'eval' calls between the reference scope (inclusive) and the
   // binding scope (exclusive).
   Variable* local_if_not_shadowed_;
 

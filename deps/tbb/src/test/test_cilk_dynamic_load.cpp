@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -35,11 +35,11 @@
 // The compiler does not add "-lcilkrts" linker option on some linux systems
 #define CILK_LINKAGE_BROKEN  (__linux__ && __GNUC__<4 && __INTEL_COMPILER_BUILD_DATE <= 20110427)
 // Currently, the interop doesn't support the situation:
-//1) TBB is outermost;
-//2)   Cilk, and it should be dynamically loaded with dlopen/LoadLibrary (possibly via a 3rd party module);
-//3)     TBB again;
-//4)       Cilk again.
-#define HEAVY_NESTED_INTEROP_SUPPORT __INTEL_COMPILER_BUILD_DATE < 20110427
+//1) Intel(R) Threading Building Blocks (Intel(R) TBB) is outermost;
+//2)   Intel(R) Cilk(TM) Plus, and it should be dynamically loaded with dlopen/LoadLibrary (possibly via a 3rd party module);
+//3)     Intel(R) TBB again;
+//4)       Intel(R) Cilk(TM) Plus again.
+#define HEAVY_NESTED_INTEROP_SUPPORT ( __INTEL_COMPILER_BUILD_DATE < 20110427 )
 
 #if __TBB_CILK_INTEROP && CILK_SYMBOLS_VISIBLE && !CILK_LINKAGE_BROKEN && HEAVY_NESTED_INTEROP_SUPPORT
 

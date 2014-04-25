@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -140,6 +140,11 @@ private:
         }
     private:
         void operator=(handle_object&);
+#if __SUNPRO_CC
+    // Presumably due to a compiler error, private copy constructor
+    // breaks expressions like handle h = cache[key];
+    public:
+#endif
         handle_object(handle_object &);
     };
 private:

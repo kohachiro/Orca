@@ -24,24 +24,48 @@
 
 #include "runner.h"
 #include "task.h"
+#include "uv.h"
 
 char executable_path[PATHMAX] = { '\0' };
 
+int tap_output = 0;
 
-static void log_progress(int total, int passed, int failed, const char* name) {
+
+static void log_progress(int total,
+                         int passed,
+                         int failed,
+                         int todos,
+                         int skipped,
+                         const char* name) {
+  int progress;
+
   if (total == 0)
     total = 1;
 
-  LOGF("[%% %3d|+ %3d|- %3d]: %s", (int) ((passed + failed) / ((double) total) * 100.0),
-      passed, failed, name);
+  progress = 100 * (passed + failed + skipped + todos) / total;
+  LOGF("[%% %3d|+ %3d|- %3d|T %3d|S %3d]: %s",
+       progress,
+       passed,
+       failed,
+       todos,
+       skipped,
+       name);
 }
 
 
 const char* fmt(double d) {
+  static char buf[1024];
+  static char* p;
   uint64_t v;
-  char* p;
 
-  p = (char *) calloc(1, 32) + 31; /* leaks memory */
+  if (p == NULL)
+    p = buf;
+
+  p += 31;
+
+  if (p >= buf + sizeof(buf))
+    return "<buffer too small>";
+
   v = (uint64_t) d;
 
 #if 0 /* works but we don't care about fractional precision */
@@ -66,8 +90,14 @@ const char* fmt(double d) {
 }
 
 
-int run_tests(int timeout, int benchmark_output) {
-  int total, passed, failed;
+int run_tests(int benchmark_output) {
+  int total;
+  int passed;
+  int failed;
+  int todos;
+  int skipped;
+  int current;
+  int test_result;
   task_entry_t* task;
 
   /* Count the number of tests. */
@@ -78,37 +108,89 @@ int run_tests(int timeout, int benchmark_output) {
     }
   }
 
+  if (tap_output) {
+    LOGF("1..%d\n", total);
+  }
+
   /* Run all tests. */
   passed = 0;
   failed = 0;
+  todos = 0;
+  skipped = 0;
+  current = 1;
   for (task = TASKS; task->main; task++) {
     if (task->is_helper) {
       continue;
     }
 
-    rewind_cursor();
-    if (!benchmark_output) {
-      log_progress(total, passed, failed, task->task_name);
+    if (!tap_output)
+      rewind_cursor();
+
+    if (!benchmark_output && !tap_output) {
+      log_progress(total, passed, failed, todos, skipped, task->task_name);
     }
 
-    if (run_test(task->task_name, timeout, benchmark_output) == 0) {
-      passed++;
-    } else {
-      failed++;
+    test_result = run_test(task->task_name, benchmark_output, current);
+    switch (test_result) {
+    case TEST_OK: passed++; break;
+    case TEST_TODO: todos++; break;
+    case TEST_SKIP: skipped++; break;
+    default: failed++;
     }
+    current++;
   }
 
-  rewind_cursor();
+  if (!tap_output)
+    rewind_cursor();
 
-  if (!benchmark_output) {
-    log_progress(total, passed, failed, "Done.\n");
+  if (!benchmark_output && !tap_output) {
+    log_progress(total, passed, failed, todos, skipped, "Done.\n");
   }
 
   return failed;
 }
 
 
-int run_test(const char* test, int timeout, int benchmark_output) {
+void log_tap_result(int test_count,
+                    const char* test,
+                    int status,
+                    process_info_t* process) {
+  const char* result;
+  const char* directive;
+  char reason[1024];
+
+  switch (status) {
+  case TEST_OK:
+    result = "ok";
+    directive = "";
+    break;
+  case TEST_TODO:
+    result = "not ok";
+    directive = " # TODO ";
+    break;
+  case TEST_SKIP:
+    result = "ok";
+    directive = " # SKIP ";
+    break;
+  default:
+    result = "not ok";
+    directive = "";
+  }
+
+  if ((status == TEST_SKIP || status == TEST_TODO) &&
+      process_output_size(process) > 0) {
+    process_read_last_line(process, reason, sizeof reason);
+  } else {
+    reason[0] = '\0';
+  }
+
+  LOGF("%s %d - %s%s%s\n", result, test_count, test, directive, reason);
+}
+
+
+int run_test(const char* test,
+             int benchmark_output,
+             int test_count) {
   char errmsg[1024] = "no error";
   process_info_t processes[1024];
   process_info_t *main_proc;
@@ -147,7 +229,8 @@ int run_test(const char* test, int timeout, int benchmark_output) {
 
     if (process_start(task->task_name,
                       task->process_name,
-                      &processes[process_count]) == -1) {
+                      &processes[process_count],
+                      1 /* is_helper */) == -1) {
       snprintf(errmsg,
                sizeof errmsg,
                "Process `%s` failed to start.",
@@ -173,7 +256,8 @@ int run_test(const char* test, int timeout, int benchmark_output) {
 
     if (process_start(task->task_name,
                       task->process_name,
-                      &processes[process_count]) == -1) {
+                      &processes[process_count],
+                      0 /* !is_helper */) == -1) {
       snprintf(errmsg,
                sizeof errmsg,
                "Process `%s` failed to start.",
@@ -194,7 +278,7 @@ int run_test(const char* test, int timeout, int benchmark_output) {
     goto out;
   }
 
-  result = process_wait(main_proc, 1, timeout);
+  result = process_wait(main_proc, 1, task->timeout);
   if (result == -1) {
     FATAL("process_wait failed");
   } else if (result == -2) {
@@ -206,7 +290,7 @@ int run_test(const char* test, int timeout, int benchmark_output) {
   }
 
   status = process_reap(main_proc);
-  if (status != 0) {
+  if (status != TEST_OK) {
     snprintf(errmsg,
              sizeof errmsg,
              "exit code %d",
@@ -230,9 +314,18 @@ out:
     FATAL("process_wait failed");
   }
 
+  if (tap_output)
+    log_tap_result(test_count, test, status, &processes[i]);
+
   /* Show error and output from processes if the test failed. */
   if (status != 0 || task->show_output) {
-    if (status != 0) {
+    if (tap_output) {
+      LOGF("#");
+    } else if (status == TEST_TODO) {
+      LOGF("\n`%s` todo\n", test);
+    } else if (status == TEST_SKIP) {
+      LOGF("\n`%s` skipped\n", test);
+    } else if (status != 0) {
       LOGF("\n`%s` failed: %s\n", test, errmsg);
     } else {
       LOGF("\n");
@@ -256,7 +349,10 @@ out:
         break;
       }
     }
-    LOG("=============================================================\n");
+
+    if (!tap_output) {
+      LOG("=============================================================\n");
+    }
 
   /* In benchmark mode show concise output from the main process. */
   } else if (benchmark_output) {
@@ -291,11 +387,13 @@ out:
  */
 int run_test_part(const char* test, const char* part) {
   task_entry_t* task;
+  int r;
 
   for (task = TASKS; task->main; task++) {
-    if (strcmp(test, task->task_name) == 0
-        && strcmp(part, task->process_name) == 0) {
-      return task->main();
+    if (strcmp(test, task->task_name) == 0 &&
+        strcmp(part, task->process_name) == 0) {
+      r = task->main();
+      return r;
     }
   }
 
@@ -311,7 +409,8 @@ static int compare_task(const void* va, const void* vb) {
 }
 
 
-static int find_helpers(const task_entry_t* task, const task_entry_t** helpers) {
+static int find_helpers(const task_entry_t* task,
+                        const task_entry_t** helpers) {
   const task_entry_t* helper;
   int n_helpers;
 

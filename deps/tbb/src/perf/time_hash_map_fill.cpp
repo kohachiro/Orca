@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -69,7 +69,9 @@ int MAX_TABLE_SIZE = 2000000;
 #include "tbb/spin_rw_mutex.h"
 #include "tbb/aligned_space.h"
 #include "tbb/atomic.h"
+#define __TBB_concurrent_unordered_set_H
 #include "tbb/internal/_concurrent_unordered_impl.h"
+#undef __TBB_concurrent_unordered_set_H
 // for test
 #include "tbb/spin_mutex.h"
 #include "time_framework.h"
@@ -93,7 +95,7 @@ struct Uniques : TesterBase {
         //Table->max_load_factor(1); // add stub into hash_map to uncomment it
     }
     ~Uniques() {}
-    
+
     // Returns name of test mode specified by number
     /*override*/ std::string get_name(int testn) {
         if(testn == 1) return "find";
@@ -130,6 +132,7 @@ struct Uniques : TesterBase {
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
+#undef max
 #include <limits>
 
 // Using BOX declarations from configuration

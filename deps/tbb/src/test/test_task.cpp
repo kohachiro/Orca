@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -285,7 +285,7 @@ static int TestUnconstructibleTaskCount;
 struct ConstructionFailure {
 };
 
-#if _MSC_VER && !defined(__INTEL_COMPILER)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Suppress pointless "unreachable code" warning.
     #pragma warning (push)
     #pragma warning (disable: 4702)
@@ -300,7 +300,7 @@ struct UnconstructibleTask: public tbb::empty_task {
     }
 };
 
-#if _MSC_VER && !defined(__INTEL_COMPILER)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     #pragma warning (pop)
 #endif
 

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -38,6 +38,10 @@
 #include <vector>
 #include <iterator>
 #include <functional>
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    #include <initializer_list>
+#endif
 
 namespace tbb {
 namespace interface5 {
@@ -83,13 +87,23 @@ class concurrent_priority_queue {
     //! [begin,end) constructor
     template<typename InputIterator>
     concurrent_priority_queue(InputIterator begin, InputIterator end, const allocator_type& a = allocator_type()) :
-        data(begin, end, a)
+        mark(0), data(begin, end, a)
     {
-        mark = 0;
         my_aggregator.initialize_handler(my_functor_t(this));
         heapify();
         my_size = data.size();
     }
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! Constructor from std::initializer_list
+    concurrent_priority_queue(std::initializer_list<T> const& init_list, const allocator_type &a = allocator_type()) :
+        mark(0),data(init_list.begin(), init_list.end(), a)
+    {
+        my_aggregator.initialize_handler(my_functor_t(this));
+        heapify();
+        my_size = data.size();
+    }
+#endif //# __TBB_INITIALIZER_LISTS_PRESENT
 
     //! Copy constructor
     /** This operation is unsafe if there are pending concurrent operations on the src queue. */
@@ -119,6 +133,26 @@ class concurrent_priority_queue {
         }
         return *this;
     }
+
+    //! Assign the queue from [begin,end) range, not thread-safe
+    template<typename InputIterator>
+    void assign(InputIterator begin, InputIterator end) {
+        std::vector<value_type, allocator_type>(begin, end, data.get_allocator()).swap(data);
+        mark = 0;
+        my_size = data.size();
+        heapify();
+    }
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! Assign the queue from std::initializer_list, not thread-safe
+    void assign(std::initializer_list<T> const& il) { this->assign(il.begin(), il.end()); }
+
+    //! Assign from std::initializer_list, not thread-safe
+    concurrent_priority_queue& operator=(std::initializer_list<T> const& il) {
+        this->assign(il.begin(), il.end());
+        return *this;
+    }
+#endif //# __TBB_INITIALIZER_LISTS_PRESENT
 
     //! Returns true if empty, false otherwise
     /** Returned value may not reflect results of pending operations.
@@ -163,9 +197,10 @@ class concurrent_priority_queue {
     //! Swap this queue with another; not thread-safe
     /** This operation is unsafe if there are pending concurrent operations on the queue. */
     void swap(concurrent_priority_queue& q) {
+        using std::swap;
         data.swap(q.data);
-        std::swap(mark, q.mark);
-        std::swap(my_size, q.my_size);
+        swap(mark, q.mark);
+        swap(my_size, q.my_size);
     }
 
     //! Return allocator object

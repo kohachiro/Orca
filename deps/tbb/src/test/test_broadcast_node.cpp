@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -28,6 +28,7 @@
 
 #include "harness.h"
 #include "tbb/flow_graph.h"
+#include "tbb/task.h"
 
 #include "tbb/atomic.h"
 
@@ -63,10 +64,12 @@ public:
         return v;
     }
 
-    /* override */ bool try_put( const T &v ) {
+    /* override */ tbb::task * try_put_task( const T &v ) {
         ++my_counters[(int)v];
-        return true;
+        return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
     }
+
+    /*override*/void reset_receiver() { }
 
 };
 

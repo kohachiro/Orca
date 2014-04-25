@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -51,7 +51,7 @@
 #include <errno.h>
 #endif
 
-#if MALLOC_LD_PRELOAD
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED
 
 extern "C" {
 
@@ -62,7 +62,7 @@ bool __TBB_internal_find_original_malloc(int num, const char *names[], void *tab
 
 }
 
-#endif /* MALLOC_LD_PRELOAD */
+#endif /* MALLOC_UNIXLIKE_OVERLOAD_ENABLED */
 #endif /* MALLOC_CHECK_RECURSION */
 
 namespace rml {
@@ -72,7 +72,7 @@ namespace internal {
 
 void* (*original_malloc_ptr)(size_t) = 0;
 void  (*original_free_ptr)(void*) = 0;
-#if MALLOC_LD_PRELOAD
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED
 static void* (*original_calloc_ptr)(size_t,size_t) = 0;
 static void* (*original_realloc_ptr)(void*,size_t) = 0;
 #endif
@@ -97,16 +97,16 @@ extern "C" void MallocInitializeITT() {
 #define MALLOCLIB_NAME "tbbmalloc" DEBUG_SUFFIX ".dll"
 #elif __APPLE__
 #define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".dylib"
+#elif __FreeBSD__ || __NetBSD__ || __sun || _AIX || __ANDROID__
+#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".so"
 #elif __linux__
 #define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX  __TBB_STRING(.so.TBB_COMPATIBLE_INTERFACE_VERSION)
-#elif __FreeBSD__ || __NetBSD__ || __sun || _AIX
-#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".so"
 #else
 #error Unknown OS
 #endif
 
 void init_tbbmalloc() {
-#if MALLOC_LD_PRELOAD
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED
     if (malloc_proxy && __TBB_internal_find_original_malloc) {
         const char *alloc_names[] = { "malloc", "free", "realloc", "calloc"};
         void *orig_alloc_ptrs[4];
@@ -125,7 +125,7 @@ void init_tbbmalloc() {
             original_malloc_found = 1;
         }
     }
-#endif /* MALLOC_LD_PRELOAD */
+#endif /* MALLOC_UNIXLIKE_OVERLOAD_ENABLED */
 
 #if DO_ITT_NOTIFY
     MallocInitializeITT();
@@ -134,18 +134,21 @@ void init_tbbmalloc() {
 /* Preventing TBB allocator library from unloading to prevent
    resource leak, as memory is not released on the library unload.
 */
-#if USE_WINTHREAD && !__TBB_SOURCE_DIRECTLY_INCLUDED
+#if USE_WINTHREAD && !__TBB_SOURCE_DIRECTLY_INCLUDED && !__TBB_WIN8UI_SUPPORT
     // Prevent Windows from displaying message boxes if it fails to load library
     UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
-    HMODULE lib = LoadLibrary(MALLOCLIB_NAME);
-    MALLOC_ASSERT(lib, "Allocator can't load ifself.");
+    HMODULE lib;
+    BOOL ret = GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+                                 |GET_MODULE_HANDLE_EX_FLAG_PIN,
+                                 (LPCTSTR)&scalable_malloc, &lib);
+    MALLOC_ASSERT(lib && ret, "Allocator can't find itself.");
     SetErrorMode (prev_mode);
 #endif /* USE_PTHREAD && !__TBB_SOURCE_DIRECTLY_INCLUDED */
 }
 
 #if !__TBB_SOURCE_DIRECTLY_INCLUDED
 #if USE_WINTHREAD
-extern "C" BOOL WINAPI DllMain( HINSTANCE hInst, DWORD callReason, LPVOID )
+extern "C" BOOL WINAPI DllMain( HINSTANCE /*hInst*/, DWORD callReason, LPVOID )
 {
 
     if (callReason==DLL_THREAD_DETACH)
@@ -158,27 +161,29 @@ extern "C" BOOL WINAPI DllMain( HINSTANCE hInst, DWORD callReason, LPVOID )
     }
     return TRUE;
 }
-#else
+#else /* !USE_WINTHREAD */
 struct RegisterProcessShutdownNotification {
+// Work around non-reentrancy in dlopen() on Android
+#if !__TBB_USE_DLOPEN_REENTRANCY_WORKAROUND
     RegisterProcessShutdownNotification() {
         // prevents unloading, POSIX case
-        void *ret = dlopen(MALLOCLIB_NAME, RTLD_NOW);
-        MALLOC_ASSERT(ret, "Allocator can't load ifself.");
+        dlopen(MALLOCLIB_NAME, RTLD_NOW);
     }
+#endif /* !__ANDROID__ */
     ~RegisterProcessShutdownNotification() {
         __TBB_mallocProcessShutdownNotification();
     }
 };
 
 static RegisterProcessShutdownNotification reg;
-#endif /* USE_WINTHREAD */
+#endif /* !USE_WINTHREAD */
 #endif /* !__TBB_SOURCE_DIRECTLY_INCLUDED */
 
 #if MALLOC_CHECK_RECURSION
 
 bool  original_malloc_found;
 
-#if MALLOC_LD_PRELOAD
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED
 
 extern "C" {
 
@@ -209,25 +214,21 @@ void __TBB_internal_free(void *object)
 
 } /* extern "C" */
 
-#endif /* MALLOC_LD_PRELOAD */
+#endif /* MALLOC_UNIXLIKE_OVERLOAD_ENABLED */
 
 #endif /* MALLOC_CHECK_RECURSION */
 
 } } // namespaces
 
 #if __TBB_ipf
-/* It was found that on IPF inlining of __TBB_machine_lockbyte leads
-   to serious performance regression with ICC 10.0. So keep it out-of-line.
+/* It was found that on IA-64 architecture inlining of __TBB_machine_lockbyte leads
+   to serious performance regression with ICC. So keep it out-of-line.
 
    This code is copy-pasted from tbb_misc.cpp.
  */
 extern "C" intptr_t __TBB_machine_lockbyte( volatile unsigned char& flag ) {
-    if ( !__TBB_TryLockByte(flag) ) {
-        tbb::internal::atomic_backoff b;
-        do {
-            b.pause();
-        } while ( !__TBB_TryLockByte(flag) );
-    }
+    tbb::internal::atomic_backoff backoff;
+    while( !__TBB_TryLockByte(flag) ) backoff.pause();
     return 0;
 }
 #endif

@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -50,6 +50,9 @@
     LIB_LINK_LIBS =
     LIB_OUTPUT_KEY =
     ifeq ($(tbb_os),linux)
+        ifeq ($(compiler),clang)
+            LIBS = -pthread -ldl -lrt
+        endif
         ifeq ($(compiler),gcc)
             LIBS = -pthread -ldl -lrt
         endif

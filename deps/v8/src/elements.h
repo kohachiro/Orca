@@ -65,7 +65,47 @@ class ElementsAccessor {
   // can optionally pass in the backing store to use for the check, which must
   // be compatible with the ElementsKind of the ElementsAccessor. If
   // backing_store is NULL, the holder->elements() is used as the backing store.
+  MUST_USE_RESULT virtual Handle<Object> Get(
+      Handle<Object> receiver,
+      Handle<JSObject> holder,
+      uint32_t key,
+      Handle<FixedArrayBase> backing_store =
+          Handle<FixedArrayBase>::null()) = 0;
+
   MUST_USE_RESULT virtual MaybeObject* Get(
+      Object* receiver,
+      JSObject* holder,
+      uint32_t key,
+      FixedArrayBase* backing_store = NULL) = 0;
+
+  // Returns an element's attributes, or ABSENT if there is no such
+  // element. This method doesn't iterate up the prototype chain.  The caller
+  // can optionally pass in the backing store to use for the check, which must
+  // be compatible with the ElementsKind of the ElementsAccessor. If
+  // backing_store is NULL, the holder->elements() is used as the backing store.
+  MUST_USE_RESULT virtual PropertyAttributes GetAttributes(
+      Object* receiver,
+      JSObject* holder,
+      uint32_t key,
+      FixedArrayBase* backing_store = NULL) = 0;
+
+  // Returns an element's type, or NONEXISTENT if there is no such
+  // element. This method doesn't iterate up the prototype chain.  The caller
+  // can optionally pass in the backing store to use for the check, which must
+  // be compatible with the ElementsKind of the ElementsAccessor. If
+  // backing_store is NULL, the holder->elements() is used as the backing store.
+  MUST_USE_RESULT virtual PropertyType GetType(
+      Object* receiver,
+      JSObject* holder,
+      uint32_t key,
+      FixedArrayBase* backing_store = NULL) = 0;
+
+  // Returns an element's accessors, or NULL if the element does not exist or
+  // is plain. This method doesn't iterate up the prototype chain.  The caller
+  // can optionally pass in the backing store to use for the check, which must
+  // be compatible with the ElementsKind of the ElementsAccessor. If
+  // backing_store is NULL, the holder->elements() is used as the backing store.
+  MUST_USE_RESULT virtual AccessorPair* GetAccessorPair(
       Object* receiver,
       JSObject* holder,
       uint32_t key,
@@ -76,8 +116,9 @@ class ElementsAccessor {
   // changing array sizes as defined in EcmaScript 5.1 15.4.5.2, i.e. array that
   // have non-deletable elements can only be shrunk to the size of highest
   // element that is non-deletable.
-  MUST_USE_RESULT virtual MaybeObject* SetLength(JSArray* holder,
-                                                 Object* new_length) = 0;
+  MUST_USE_RESULT virtual Handle<Object> SetLength(
+      Handle<JSArray> holder,
+      Handle<Object> new_length) = 0;
 
   // Modifies both the length and capacity of a JSArray, resizing the underlying
   // backing store as necessary. This method does NOT honor the semantics of
@@ -85,14 +126,16 @@ class ElementsAccessor {
   // elements. This method should only be called for array expansion OR by
   // runtime JavaScript code that use InternalArrays and don't care about
   // EcmaScript 5.1 semantics.
-  MUST_USE_RESULT virtual MaybeObject* SetCapacityAndLength(JSArray* array,
-                                                            int capacity,
-                                                            int length) = 0;
+  virtual void SetCapacityAndLength(
+      Handle<JSArray> array,
+      int capacity,
+      int length) = 0;
 
   // Deletes an element in an object, returning a new elements backing store.
-  MUST_USE_RESULT virtual MaybeObject* Delete(JSObject* holder,
-                                              uint32_t key,
-                                              JSReceiver::DeleteMode mode) = 0;
+  MUST_USE_RESULT virtual Handle<Object> Delete(
+      Handle<JSObject> holder,
+      uint32_t key,
+      JSReceiver::DeleteMode mode) = 0;
 
   // If kCopyToEnd is specified as the copy_size to CopyElements, it copies all
   // of elements from source after source_start to the destination array.
@@ -107,21 +150,22 @@ class ElementsAccessor {
   // the source JSObject or JSArray in source_holder. If the holder's backing
   // store is available, it can be passed in source and source_holder is
   // ignored.
-  MUST_USE_RESULT virtual MaybeObject* CopyElements(
-      JSObject* source_holder,
+  virtual void CopyElements(
+      Handle<JSObject> source_holder,
       uint32_t source_start,
-      FixedArrayBase* destination,
-      ElementsKind destination_kind,
+      ElementsKind source_kind,
+      Handle<FixedArrayBase> destination,
       uint32_t destination_start,
       int copy_size,
-      FixedArrayBase* source = NULL) = 0;
+      Handle<FixedArrayBase> source = Handle<FixedArrayBase>::null()) = 0;
 
-  MUST_USE_RESULT MaybeObject* CopyElements(JSObject* from_holder,
-                                            FixedArrayBase* to,
-                                            ElementsKind to_kind,
-                                            FixedArrayBase* from = NULL) {
-    return CopyElements(from_holder, 0, to, to_kind, 0,
-                        kCopyToEndAndInitializeToHole, from);
+  void CopyElements(
+      Handle<JSObject> from_holder,
+      Handle<FixedArrayBase> to,
+      ElementsKind from_kind,
+      Handle<FixedArrayBase> from = Handle<FixedArrayBase>::null()) {
+    CopyElements(from_holder, 0, from_kind, to, 0,
+                 kCopyToEndAndInitializeToHole, from);
   }
 
   MUST_USE_RESULT virtual MaybeObject* AddElementsToFixedArray(
@@ -142,7 +186,7 @@ class ElementsAccessor {
   static void TearDown();
 
  protected:
-  friend class NonStrictArgumentsElementsAccessor;
+  friend class SloppyArgumentsElementsAccessor;
 
   virtual uint32_t GetCapacity(FixedArrayBase* backing_store) = 0;
 
@@ -164,15 +208,11 @@ class ElementsAccessor {
   DISALLOW_COPY_AND_ASSIGN(ElementsAccessor);
 };
 
+void CheckArrayAbuse(JSObject* obj, const char* op, uint32_t key,
+                     bool allow_appending = false);
 
-void CopyObjectToObjectElements(FixedArray* from_obj,
-                                ElementsKind from_kind,
-                                uint32_t from_start,
-                                FixedArray* to_obj,
-                                ElementsKind to_kind,
-                                uint32_t to_start,
-                                int copy_size);
-
+Handle<Object> ArrayConstructInitializeElements(Handle<JSArray> array,
+                                                Arguments* args);
 
 } }  // namespace v8::internal
 

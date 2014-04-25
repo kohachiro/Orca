@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -119,7 +119,7 @@ private:
     TaskGeneratorBody ( const TaskGeneratorBody& );
     // TestBody() needs access to the default constructor
     template<class Body, class Iterator> friend void TestBody( size_t );
-}; // class TaskGeneratorBody
+};
 
 /** Work item is passed by reference here. **/
 class TaskGeneratorBody_RefVersion
@@ -128,7 +128,7 @@ public:
     void operator() ( value_t& depth, tbb::parallel_do_feeder<value_t>& feeder ) const {
         do_work(depth, feeder);
     }
-}; // class TaskGeneratorBody
+};
 
 /** Work item is passed as const here. Compilers must ignore the const qualifier. **/
 class TaskGeneratorBody_ConstVersion
@@ -137,7 +137,7 @@ public:
     void operator() ( const value_t depth, tbb::parallel_do_feeder<value_t>& feeder ) const {
         do_work(depth, feeder);
     }
-}; // class TaskGeneratorBody
+};
 
 /** Work item is passed by reference to const here. **/
 class TaskGeneratorBody_ConstRefVersion
@@ -146,7 +146,7 @@ public:
     void operator() ( const value_t& depth, tbb::parallel_do_feeder<value_t>& feeder ) const {
         do_work(depth, feeder);
     }
-}; // class TaskGeneratorBody
+};
 
 /** Work item is passed by reference to volatile here. **/
 class TaskGeneratorBody_VolatileRefVersion
@@ -155,16 +155,16 @@ public:
     void operator() ( volatile value_t& depth, tbb::parallel_do_feeder<value_t>& feeder ) const {
         do_work(const_cast<value_t&>(depth), feeder);
     }
-}; // class TaskGeneratorBody
+};
 
-/** Work item is passed by reference to volatile here. **/
+/** Work item is passed by reference to const volatile here. **/
 class TaskGeneratorBody_ConstVolatileRefVersion
 {
 public:
     void operator() ( const volatile value_t& depth, tbb::parallel_do_feeder<value_t>& feeder ) const {
         do_work(const_cast<value_t&>(depth), feeder);
     }
-}; // class TaskGeneratorBody
+};
 
 
 static value_t g_depths[N_DEPTHS] = {0, 1, 2, 3, 4, 0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 0, 1, 2};
@@ -183,7 +183,6 @@ void TestBody ( size_t depth ) {
 
 template<class Iterator>
 void TestIterator_RvalueOnly ( int /*nthread*/, size_t depth ) {
-    g_values_counter = 0;
     TestBody<FakeTaskGeneratorBody, Iterator> (depth);
     TestBody<FakeTaskGeneratorBody_ConstRefVersion, Iterator> (depth);
     TestBody<TaskGeneratorBody, Iterator> (depth);
@@ -224,6 +223,7 @@ int TestMain () {
         REPORT("number of threads must be positive\n");
         exit(1);
     }
+    g_values_counter = 0;
     for( int p=MinThread; p<=MaxThread; ++p ) {
         tbb::task_scheduler_init init( p );
         Run(p);

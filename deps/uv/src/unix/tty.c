@@ -21,6 +21,7 @@
 
 #include "uv.h"
 #include "internal.h"
+#include "spinlock.h"
 
 #include <assert.h>
 #include <unistd.h>
@@ -28,44 +29,98 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 
-
 static int orig_termios_fd = -1;
 static struct termios orig_termios;
+static uv_spinlock_t termios_spinlock = UV_SPINLOCK_INITIALIZER;
 
 
 int uv_tty_init(uv_loop_t* loop, uv_tty_t* tty, int fd, int readable) {
-  uv__stream_init(loop, (uv_stream_t*)tty, UV_TTY);
+  int flags;
+  int newfd;
+  int r;
 
-  if (readable) {
-    uv__nonblock(fd, 1);
-    uv__stream_open((uv_stream_t*)tty, fd, UV_STREAM_READABLE);
-  } else {
-    /* Note: writable tty we set to blocking mode. */
-    uv__stream_open((uv_stream_t*)tty, fd, UV_STREAM_WRITABLE);
-    tty->flags |= UV_STREAM_BLOCKING;
+  flags = 0;
+  newfd = -1;
+
+  uv__stream_init(loop, (uv_stream_t*) tty, UV_TTY);
+
+  /* Reopen the file descriptor when it refers to a tty. This lets us put the
+   * tty in non-blocking mode without affecting other processes that share it
+   * with us.
+   *
+   * Example: `node | cat` - if we put our fd 0 in non-blocking mode, it also
+   * affects fd 1 of `cat` because both file descriptors refer to the same
+   * struct file in the kernel. When we reopen our fd 0, it points to a
+   * different struct file, hence changing its properties doesn't affect
+   * other processes.
+   */
+  if (isatty(fd)) {
+    r = uv__open_cloexec("/dev/tty", O_RDWR);
+
+    if (r < 0) {
+      /* fallback to using blocking writes */
+      if (!readable)
+        flags |= UV_STREAM_BLOCKING;
+      goto skip;
+    }
+
+    newfd = r;
+
+    r = uv__dup2_cloexec(newfd, fd);
+    if (r < 0 && r != -EINVAL) {
+      /* EINVAL means newfd == fd which could conceivably happen if another
+       * thread called close(fd) between our calls to isatty() and open().
+       * That's a rather unlikely event but let's handle it anyway.
+       */
+      uv__close(newfd);
+      return r;
+    }
+
+    fd = newfd;
   }
 
+skip:
+#if defined(__APPLE__)
+  r = uv__stream_try_select((uv_stream_t*) tty, &fd);
+  if (r) {
+    if (newfd != -1)
+      uv__close(newfd);
+    return r;
+  }
+#endif
+
+  if (readable)
+    flags |= UV_STREAM_READABLE;
+  else
+    flags |= UV_STREAM_WRITABLE;
+
+  if (!(flags & UV_STREAM_BLOCKING))
+    uv__nonblock(fd, 1);
+
+  uv__stream_open((uv_stream_t*) tty, fd, flags);
   tty->mode = 0;
+
   return 0;
 }
 
 
 int uv_tty_set_mode(uv_tty_t* tty, int mode) {
-  int fd = tty->fd;
   struct termios raw;
+  int fd;
 
-  if (mode && tty->mode == 0) {
-    /* on */
+  fd = uv__stream_fd(tty);
 
-    if (tcgetattr(fd, &tty->orig_termios)) {
-      goto fatal;
-    }
+  if (mode && tty->mode == 0) {  /* on */
+    if (tcgetattr(fd, &tty->orig_termios))
+      return -errno;
 
     /* This is used for uv_tty_reset_mode() */
+    uv_spinlock_lock(&termios_spinlock);
     if (orig_termios_fd == -1) {
       orig_termios = tty->orig_termios;
       orig_termios_fd = fd;
     }
+    uv_spinlock_unlock(&termios_spinlock);
 
     raw = tty->orig_termios;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
@@ -76,37 +131,26 @@ int uv_tty_set_mode(uv_tty_t* tty, int mode) {
     raw.c_cc[VTIME] = 0;
 
     /* Put terminal in raw mode after draining */
-    if (tcsetattr(fd, TCSADRAIN, &raw)) {
-      goto fatal;
-    }
+    if (tcsetattr(fd, TCSADRAIN, &raw))
+      return -errno;
 
     tty->mode = 1;
-    return 0;
-  } else if (mode == 0 && tty->mode) {
-    /* off */
-
+  } else if (mode == 0 && tty->mode) {  /* off */
     /* Put terminal in original mode after flushing */
-    if (tcsetattr(fd, TCSAFLUSH, &tty->orig_termios)) {
-      goto fatal;
-    }
-
+    if (tcsetattr(fd, TCSAFLUSH, &tty->orig_termios))
+      return -errno;
     tty->mode = 0;
-    return 0;
   }
 
-fatal:
-  uv__set_sys_error(tty->loop, errno);
-  return -1;
+  return 0;
 }
 
 
 int uv_tty_get_winsize(uv_tty_t* tty, int* width, int* height) {
   struct winsize ws;
 
-  if (ioctl(tty->fd, TIOCGWINSZ, &ws) < 0) {
-    uv__set_sys_error(tty->loop, errno);
-    return -1;
-  }
+  if (ioctl(uv__stream_fd(tty), TIOCGWINSZ, &ws))
+    return -errno;
 
   *width = ws.ws_col;
   *height = ws.ws_row;
@@ -116,30 +160,70 @@ int uv_tty_get_winsize(uv_tty_t* tty, int* width, int* height) {
 
 
 uv_handle_type uv_guess_handle(uv_file file) {
+  struct sockaddr sa;
   struct stat s;
+  socklen_t len;
+  int type;
 
-  if (file < 0) {
+  if (file < 0)
     return UV_UNKNOWN_HANDLE;
-  }
 
-  if (isatty(file)) {
+  if (isatty(file))
     return UV_TTY;
-  }
 
-  if (fstat(file, &s)) {
+  if (fstat(file, &s))
     return UV_UNKNOWN_HANDLE;
-  }
 
-  if (!S_ISSOCK(s.st_mode) && !S_ISFIFO(s.st_mode)) {
+  if (S_ISREG(s.st_mode))
     return UV_FILE;
+
+  if (S_ISCHR(s.st_mode))
+    return UV_FILE;  /* XXX UV_NAMED_PIPE? */
+
+  if (S_ISFIFO(s.st_mode))
+    return UV_NAMED_PIPE;
+
+  if (!S_ISSOCK(s.st_mode))
+    return UV_UNKNOWN_HANDLE;
+
+  len = sizeof(type);
+  if (getsockopt(file, SOL_SOCKET, SO_TYPE, &type, &len))
+    return UV_UNKNOWN_HANDLE;
+
+  len = sizeof(sa);
+  if (getsockname(file, &sa, &len))
+    return UV_UNKNOWN_HANDLE;
+
+  if (type == SOCK_DGRAM)
+    if (sa.sa_family == AF_INET || sa.sa_family == AF_INET6)
+      return UV_UDP;
+
+  if (type == SOCK_STREAM) {
+    if (sa.sa_family == AF_INET || sa.sa_family == AF_INET6)
+      return UV_TCP;
+    if (sa.sa_family == AF_UNIX)
+      return UV_NAMED_PIPE;
   }
 
-  return UV_NAMED_PIPE;
+  return UV_UNKNOWN_HANDLE;
 }
 
 
-void uv_tty_reset_mode() {
-  if (orig_termios_fd >= 0) {
-    tcsetattr(orig_termios_fd, TCSANOW, &orig_termios);
-  }
+/* This function is async signal-safe, meaning that it's safe to call from
+ * inside a signal handler _unless_ execution was inside uv_tty_set_mode()'s
+ * critical section when the signal was raised.
+ */
+int uv_tty_reset_mode(void) {
+  int err;
+
+  if (!uv_spinlock_trylock(&termios_spinlock))
+    return -EBUSY;  /* In uv_tty_set_mode(). */
+
+  err = 0;
+  if (orig_termios_fd != -1)
+    if (tcsetattr(orig_termios_fd, TCSANOW, &orig_termios))
+      err = -errno;
+
+  uv_spinlock_unlock(&termios_spinlock);
+  return err;
 }

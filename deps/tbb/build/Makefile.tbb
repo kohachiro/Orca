@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -36,7 +36,7 @@ DEBUG_SUFFIX=$(findstring _debug,_$(cfg))
 #------------------------------------------------------------
 # Define static pattern rules dealing with .cpp source files
 #------------------------------------------------------------
-$(warning CONFIG: cfg=$(cfg) arch=$(arch) compiler=$(compiler) os=$(tbb_os) runtime=$(runtime))
+$(warning CONFIG: cfg=$(cfg) arch=$(arch) compiler=$(compiler) target=$(target) runtime=$(runtime))
 
 default_tbb: $(TBB.DLL)
 .PHONY: default_tbb tbbvars clean
@@ -45,11 +45,6 @@ default_tbb: $(TBB.DLL)
 VPATH = $(tbb_root)/src/tbb/$(ASSEMBLY_SOURCE) $(tbb_root)/src/tbb $(tbb_root)/src/old $(tbb_root)/src/rml/client
 
 CPLUS_FLAGS += $(PIC_KEY) $(DEFINE_KEY)__TBB_BUILD=1
-
-# A template to switch off strict-ansi for certain compilation units
-# ifeq (1,$(TBB_NOSTRICT))
-# KNOWN_NOSTRICT = <object-file-name>
-# endif
 
 # suppress warnings for build of itt_notify by GCC3
 ifneq (,$(findstring gcc_cc3., $(compiler)_$(runtime)))
@@ -68,11 +63,9 @@ TBB_CPLUS.OBJ = concurrent_hash_map.$(OBJ) \
 		queuing_rw_mutex.$(OBJ) \
 		reader_writer_lock.$(OBJ) \
 		spin_rw_mutex.$(OBJ) \
+		x86_rtm_rw_mutex.$(OBJ) \
 		spin_mutex.$(OBJ) \
 		critical_section.$(OBJ) \
-		task.$(OBJ) \
-		tbb_misc.$(OBJ) \
-		tbb_misc_ex.$(OBJ) \
 		mutex.$(OBJ) \
 		recursive_mutex.$(OBJ) \
 		condition_variable.$(OBJ) \
@@ -81,6 +74,9 @@ TBB_CPLUS.OBJ = concurrent_hash_map.$(OBJ) \
 		semaphore.$(OBJ) \
 		private_server.$(OBJ) \
 		rml_tbb.$(OBJ) \
+		tbb_misc.$(OBJ) \
+		tbb_misc_ex.$(OBJ) \
+		task.$(OBJ) \
 		task_group_context.$(OBJ) \
 		governor.$(OBJ) \
 		market.$(OBJ) \

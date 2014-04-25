@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -36,17 +36,16 @@ namespace tbb {
 void spin_mutex::scoped_lock::internal_acquire( spin_mutex& m ) {
     __TBB_ASSERT( !my_mutex, "already holding a lock on a spin_mutex" );
     ITT_NOTIFY(sync_prepare, &m);
-    my_unlock_value = __TBB_LockByte(m.flag);
+    __TBB_LockByte(m.flag);
     my_mutex = &m;
     ITT_NOTIFY(sync_acquired, &m);
 }
 
 void spin_mutex::scoped_lock::internal_release() {
     __TBB_ASSERT( my_mutex, "release on spin_mutex::scoped_lock that is not holding a lock" );
-    __TBB_ASSERT( !(my_unlock_value&1), "corrupted scoped_lock?" );
 
     ITT_NOTIFY(sync_releasing, my_mutex);
-    __TBB_UnlockByte(my_mutex->flag, my_unlock_value);
+    __TBB_UnlockByte(my_mutex->flag);
     my_mutex = NULL;
 }
 
@@ -54,7 +53,6 @@ bool spin_mutex::scoped_lock::internal_try_acquire( spin_mutex& m ) {
     __TBB_ASSERT( !my_mutex, "already holding a lock on a spin_mutex" );
     bool result = bool( __TBB_TryLockByte(m.flag) );
     if( result ) {
-        my_unlock_value = 0;
         my_mutex = &m;
         ITT_NOTIFY(sync_acquired, &m);
     }

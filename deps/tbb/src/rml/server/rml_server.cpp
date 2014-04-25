@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -833,7 +833,7 @@ void thread_map::unbind() {
 
 void thread_map::assist_cleanup( bool assist_null_only ) {
     // To avoid deadlock, the current thread *must* help out with cleanups that have not started,
-    // becausd the thread that created the job may be busy for a long time.
+    // because the thread that created the job may be busy for a long time.
     for( iterator i = begin(); i!=end(); ++i ) {
         rml::job* j=0;
         job_automaton& ja = i->my_automaton;
@@ -1840,14 +1840,9 @@ void omp_connection_v2::get_threads( size_type request_size, void* cookie, job* 
 void omp_dispatch_type::consume() {
     // Wait for short window between when master sets state of this thread to ts_omp_busy
     // and master thread calls produce.
-    job_type* j = job; 
-    if( !j ) {
-        tbb::internal::atomic_backoff bo;
-        do {
-            bo.pause();
-            j = job;
-        } while( !j );
-    }
+    job_type* j;
+    tbb::internal::atomic_backoff backoff;
+    while( (j = job)==NULL ) backoff.pause();
     job = static_cast<job_type*>(NULL);
     client->process(*j,cookie,index);
 #if TBB_USE_ASSERT
@@ -3154,13 +3149,8 @@ void connection_scavenger_thread::add_request( generic_connection<Server,Client>
 {
     uintptr_t conn_ex = (uintptr_t)conn_to_close | (connection_traits<Server,Client>::is_tbb<<1);
     __TBB_ASSERT( !conn_to_close->next_conn, NULL );
-    uintptr_t old_tail_ex = connections_to_reclaim.tail;
+    const uintptr_t old_tail_ex = connections_to_reclaim.tail.fetch_and_store(conn_ex);
     __TBB_ASSERT( old_tail_ex==0||old_tail_ex>garbage_connection_queue::plugged_acked, "Unloading DLL called while this connection is being closed?" );
-    tbb::internal::atomic_backoff backoff;
-    while( connections_to_reclaim.tail.compare_and_swap( conn_ex, old_tail_ex )!=old_tail_ex ) {
-        backoff.pause();
-        old_tail_ex = connections_to_reclaim.tail;
-    }
 
     if( old_tail_ex==garbage_connection_queue::empty )
         connections_to_reclaim.head = conn_ex;

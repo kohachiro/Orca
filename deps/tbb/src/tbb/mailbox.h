@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -33,6 +33,7 @@
 #include "tbb/cache_aligned_allocator.h"
 
 #include "scheduler_common.h"
+#include "tbb/atomic.h"
 
 namespace tbb {
 namespace internal {
@@ -79,7 +80,7 @@ struct task_proxy : public task {
             // Attempt to transition the proxy to the "empty" state with
             // cleaner_bit specifying entity responsible for its eventual freeing.
             // Explicit cast to void* is to work around a seeming ICC 11.1 bug.
-            if ( __TBB_CompareAndSwapW( (void*)&task_and_tag, cleaner_bit, tat ) == tat ) {
+            if ( as_atomic(task_and_tag).compare_and_swap(cleaner_bit, tat) == tat ) {
                 // Successfully grabbed the task, and left new owner with the job of freeing the proxy
                 return task_ptr(tat);
             }
@@ -110,8 +111,7 @@ protected:
 
 //! Class representing where mail is put.
 /** Padded to occupy a cache line. */
-class mail_outbox : unpadded_mail_outbox {
-    char pad[NFS_MaxLineSize-sizeof(unpadded_mail_outbox)];
+class mail_outbox : padded<unpadded_mail_outbox> {
 
     task_proxy* internal_pop() {
         task_proxy* const first = __TBB_load_relaxed(my_first);
@@ -125,15 +125,15 @@ class mail_outbox : unpadded_mail_outbox {
         } else {
             // There is only one item.  Some care is required to pop it.
             my_first = NULL;
-            if( (proxy_ptr*)__TBB_CompareAndSwapW(&my_last, (intptr_t)&my_first,
-                                (intptr_t)&first->next_in_mailbox) == &first->next_in_mailbox )
+            if( as_atomic(my_last).compare_and_swap(&my_first,&first->next_in_mailbox) == &first->next_in_mailbox )
             {
                 // Successfully transitioned mailbox from having one item to having none.
                 __TBB_ASSERT(!first->next_in_mailbox,NULL);
             } else {
                 // Some other thread updated my_last but has not filled in first->next_in_mailbox
                 // Wait until first item points to second item.
-                for( atomic_backoff backoff; !(second = first->next_in_mailbox); backoff.pause() ) {}
+                atomic_backoff backoff;
+                while( !(second = first->next_in_mailbox) ) backoff.pause();
                 my_first = second;
             }
         }
@@ -153,6 +153,11 @@ public:
         __TBB_store_relaxed(*link, &t);
     }
 
+    //! Return true if mailbox is empty
+    bool empty() {
+        return __TBB_load_relaxed(my_first) == NULL;
+    }
+
     //! Construct *this as a mailbox from zeroed memory.
     /** Raise assertion if *this is not previously zeroed, or sizeof(this) is wrong.
         This method is provided instead of a full constructor since we know the object
@@ -163,6 +168,7 @@ public:
         __TBB_ASSERT( !my_last, NULL );
         __TBB_ASSERT( !my_is_idle, NULL );
         my_last=&my_first;
+        suppress_unused_warning(pad);
     }
 
     //! Drain the mailbox 
@@ -203,6 +209,10 @@ public:
     //! Get next piece of mail, or NULL if mailbox is empty.
     task_proxy* pop() {
         return my_putter->internal_pop();
+    }
+    //! Return true if mailbox is empty
+    bool empty() {
+        return my_putter->empty();
     }
     //! Indicate whether thread that reads this mailbox is idle.
     /** Raises assertion failure if mailbox is redundantly marked as not idle. */

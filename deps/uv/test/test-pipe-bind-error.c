@@ -53,24 +53,21 @@ TEST_IMPL(pipe_bind_error_addrinuse) {
   r = uv_pipe_init(uv_default_loop(), &server2, 0);
   ASSERT(r == 0);
   r = uv_pipe_bind(&server2, TEST_PIPENAME);
-  ASSERT(r == -1);
-
-  ASSERT(uv_last_error(uv_default_loop()).code == UV_EADDRINUSE);
+  ASSERT(r == UV_EADDRINUSE);
 
   r = uv_listen((uv_stream_t*)&server1, SOMAXCONN, NULL);
   ASSERT(r == 0);
   r = uv_listen((uv_stream_t*)&server2, SOMAXCONN, NULL);
-  ASSERT(r == -1);
-
-  ASSERT(uv_last_error(uv_default_loop()).code == UV_EINVAL);
+  ASSERT(r == UV_EINVAL);
 
   uv_close((uv_handle_t*)&server1, close_cb);
   uv_close((uv_handle_t*)&server2, close_cb);
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(close_cb_called == 2);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
@@ -81,17 +78,17 @@ TEST_IMPL(pipe_bind_error_addrnotavail) {
 
   r = uv_pipe_init(uv_default_loop(), &server, 0);
   ASSERT(r == 0);
-  r = uv_pipe_bind(&server, BAD_PIPENAME);
 
-  ASSERT(r == -1);
-  ASSERT(uv_last_error(uv_default_loop()).code == UV_EACCES);
+  r = uv_pipe_bind(&server, BAD_PIPENAME);
+  ASSERT(r == UV_EACCES);
 
   uv_close((uv_handle_t*)&server, close_cb);
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(close_cb_called == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
@@ -105,16 +102,15 @@ TEST_IMPL(pipe_bind_error_inval) {
   r = uv_pipe_bind(&server, TEST_PIPENAME);
   ASSERT(r == 0);
   r = uv_pipe_bind(&server, TEST_PIPENAME_2);
-  ASSERT(r == -1);
-
-  ASSERT(uv_last_error(uv_default_loop()).code == UV_EINVAL);
+  ASSERT(r == UV_EINVAL);
 
   uv_close((uv_handle_t*)&server, close_cb);
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(close_cb_called == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
@@ -125,16 +121,16 @@ TEST_IMPL(pipe_listen_without_bind) {
 
   r = uv_pipe_init(uv_default_loop(), &server, 0);
   ASSERT(r == 0);
-  r = uv_listen((uv_stream_t*)&server, SOMAXCONN, NULL);
-  ASSERT(r == -1);
 
-  ASSERT(uv_last_error(uv_default_loop()).code == UV_EINVAL);
+  r = uv_listen((uv_stream_t*)&server, SOMAXCONN, NULL);
+  ASSERT(r == UV_EINVAL);
 
   uv_close((uv_handle_t*)&server, close_cb);
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(close_cb_called == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

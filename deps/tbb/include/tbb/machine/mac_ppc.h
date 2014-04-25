@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -47,15 +47,18 @@
     #define __TBB_WORDSIZE 4
 #endif
 
-#ifndef __BYTE_ORDER__
-    // Hopefully endianness can be validly determined at runtime.
-    // This may silently fail in some embedded systems with page-specific endianness.
-#elif __BYTE_ORDER__==__ORDER_BIG_ENDIAN__
-    #define __TBB_BIG_ENDIAN 1
-#elif __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__
-    #define __TBB_BIG_ENDIAN 0
+// Traditionally Power Architecture is big-endian.
+// Little-endian could be just an address manipulation (compatibility with TBB not verified),
+// or normal little-endian (on more recent systems). Embedded PowerPC systems may support
+// page-specific endianness, but then one endianness must be hidden from TBB so that it still sees only one.
+#if __BIG_ENDIAN__ || (defined(__BYTE_ORDER__) && __BYTE_ORDER__==__ORDER_BIG_ENDIAN__)
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_BIG
+#elif __LITTLE_ENDIAN__ || (defined(__BYTE_ORDER__) && __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__)
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_LITTLE
+#elif defined(__BYTE_ORDER__)
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_UNSUPPORTED
 #else
-     #define __TBB_BIG_ENDIAN -1 // not currently supported
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_DETECT
 #endif
 
 // On Power Architecture, (lock-free) 64-bit atomics require 64-bit hardware:

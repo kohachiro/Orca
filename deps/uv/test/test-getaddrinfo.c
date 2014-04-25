@@ -21,11 +21,7 @@
 
 #include "uv.h"
 #include "task.h"
-
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h> /* strlen */
-
 
 #define CONCURRENT_COUNT    10
 
@@ -37,6 +33,18 @@ static int getaddrinfo_cbs = 0;
 static uv_getaddrinfo_t* getaddrinfo_handle;
 static uv_getaddrinfo_t getaddrinfo_handles[CONCURRENT_COUNT];
 static int callback_counts[CONCURRENT_COUNT];
+static int fail_cb_called;
+
+
+static void getaddrinfo_fail_cb(uv_getaddrinfo_t* req,
+                                int status,
+                                struct addrinfo* res) {
+  ASSERT(fail_cb_called == 0);
+  ASSERT(status < 0);
+  ASSERT(res == NULL);
+  uv_freeaddrinfo(res);  /* Should not crash. */
+  fail_cb_called++;
+}
 
 
 static void getaddrinfo_basic_cb(uv_getaddrinfo_t* handle,
@@ -72,6 +80,23 @@ static void getaddrinfo_cuncurrent_cb(uv_getaddrinfo_t* handle,
 }
 
 
+TEST_IMPL(getaddrinfo_fail) {
+  uv_getaddrinfo_t req;
+
+  ASSERT(0 == uv_getaddrinfo(uv_default_loop(),
+                             &req,
+                             getaddrinfo_fail_cb,
+                             "xyzzy.xyzzy.xyzzy",
+                             NULL,
+                             NULL));
+  ASSERT(0 == uv_run(uv_default_loop(), UV_RUN_DEFAULT));
+  ASSERT(fail_cb_called == 1);
+
+  MAKE_VALGRIND_HAPPY();
+  return 0;
+}
+
+
 TEST_IMPL(getaddrinfo_basic) {
   int r;
   getaddrinfo_handle = (uv_getaddrinfo_t*)malloc(sizeof(uv_getaddrinfo_t));
@@ -84,10 +109,11 @@ TEST_IMPL(getaddrinfo_basic) {
                      NULL);
   ASSERT(r == 0);
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(getaddrinfo_cbs == 1);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
@@ -112,11 +138,12 @@ TEST_IMPL(getaddrinfo_concurrent) {
     ASSERT(r == 0);
   }
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   for (i = 0; i < CONCURRENT_COUNT; i++) {
     ASSERT(callback_counts[i] == 1);
   }
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

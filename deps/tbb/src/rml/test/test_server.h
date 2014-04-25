@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -67,19 +67,7 @@ static bool TestSingleConnection;
 
 static size_t N_TestConnections;
 
-#if _WIN32||_WIN64
-#include <Windows.h> /* Need Sleep */
-#else
-#include <unistd.h>  /* Need usleep */   
-#endif
-
-void MilliSleep( unsigned milliseconds ) {
-#if _WIN32||_WIN64
-    Sleep( milliseconds );
-#else
-    usleep( milliseconds*1000 );
-#endif /* _WIN32||_WIN64 */
-}
+static int default_concurrency;
 
 class MyJob: public ::rml::job {
 public:
@@ -144,7 +132,7 @@ private:
 public:
     enum state_t {
         //! Treat *this as constructed.
-        live=0x1,
+        live=0x1234,
         //! Treat *this as destroyed.
         destroyed=0xDEAD
     };
@@ -408,11 +396,11 @@ void SimpleTest() {
         doc(0);
 #endif
     }
-    ASSERT( Harness::ConcurrencyTracker::PeakParallelism()>1, "No multiple connections exercised?" );
+    ASSERT( Harness::ConcurrencyTracker::PeakParallelism()>1 || default_concurrency==0, "No multiple connections exercised?" );
 #endif /* !TRIVIAL */
     // Let RML catch up.
     while( ClientConstructions!=ClientDestructions )
-        MilliSleep(1);
+        Harness::Sleep(1);
 }
 
 static void check_server_info( void* arg, const char* server_info )
@@ -440,6 +428,7 @@ void VerifyInitialization( int n_thread ) {
                client->client_id(), n_thread, 0, 0);
     ASSERT( server, NULL );
     client->set_server( server );
+    default_concurrency = server->default_concurrency();
 
     DoClientSpecificVerification( *server, n_thread );
 

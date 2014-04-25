@@ -99,6 +99,7 @@ class CompilationCacheScript : public CompilationSubCache {
                                     Handle<Object> name,
                                     int line_offset,
                                     int column_offset,
+                                    bool is_shared_cross_origin,
                                     Handle<Context> context);
   void Put(Handle<String> source,
            Handle<Context> context,
@@ -119,7 +120,8 @@ class CompilationCacheScript : public CompilationSubCache {
   bool HasOrigin(Handle<SharedFunctionInfo> function_info,
                  Handle<Object> name,
                  int line_offset,
-                 int column_offset);
+                 int column_offset,
+                 bool is_shared_cross_origin);
 
   void* script_histogram_;
   bool script_histogram_initialized_;
@@ -134,10 +136,9 @@ class CompilationCacheScript : public CompilationSubCache {
 // entries:
 // 1. The source string.
 // 2. The shared function info of the calling function.
-// 3. Whether the source should be compiled as strict code or as non-strict
-//    code.
+// 3. Whether the source should be compiled as strict code or as sloppy code.
 //    Note: Currently there are clients of CompileEval that always compile
-//    non-strict code even if the calling function is a strict mode function.
+//    sloppy code even if the calling function is a strict mode function.
 //    More specifically these are the CompileString, DebugEvaluate and
 //    DebugEvaluateGlobal runtime functions.
 // 4. The start position of the calling scope.
@@ -148,7 +149,7 @@ class CompilationCacheEval: public CompilationSubCache {
 
   Handle<SharedFunctionInfo> Lookup(Handle<String> source,
                                     Handle<Context> context,
-                                    LanguageMode language_mode,
+                                    StrictMode strict_mode,
                                     int scope_position);
 
   void Put(Handle<String> source,
@@ -212,6 +213,7 @@ class CompilationCache {
                                           Handle<Object> name,
                                           int line_offset,
                                           int column_offset,
+                                          bool is_shared_cross_origin,
                                           Handle<Context> context);
 
   // Finds the shared function info for a source string for eval in a
@@ -219,8 +221,7 @@ class CompilationCache {
   // contain a script for the given source string.
   Handle<SharedFunctionInfo> LookupEval(Handle<String> source,
                                         Handle<Context> context,
-                                        bool is_global,
-                                        LanguageMode language_mode,
+                                        StrictMode strict_mode,
                                         int scope_position);
 
   // Returns the regexp data associated with the given regexp if it
@@ -238,7 +239,6 @@ class CompilationCache {
   // with the shared function info. This may overwrite an existing mapping.
   void PutEval(Handle<String> source,
                Handle<Context> context,
-               bool is_global,
                Handle<SharedFunctionInfo> function_info,
                int scope_position);
 

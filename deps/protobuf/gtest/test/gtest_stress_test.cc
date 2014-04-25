@@ -32,7 +32,7 @@
 // Tests that SCOPED_TRACE() and various Google Test assertions can be
 // used in a large number of threads concurrently.
 
-#include <gtest/gtest.h>
+#include "gtest/gtest.h"
 
 #include <iostream>
 #include <vector>
@@ -50,7 +50,6 @@ namespace testing {
 namespace {
 
 using internal::Notification;
-using internal::String;
 using internal::TestPropertyKeyIs;
 using internal::ThreadWithParam;
 using internal::scoped_ptr;
@@ -62,13 +61,13 @@ using internal::scoped_ptr;
 // How many threads to create?
 const int kThreadCount = 50;
 
-String IdToKey(int id, const char* suffix) {
+std::string IdToKey(int id, const char* suffix) {
   Message key;
   key << "key_" << id << "_" << suffix;
   return key.GetString();
 }
 
-String IdToString(int id) {
+std::string IdToString(int id) {
   Message id_message;
   id_message << id;
   return id_message.GetString();

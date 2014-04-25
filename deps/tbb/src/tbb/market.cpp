@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -113,7 +113,7 @@ market& market::global_market ( unsigned max_num_workers, size_t stack_size ) {
         size += sizeof(generic_scheduler*) * (max_num_workers - 1);
 #endif /* __TBB_TASK_GROUP_CONTEXT */
         __TBB_InitOnce::add_ref();
-        void* storage = NFS_Allocate(size, 1, NULL);
+        void* storage = NFS_Allocate(1, size, NULL);
         memset( storage, 0, size );
         // Initialize and publish global market
         m = new (storage) market( max_num_workers, stack_size );
@@ -146,11 +146,27 @@ void market::release () {
         my_server->request_close_connection();
 }
 
+void market::wait_workers () {
+    // usable for this kind of scheduler only
+    __TBB_ASSERT(governor::needsWaitWorkers(), NULL);
+    // wait till terminating last worker decresed my_ref_count
+    while (__TBB_load_with_acquire(my_ref_count) > 1)
+        __TBB_Yield();
+    __TBB_ASSERT(1 == my_ref_count, NULL);
+    release();
+}
+
 arena& market::create_arena ( unsigned max_num_workers, size_t stack_size ) {
     market &m = global_market( max_num_workers, stack_size ); // increases market's ref count
+#if __TBB_TASK_ARENA
+    // Prevent cutting an extra slot for task_arena(p,0) with default market (p-1 worketrs).
+    // This is a temporary workaround for 1968 until (TODO:) master slot reservation is reworked
+    arena& a = arena::allocate_arena( m, min(max_num_workers, m.my_max_num_workers+1) );
+#else
     arena& a = arena::allocate_arena( m, min(max_num_workers, m.my_max_num_workers) );
+#endif
     // Add newly created arena into the existing market's list.
-    spin_mutex::scoped_lock lock(m.my_arenas_list_mutex);
+    arenas_list_mutex_type::scoped_lock lock(m.my_arenas_list_mutex);
     m.insert_arena_into_list(a);
     return a;
 }
@@ -169,7 +185,7 @@ void market::detach_arena ( arena& a ) {
 
 void market::try_destroy_arena ( arena* a, uintptr_t aba_epoch ) {
     __TBB_ASSERT ( a, NULL );
-    spin_mutex::scoped_lock lock(my_arenas_list_mutex);
+    arenas_list_mutex_type::scoped_lock lock(my_arenas_list_mutex);
     assert_market_valid();
 #if __TBB_TASK_PRIORITY
     for ( int p = my_global_top_priority; p >= my_global_bottom_priority; --p ) {
@@ -181,7 +197,7 @@ void market::try_destroy_arena ( arena* a, uintptr_t aba_epoch ) {
             if ( a == &*it ) {
                 if ( it->my_aba_epoch == aba_epoch ) {
                     // Arena is alive
-                    if ( !a->my_num_workers_requested && !a->my_num_threads_active ) {
+                    if ( !a->my_num_workers_requested && !a->my_references ) {
                         __TBB_ASSERT( !a->my_num_workers_allotted && (a->my_pool_state == arena::SNAPSHOT_EMPTY || !a->my_max_num_workers), "Inconsistent arena state" );
                         // Arena is abandoned. Destroy it.
                         detach_arena( *a );
@@ -230,7 +246,7 @@ arena* market::arena_in_need ( arena_list_type &arenas, arena_list_type::iterato
         if ( ++it == arenas.end() )
             it = arenas.begin();
         if ( a.num_workers_active() < a.my_num_workers_allotted ) {
-            ++a.my_num_threads_active;
+            a.my_references+=2; // add a worker
 #if __TBB_TRACK_PRIORITY_LEVEL_SATURATION
             ++a.my_num_workers_present;
             ++my_priority_levels[a.my_top_priority].workers_present;
@@ -290,14 +306,14 @@ arena* market::arena_in_need (
 #endif /* __TBB_TRACK_PRIORITY_LEVEL_SATURATION */
                              )
 {
-    spin_mutex::scoped_lock lock(my_arenas_list_mutex);
+    arenas_list_mutex_type::scoped_lock lock(my_arenas_list_mutex);
     assert_market_valid();
 #if __TBB_TRACK_PRIORITY_LEVEL_SATURATION
     if ( prev_arena ) {
         priority_level_info &pl = my_priority_levels[prev_arena->my_top_priority];
         --prev_arena->my_num_workers_present;
         --pl.workers_present;
-        if ( !--prev_arena->my_num_threads_active && !prev_arena->my_num_workers_requested ) {
+        if ( !--prev_arena->my_references && !prev_arena->my_num_workers_requested ) {
             detach_arena( *a );
             lock.release();
             a->free_arena();
@@ -368,13 +384,23 @@ void market::adjust_demand ( arena& a, int delta ) {
         }
         delta = -prev_req;
     }
+#if __TBB_TASK_ARENA
+    else if ( prev_req < 0 ) {
+        delta = a.my_num_workers_requested;
+    }
+#else  /* __TBB_TASK_ARENA */
     __TBB_ASSERT( prev_req >= 0, "Part-size request to RML?" );
+#endif /* __TBB_TASK_ARENA */
 #if __TBB_TASK_PRIORITY
     intptr_t p = a.my_top_priority;
     priority_level_info &pl = my_priority_levels[p];
     pl.workers_requested += delta;
     __TBB_ASSERT( pl.workers_requested >= 0, NULL );
+#if !__TBB_TASK_ARENA
     __TBB_ASSERT( a.my_num_workers_requested >= 0, NULL );
+#else
+    //TODO: understand the assertion and modify
+#endif
     if ( a.my_num_workers_requested <= 0 ) {
         if ( a.my_top_priority != normalized_normal_priority ) {
             GATHER_STATISTIC( ++governor::local_scheduler_if_initialized()->my_counters.arena_prio_resets );
@@ -394,7 +420,11 @@ void market::adjust_demand ( arena& a, int delta ) {
         update_allotment( my_global_top_priority );
     }
     else if ( p > my_global_top_priority ) {
+#if !__TBB_TASK_ARENA
         __TBB_ASSERT( pl.workers_requested > 0, NULL );
+#else
+        //TODO: understand the assertion and modify
+#endif
         update_global_top_priority(p);
         a.my_num_workers_allotted = min( (int)my_max_num_workers, a.my_num_workers_requested );
         my_priority_levels[p - 1].workers_available = my_max_num_workers - a.my_num_workers_allotted;
@@ -426,6 +456,7 @@ void market::adjust_demand ( arena& a, int delta ) {
         __TBB_ASSERT( my_global_bottom_priority < p && p < my_global_top_priority, NULL );
         update_allotment( p );
     }
+    __TBB_ASSERT( my_global_top_priority >= a.my_top_priority || a.my_num_workers_requested<=0, NULL );
     assert_market_valid();
 #else /* !__TBB_TASK_PRIORITY */
     my_total_demand += delta;
@@ -504,14 +535,16 @@ void market::update_arena_top_priority ( arena& a, intptr_t new_priority ) {
     __TBB_ASSERT( prev_level.workers_requested >= 0 && new_level.workers_requested >= 0, NULL );
 }
 
-bool market::lower_arena_priority ( arena& a, intptr_t new_priority, intptr_t old_priority ) {
-    spin_mutex::scoped_lock lock(my_arenas_list_mutex);
-    if ( a.my_top_priority != old_priority ) {
+bool market::lower_arena_priority ( arena& a, intptr_t new_priority, uintptr_t old_reload_epoch ) {
+    // TODO: replace the lock with a try_lock loop which performs a double check of the epoch
+    arenas_list_mutex_type::scoped_lock lock(my_arenas_list_mutex);
+    if ( a.my_reload_epoch != old_reload_epoch ) {
         assert_market_valid();
         return false;
     }
     __TBB_ASSERT( a.my_top_priority > new_priority, NULL );
     __TBB_ASSERT( my_global_top_priority >= a.my_top_priority, NULL );
+
     intptr_t p = a.my_top_priority;
     update_arena_top_priority( a, new_priority );
     if ( a.my_num_workers_requested > 0 ) {
@@ -526,55 +559,65 @@ bool market::lower_arena_priority ( arena& a, intptr_t new_priority, intptr_t ol
         }
         update_allotment( p );
     }
+
+    __TBB_ASSERT( my_global_top_priority >= a.my_top_priority, NULL );
     assert_market_valid();
     return true;
 }
 
 bool market::update_arena_priority ( arena& a, intptr_t new_priority ) {
-    spin_mutex::scoped_lock lock(my_arenas_list_mutex);
+    arenas_list_mutex_type::scoped_lock lock(my_arenas_list_mutex);
+
+    __TBB_ASSERT( my_global_top_priority >= a.my_top_priority || a.my_num_workers_requested <= 0, NULL );
+    assert_market_valid();
     if ( a.my_top_priority == new_priority ) {
-        assert_market_valid();
         return false;
     }
     else if ( a.my_top_priority > new_priority ) {
         if ( a.my_bottom_priority > new_priority )
             a.my_bottom_priority = new_priority;
-        assert_market_valid();
         return false;
     }
+    else if ( a.my_num_workers_requested <= 0 ) {
+        return false;
+    }
+
+    __TBB_ASSERT( my_global_top_priority >= a.my_top_priority, NULL );
+
     intptr_t p = a.my_top_priority;
     intptr_t highest_affected_level = max(p, new_priority);
     update_arena_top_priority( a, new_priority );
-    if ( a.my_num_workers_requested > 0 ) {
-        if ( my_global_top_priority < new_priority ) {
-            update_global_top_priority(new_priority);
-        }
-        else if ( my_global_top_priority == new_priority ) {
-            advance_global_reload_epoch();
-        }
-        else {
-            __TBB_ASSERT( new_priority < my_global_top_priority, NULL );
-            __TBB_ASSERT( new_priority > my_global_bottom_priority, NULL );
-            if ( p == my_global_top_priority && !my_priority_levels[p].workers_requested ) {
-                // Global top level became empty
-                __TBB_ASSERT( my_global_bottom_priority < p, NULL );
-                for ( --p; !my_priority_levels[p].workers_requested; --p ) continue;
-                __TBB_ASSERT( p >= new_priority, NULL );
-                update_global_top_priority(p);
-                highest_affected_level = p;
-            }
-        }
-        if ( p == my_global_bottom_priority ) {
-            // Arena priority was increased from the global bottom level.
-            __TBB_ASSERT( p < new_priority, NULL );                     // n
-            __TBB_ASSERT( new_priority <= my_global_top_priority, NULL );
-            while ( !my_priority_levels[my_global_bottom_priority].workers_requested )
-                ++my_global_bottom_priority;
-            __TBB_ASSERT( my_global_bottom_priority <= new_priority, NULL );
-            __TBB_ASSERT( my_priority_levels[my_global_bottom_priority].workers_requested > 0, NULL );
-        }
-        update_allotment( highest_affected_level );
+
+    if ( my_global_top_priority < new_priority ) {
+        update_global_top_priority(new_priority);
     }
+    else if ( my_global_top_priority == new_priority ) {
+        advance_global_reload_epoch();
+    }
+    else {
+        __TBB_ASSERT( new_priority < my_global_top_priority, NULL );
+        __TBB_ASSERT( new_priority > my_global_bottom_priority, NULL );
+        if ( p == my_global_top_priority && !my_priority_levels[p].workers_requested ) {
+            // Global top level became empty
+            __TBB_ASSERT( my_global_bottom_priority < p, NULL );
+            for ( --p; !my_priority_levels[p].workers_requested; --p ) continue;
+            __TBB_ASSERT( p >= new_priority, NULL );
+            update_global_top_priority(p);
+            highest_affected_level = p;
+        }
+    }
+    if ( p == my_global_bottom_priority ) {
+        // Arena priority was increased from the global bottom level.
+        __TBB_ASSERT( p < new_priority, NULL );                     // n
+        __TBB_ASSERT( new_priority <= my_global_top_priority, NULL );
+        while ( !my_priority_levels[my_global_bottom_priority].workers_requested )
+            ++my_global_bottom_priority;
+        __TBB_ASSERT( my_global_bottom_priority <= new_priority, NULL );
+        __TBB_ASSERT( my_priority_levels[my_global_bottom_priority].workers_requested > 0, NULL );
+    }
+    update_allotment( highest_affected_level );
+
+    __TBB_ASSERT( my_global_top_priority >= a.my_top_priority, NULL );
     assert_market_valid();
     return true;
 }

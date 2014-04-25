@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -72,9 +72,9 @@ namespace helpers{
 }
 namespace helpers{
     template<class T> void ignore( const T& ) { }
-    //TODO: add test cases for prevent_optimizng_out function
+    //TODO: add test cases for prevent_optimizing_out function
     template<typename type>
-    void prevent_optimizng_out(type volatile const& s){
+    void prevent_optimizing_out(type volatile const& s){
         volatile const type* dummy = &s;
         ignore(dummy);
     }
@@ -101,44 +101,44 @@ namespace helpers{
     };
 
     template <typename counter_type = size_t>
-    struct object_instanses_counting_type{
+    struct object_instances_counting_type{
         counter_type * m_p_count;
-        object_instanses_counting_type(): m_p_count (new counter_type){*m_p_count =1; } //to overcome absense of constructor in tbb::atomic
-        ~object_instanses_counting_type(){ if (! --(*m_p_count)){delete(m_p_count);}}
-        object_instanses_counting_type(object_instanses_counting_type const& other): m_p_count(other.m_p_count){
+        object_instances_counting_type(): m_p_count (new counter_type){*m_p_count =1; } //to overcome absense of constructor in tbb::atomic
+        ~object_instances_counting_type(){ if (! --(*m_p_count)){delete(m_p_count);}}
+        object_instances_counting_type(object_instances_counting_type const& other): m_p_count(other.m_p_count){
             ++(*m_p_count);
         }
-        object_instanses_counting_type& operator=(object_instanses_counting_type other){
+        object_instances_counting_type& operator=(object_instances_counting_type other){
             std::swap(this->m_p_count,other.m_p_count);
             return *this;
         }
         size_t instances_count()const {return *m_p_count;}
     };
-    typedef object_instanses_counting_type<> object_instanses_counting_serial_type;
-    typedef object_instanses_counting_type<tbb::atomic<std::size_t> > object_instanses_counting_concurent_type;
+    typedef object_instances_counting_type<> object_instances_counting_serial_type;
+    typedef object_instances_counting_type<tbb::atomic<std::size_t> > object_instances_counting_concurrent_type;
 
-    namespace object_instanses_counting_type_test_cases{
+    namespace object_instances_counting_type_test_cases{
         namespace serial_tests{
-            TEST_CASE_WITH_FIXTURE(test_object_instanses_counting_type_creation,empty_fixture){
-                ASSERT(object_instanses_counting_serial_type().instances_count()==1,"newly created instance by definition has instances_count equal to 1");
+            TEST_CASE_WITH_FIXTURE(test_object_instances_counting_type_creation,empty_fixture){
+                ASSERT(object_instances_counting_serial_type().instances_count()==1,"newly created instance by definition has instances_count equal to 1");
             }
-            TEST_CASE_WITH_FIXTURE(test_object_instanses_counting_type_copy,empty_fixture){
-                object_instanses_counting_serial_type source;
-                ASSERT(object_instanses_counting_serial_type(source).instances_count()==2,"copy should increase ref count");
+            TEST_CASE_WITH_FIXTURE(test_object_instances_counting_type_copy,empty_fixture){
+                object_instances_counting_serial_type source;
+                ASSERT(object_instances_counting_serial_type(source).instances_count()==2,"copy should increase ref count");
             }
-            TEST_CASE_WITH_FIXTURE(test_object_instanses_counting_type_assignment,empty_fixture){
-                object_instanses_counting_serial_type source;
-                object_instanses_counting_serial_type assigned;
+            TEST_CASE_WITH_FIXTURE(test_object_instances_counting_type_assignment,empty_fixture){
+                object_instances_counting_serial_type source;
+                object_instances_counting_serial_type assigned;
                 assigned = source;
                 ASSERT(source.instances_count()==2,"assign should increase ref count");
                 ASSERT(assigned.instances_count()==2,"assign should increase ref count");
             }
         }
-        namespace concurent_tests{
-            typedef native_for_concurrent_op_repeated<object_instanses_counting_concurent_type>  native_for_concurrent_op;
+        namespace concurrent_tests{
+            typedef native_for_concurrent_op_repeated<object_instances_counting_concurrent_type>  native_for_concurrent_op;
 
             struct native_for_single_op_repeated_fixture{
-                object_instanses_counting_concurent_type source;
+                object_instances_counting_concurrent_type source;
                 void run_native_for_and_assert_source_is_unique(native_for_concurrent_op::test_function_pointer_type operation,const char* msg){
                     //TODO: refactor number of threads into separate fixture
                     const size_t number_of_threads = min(4,tbb::task_scheduler_init::default_num_threads());
@@ -149,18 +149,18 @@ namespace helpers{
                 }
 
             };
-            TEST_CASE_WITH_FIXTURE(test_object_instanses_counting_type_copy,native_for_single_op_repeated_fixture){
-                struct _{ static void copy(object_instanses_counting_concurent_type& source){
-                    object_instanses_counting_concurent_type copy(source);
-                    helpers::prevent_optimizng_out(copy);
+            TEST_CASE_WITH_FIXTURE(test_object_instances_counting_type_copy,native_for_single_op_repeated_fixture){
+                struct _{ static void copy(object_instances_counting_concurrent_type& source){
+                    object_instances_counting_concurrent_type copy(source);
+                    helpers::prevent_optimizing_out(copy);
                 }};
                 run_native_for_and_assert_source_is_unique(&_::copy,"reference counting during copy construction/destruction is not thread safe ?");
             }
-            TEST_CASE_WITH_FIXTURE(test_object_instanses_counting_type_assignment,native_for_single_op_repeated_fixture){
-                struct _{ static void assign(object_instanses_counting_concurent_type& source){
-                    object_instanses_counting_concurent_type assigned;
+            TEST_CASE_WITH_FIXTURE(test_object_instances_counting_type_assignment,native_for_single_op_repeated_fixture){
+                struct _{ static void assign(object_instances_counting_concurrent_type& source){
+                    object_instances_counting_concurrent_type assigned;
                     assigned = source;
-                    helpers::prevent_optimizng_out(assigned);
+                    helpers::prevent_optimizing_out(assigned);
                 }};
                 run_native_for_and_assert_source_is_unique(&_::assign,"reference counting during assigning/destruction is not thread safe ?");
             }
@@ -236,7 +236,7 @@ namespace serial_tests{
         }
         }
         namespace helpers{
-            using ::helpers::object_instanses_counting_serial_type;
+            using ::helpers::object_instances_counting_serial_type;
         }
         namespace helpers{
             template<typename value_type>
@@ -250,9 +250,9 @@ namespace serial_tests{
         struct instance_counting_fixture{
             static const size_t number_of_lru_history_items = 8;
 
-            typedef helpers::clonning_function<helpers::object_instanses_counting_serial_type> cloner_type;
-            typedef get_lru_cache_type::apply<size_t,helpers::object_instanses_counting_serial_type,cloner_type>::type cache_type;
-            helpers::object_instanses_counting_serial_type source;
+            typedef helpers::clonning_function<helpers::object_instances_counting_serial_type> cloner_type;
+            typedef get_lru_cache_type::apply<size_t,helpers::object_instances_counting_serial_type,cloner_type>::type cache_type;
+            helpers::object_instances_counting_serial_type source;
             cloner_type cloner;
             cache_type cache;
 
@@ -292,9 +292,9 @@ namespace serial_tests{
         struct filled_instance_counting_fixture_with_external_map{
             static const size_t number_of_lru_history_items = 8;
 
-            typedef helpers::map_searcher<size_t,helpers::object_instanses_counting_serial_type> map_searcher_type;
+            typedef helpers::map_searcher<size_t,helpers::object_instances_counting_serial_type> map_searcher_type;
             typedef map_searcher_type::map_type objects_map_type;
-            typedef get_lru_cache_type::apply<size_t,helpers::object_instanses_counting_serial_type,map_searcher_type>::type cache_type;
+            typedef get_lru_cache_type::apply<size_t,helpers::object_instances_counting_serial_type,map_searcher_type>::type cache_type;
             map_searcher_type::map_type objects_map;
             cache_type cache;
             filled_instance_counting_fixture_with_external_map():cache(map_searcher_type(objects_map),number_of_lru_history_items){}
@@ -329,7 +329,7 @@ namespace serial_tests{
         TEST_CASE_WITH_FIXTURE(test_live_handler_object_is_ref_counted,filled_instance_counting_fixture_with_external_map){
             cache_type::handle h = cache[0];
             {
-                cache_type::handle h = cache[0];
+                cache_type::handle h1 = cache[0];
             }
             //cause eviction
             fill_up_cache(1,number_of_lru_history_items+2);
@@ -339,7 +339,7 @@ namespace serial_tests{
 }
 
 
-namespace concurency_tests{
+namespace concurrency_tests{
     namespace helpers{
         using namespace ::helpers;
     }
@@ -362,9 +362,9 @@ namespace concurency_tests{
         static const size_t number_of_lru_history_items = 8;
         static const size_t array_size = 16*number_of_lru_history_items;
 
-        typedef helpers::array_searcher<size_t,helpers::object_instanses_counting_concurent_type,array_size> array_searcher_type;
+        typedef helpers::array_searcher<size_t,helpers::object_instances_counting_concurrent_type,array_size> array_searcher_type;
         typedef array_searcher_type::array_type objects_array_type;
-        typedef get_lru_cache_type::apply<size_t,helpers::object_instanses_counting_concurent_type,array_searcher_type>::type cache_type;
+        typedef get_lru_cache_type::apply<size_t,helpers::object_instances_counting_concurrent_type,array_searcher_type>::type cache_type;
         array_searcher_type::array_type objects_array;
         cache_type cache;
         filled_instance_counting_fixture_with_external_array():cache(array_searcher_type(objects_array),number_of_lru_history_items){}
@@ -390,12 +390,12 @@ namespace concurency_tests{
 
     //TODO: make this more reproducible
     //TODO: split this test case in two parts
-    TEST_CASE_WITH_FIXTURE(correctness_of_braces_and_hanlde_destructor,filled_instance_counting_fixture_with_external_array){
-        typedef correctness_of_braces_and_hanlde_destructor self_type;
+    TEST_CASE_WITH_FIXTURE(correctness_of_braces_and_handle_destructor,filled_instance_counting_fixture_with_external_array){
+        typedef correctness_of_braces_and_handle_destructor self_type;
         struct _{static void use_cache(self_type& tc){
             for (size_t i=0;i<array_size;++i){
                 cache_type::handle h=tc.cache[i];
-                helpers::prevent_optimizng_out(h.value());
+                helpers::prevent_optimizing_out(h.value());
             }
 
         }};

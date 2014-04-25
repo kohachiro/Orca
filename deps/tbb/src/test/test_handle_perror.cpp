@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -56,11 +56,11 @@ static void TestHandlePerror() {
 #if TBB_USE_EXCEPTIONS
         REMARK("caught runtime_exception('%s')\n",e.what());
         ASSERT( memcmp(e.what(),"apple: ",7)==0, NULL );
-        ASSERT( strstr(e.what(),"unavailable")!=NULL, "bad error message?" ); 
+        ASSERT( strlen(strstr(e.what(), strerror(EAGAIN))), "bad error message?" ); 
 #endif /* TBB_USE_EXCEPTIONS */
         caught = true;
     }
-    ASSERT(caught,NULL);
+    ASSERT( caught, NULL );
 }
 
 int TestMain () {

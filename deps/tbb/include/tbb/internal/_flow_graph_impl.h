@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -39,6 +39,8 @@ namespace internal {
         enum graph_buffer_policy { rejecting, reserving, queueing, tag_matching };
     }
 
+// -------------- function_body containers ----------------------
+
     //! A functor that takes no input and generates a value of type Output
     template< typename Output >
     class source_body : tbb::internal::no_assign {
@@ -57,6 +59,7 @@ namespace internal {
         /*override*/ source_body_leaf* clone() { 
             return new source_body_leaf< Output, Body >(init_body); 
         }
+        Body get_body() { return body; }
     private:
         Body body;
         Body init_body;
@@ -154,7 +157,7 @@ namespace internal {
     public:
         multifunction_body_leaf(const B &_body) : body(_body), init_body(_body) { }
         void operator()(const Input &input, OutputSet &oset) {
-            body(input, oset); // body should explicitly put() to one or more of oset.
+            body(input, oset); // body may explicitly put() to one or more of oset.
         }
         B get_body() { return body; }
         /*override*/ multifunction_body_leaf* clone() {
@@ -164,56 +167,66 @@ namespace internal {
         B body;
         B init_body;
     };
+
+// --------------------------- end of function_body containers ------------------------
+
+// --------------------------- node task bodies ---------------------------------------
     
-    //! A task that calls a node's forward function
+    //! A task that calls a node's forward_task function
     template< typename NodeType >
-    class forward_task : public task {
+    class forward_task_bypass : public task {
     
         NodeType &my_node;
     
     public:
     
-        forward_task( NodeType &n ) : my_node(n) {}
+        forward_task_bypass( NodeType &n ) : my_node(n) {}
     
         task *execute() {
-            my_node.forward();
-            return NULL;
+            task * new_task = my_node.forward_task();
+            if (new_task == SUCCESSFULLY_ENQUEUED) new_task = NULL;
+            return new_task;
         }
     };
     
-    //! A task that calls a node's apply_body function, passing in an input of type Input
+    //! A task that calls a node's apply_body_bypass function, passing in an input of type Input
+    //  return the task* unless it is SUCCESSFULLY_ENQUEUED, in which case return NULL
     template< typename NodeType, typename Input >
-    class apply_body_task : public task {
+    class apply_body_task_bypass : public task {
     
         NodeType &my_node;
         Input my_input;
         
     public:
         
-        apply_body_task( NodeType &n, const Input &i ) : my_node(n), my_input(i) {}
+        apply_body_task_bypass( NodeType &n, const Input &i ) : my_node(n), my_input(i) {}
         
         task *execute() {
-            my_node.apply_body( my_input );
-            return NULL;
+            task * next_task = my_node.apply_body_bypass( my_input );
+            if(next_task == SUCCESSFULLY_ENQUEUED) next_task = NULL;
+            return next_task;
         }
     };
-    
+
     //! A task that calls a node's apply_body function with no input
     template< typename NodeType >
-    class source_task : public task {
+    class source_task_bypass : public task {
     
         NodeType &my_node;
     
     public:
     
-        source_task( NodeType &n ) : my_node(n) {}
+        source_task_bypass( NodeType &n ) : my_node(n) {}
     
         task *execute() {
-            my_node.apply_body( );
-            return NULL;
+            task *new_task = my_node.apply_body_bypass( );
+            if(new_task == SUCCESSFULLY_ENQUEUED) return NULL;
+            return new_task;
         }
     };
-    
+
+// ------------------------ end of node task bodies -----------------------------------
+
     //! An empty functor that takes an Input and returns a default constructed Output
     template< typename Input, typename Output >
     struct empty_body {
@@ -280,7 +293,7 @@ namespace internal {
     //! A cache of predecessors that only supports try_get
     template< typename T, typename M=spin_mutex >
     class predecessor_cache : public node_cache< sender<T>, M > {
-        public:
+    public:
         typedef M my_mutex_type;
         typedef T output_type; 
         typedef sender<output_type> predecessor_type;
@@ -318,8 +331,24 @@ namespace internal {
             } while ( msg == false );
             return msg;
         }
-    
+
+        void reset() {
+            if(!my_owner) {
+                return;  // retain ownership of edges
+            }
+            for(;;) {
+                predecessor_type *src;
+                {
+                    typename my_mutex_type::scoped_lock lock(this->my_mutex);
+                    if(this->internal_empty()) break;
+                    src = &this->internal_pop();
+                }
+                src->register_successor( *my_owner);
+            }
+        }
+
     protected:
+    
         successor_type *my_owner;
     };
     
@@ -377,13 +406,18 @@ namespace internal {
             reserved_src = NULL;
             return true;
         }
+
+        void reset() {
+            reserved_src = NULL;
+            predecessor_cache<T,M>::reset();
+        }
     
     private:
         predecessor_type *reserved_src;
     };
     
     
-    //! An abstract cache of succesors
+    //! An abstract cache of successors
     template<typename T, typename M=spin_rw_mutex >
     class successor_cache : tbb::internal::no_copy {
     protected:
@@ -425,7 +459,7 @@ namespace internal {
             return my_successors.empty(); 
         }
         
-        virtual bool try_put( const T &t ) = 0; 
+        virtual task * try_put_task( const T &t ) = 0; 
      };
     
     //! An abstract cache of succesors, specialized to continue_msg
@@ -452,10 +486,8 @@ namespace internal {
         void register_successor( receiver<continue_msg> &r ) {
             my_mutex_type::scoped_lock l(my_mutex, true);
             my_successors.push_back( &r ); 
-            if ( my_owner ) {
-                continue_receiver *cr = dynamic_cast< continue_receiver * >(&r);
-                if ( cr ) 
-                    cr->register_predecessor( *my_owner );
+            if ( my_owner && r.is_continue_receiver() ) {
+                r.register_predecessor( *my_owner );
             }
         }
         
@@ -477,7 +509,7 @@ namespace internal {
             return my_successors.empty(); 
         }
     
-        virtual bool try_put( const continue_msg &t ) = 0; 
+        virtual task * try_put_task( const continue_msg &t ) = 0; 
         
      };
     
@@ -491,29 +523,31 @@ namespace internal {
         
         broadcast_cache( ) {}
         
-        bool try_put( const T &t ) {
-            bool msg = false;
-            bool upgraded = false;
-            typename my_mutex_type::scoped_lock l(this->my_mutex, false);
+        // as above, but call try_put_task instead, and return the last task we received (if any)
+        /*override*/ task * try_put_task( const T &t ) {
+            task * last_task = NULL;
+            bool upgraded = true;
+            typename my_mutex_type::scoped_lock l(this->my_mutex, upgraded);
             typename my_successors_type::iterator i = this->my_successors.begin();
             while ( i != this->my_successors.end() ) {
-               if ( (*i)->try_put( t ) == true ) {
-                   ++i;
-                   msg = true;
-               } else {
-                  if ( (*i)->register_predecessor(*this->my_owner) ) {
-                      if (!upgraded) {
-                          l.upgrade_to_writer();
-                          upgraded = true;
-                      }
-                      i = this->my_successors.erase(i);
-                  }
-                  else {
-                      ++i;
-                  }
-               }
+                task *new_task = (*i)->try_put_task(t);
+                last_task = combine_tasks(last_task, new_task);  // enqueue if necessary
+                if(new_task) {
+                    ++i;
+                }
+                else {  // failed
+                    if ( (*i)->register_predecessor(*this->my_owner) ) {
+                        if (!upgraded) {
+                            l.upgrade_to_writer();
+                            upgraded = true;
+                        }
+                        i = this->my_successors.erase(i);
+                    } else {
+                        ++i;
+                    }
+                }
             }
-            return msg;
+            return last_task;
         }
     };
 
@@ -533,27 +567,28 @@ namespace internal {
             return this->my_successors.size();
         }
         
-        bool try_put( const T &t ) {
-            bool upgraded = false;
-            typename my_mutex_type::scoped_lock l(this->my_mutex, false);
+        /*override*/task *try_put_task( const T &t ) {
+            bool upgraded = true;
+            typename my_mutex_type::scoped_lock l(this->my_mutex, upgraded);
             typename my_successors_type::iterator i = this->my_successors.begin();
             while ( i != this->my_successors.end() ) {
-               if ( (*i)->try_put( t ) ) {
-                   return true;
-               } else {
-                  if ( (*i)->register_predecessor(*this->my_owner) ) {
-                      if (!upgraded) {
-                          l.upgrade_to_writer();
-                          upgraded = true;
-                      }
-                      i = this->my_successors.erase(i);
-                  }
-                  else {
-                      ++i;
-                  }
-               }
+                task *new_task = (*i)->try_put_task(t);
+                if ( new_task ) {
+                    return new_task;
+                } else {
+                   if ( (*i)->register_predecessor(*this->my_owner) ) {
+                       if (!upgraded) {
+                           l.upgrade_to_writer();
+                           upgraded = true;
+                       }
+                       i = this->my_successors.erase(i);
+                   }
+                   else {
+                       ++i;
+                   }
+                }
             }
-            return false;
+            return NULL;
         }
     };
     
@@ -562,8 +597,8 @@ namespace internal {
         
         T *my_node;
         
-        void execute() {
-            my_node->decrement_counter();
+        task *execute() {
+            return my_node->decrement_counter();
         }
         
     public:

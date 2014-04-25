@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,6 +26,7 @@
     the GNU General Public License.
 */
 
+#include "tbb/tbb_config.h"
 #include "tbb/cache_aligned_allocator.h"
 #include "tbb/tbb_allocator.h"
 #include "tbb/tbb_exception.h"
@@ -41,7 +42,7 @@
 
 using namespace std;
 
-#if __TBB_WEAK_SYMBOLS
+#if __TBB_WEAK_SYMBOLS_PRESENT
 
 #pragma weak scalable_malloc
 #pragma weak scalable_free
@@ -55,7 +56,7 @@ extern "C" {
     void  scalable_aligned_free( void* );
 }
 
-#endif /* __TBB_WEAK_SYMBOLS */
+#endif /* __TBB_WEAK_SYMBOLS_PRESENT */
 
 namespace tbb {
 
@@ -111,10 +112,10 @@ static const dynamic_link_descriptor MallocLinkTable[] = {
 #define MALLOCLIB_NAME "tbbmalloc" DEBUG_SUFFIX ".dll"
 #elif __APPLE__
 #define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".dylib"
-#elif __linux__
-#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX  __TBB_STRING(.so.TBB_COMPATIBLE_INTERFACE_VERSION)
-#elif __FreeBSD__ || __NetBSD__ || __sun || _AIX
+#elif __FreeBSD__ || __NetBSD__ || __sun || _AIX || __ANDROID__
 #define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".so"
+#elif __linux__  // Note that order of these #elif's is important!
+#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX  __TBB_STRING(.so.TBB_COMPATIBLE_INTERFACE_VERSION)
 #else
 #error Unknown OS
 #endif

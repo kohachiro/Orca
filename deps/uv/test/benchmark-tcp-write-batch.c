@@ -112,17 +112,20 @@ BENCHMARK_IMPL(tcp_write_batch) {
   }
 
   loop = uv_default_loop();
-  addr = uv_ip4_addr("127.0.0.1", TEST_PORT);
+  ASSERT(0 == uv_ip4_addr("127.0.0.1", TEST_PORT, &addr));
 
   r = uv_tcp_init(loop, &tcp_client);
   ASSERT(r == 0);
 
-  r = uv_tcp_connect(&connect_req, &tcp_client, addr, connect_cb);
+  r = uv_tcp_connect(&connect_req,
+                     &tcp_client,
+                     (const struct sockaddr*) &addr,
+                     connect_cb);
   ASSERT(r == 0);
 
   start = uv_hrtime();
 
-  r = uv_run(loop);
+  r = uv_run(loop, UV_RUN_DEFAULT);
   ASSERT(r == 0);
 
   stop = uv_hrtime();
@@ -134,7 +137,8 @@ BENCHMARK_IMPL(tcp_write_batch) {
 
   printf("%ld write requests in %.2fs.\n",
          (long)NUM_WRITE_REQS,
-         (stop - start) / 10e8);
+         (stop - start) / 1e9);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

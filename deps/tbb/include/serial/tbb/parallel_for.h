@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -80,11 +80,11 @@ class start_for : tbb::internal::no_copy {
     }
 
 public:
-    static void run(  const Range& range, const Body& body, const Partitioner& partitioner ) {
+    static void run(  const Range& range, const Body& body, Partitioner& partitioner ) {
         if( !range.empty() ) {
             ANNOTATE_SITE_BEGIN( tbb_parallel_for );
             {
-                start_for a( range, body, const_cast< Partitioner& >( partitioner ) );
+                start_for a( range, body, partitioner );
                 a.execute();
             }
             ANNOTATE_SITE_END( tbb_parallel_for );
@@ -94,7 +94,7 @@ public:
 
 template< typename Range, typename Body, typename Partitioner >
 void start_for< Range, Body, Partitioner >::execute() {
-    if( !my_range.is_divisible() || !my_partition.divisions_left() ) {
+    if( !my_range.is_divisible() || !my_partition.is_divisible() ) {
         ANNOTATE_TASK_BEGIN( tbb_parallel_for_range );
         {
             my_body( my_range );
@@ -107,25 +107,25 @@ void start_for< Range, Body, Partitioner >::execute() {
     }
 }
 
-//! Parallel iteration over range with default partitioner..
+//! Parallel iteration over range with default partitioner.
 /** @ingroup algorithms **/
 template<typename Range, typename Body>
 void parallel_for( const Range& range, const Body& body ) {
-    serial::interface6::start_for<Range,Body,auto_partitioner>::run(range,body,auto_partitioner());
+    serial::interface6::start_for<Range,Body,const __TBB_DEFAULT_PARTITIONER>::run(range,body,__TBB_DEFAULT_PARTITIONER());
 }
 
 //! Parallel iteration over range with simple partitioner.
 /** @ingroup algorithms **/
 template<typename Range, typename Body>
 void parallel_for( const Range& range, const Body& body, const simple_partitioner& partitioner ) {
-    serial::interface6::start_for<Range,Body,simple_partitioner>::run(range,body,partitioner);
+    serial::interface6::start_for<Range,Body,const simple_partitioner>::run(range,body,partitioner);
 }
 
 //! Parallel iteration over range with auto_partitioner.
 /** @ingroup algorithms **/
 template<typename Range, typename Body>
 void parallel_for( const Range& range, const Body& body, const auto_partitioner& partitioner ) {
-    serial::interface6::start_for<Range,Body,auto_partitioner>::run(range,body,partitioner);
+    serial::interface6::start_for<Range,Body,const auto_partitioner>::run(range,body,partitioner);
 }
 
 //! Parallel iteration over range with affinity_partitioner.
@@ -135,9 +135,9 @@ void parallel_for( const Range& range, const Body& body, affinity_partitioner& p
     serial::interface6::start_for<Range,Body,affinity_partitioner>::run(range,body,partitioner);
 }
 
-//! Parallel iteration over a range of integers with a step value
-template <typename Index, typename Function>
-void parallel_for(Index first, Index last, Index step, const Function& f) {
+//! Implementation of parallel iteration over stepped range of integers with explicit step and partitioner (ignored)
+template <typename Index, typename Function, typename Partitioner>
+void parallel_for_impl(Index first, Index last, Index step, const Function& f, Partitioner& ) {
     if (step <= 0 )
         throw std::invalid_argument( "nonpositive_step" );
     else if (last > first) {
@@ -152,10 +152,46 @@ void parallel_for(Index first, Index last, Index step, const Function& f) {
     }
 }
 
-//! Parallel iteration over a range of integers with a default step value
+//! Parallel iteration over a range of integers with explicit step and default partitioner
+template <typename Index, typename Function>
+void parallel_for(Index first, Index last, Index step, const Function& f) {
+    parallel_for_impl<Index,Function,const auto_partitioner>(first, last, step, f, auto_partitioner());
+}
+//! Parallel iteration over a range of integers with explicit step and simple partitioner
+template <typename Index, typename Function>
+void parallel_for(Index first, Index last, Index step, const Function& f, const simple_partitioner& p) {
+    parallel_for_impl<Index,Function,const simple_partitioner>(first, last, step, f, p);
+}
+//! Parallel iteration over a range of integers with explicit step and auto partitioner
+template <typename Index, typename Function>
+void parallel_for(Index first, Index last, Index step, const Function& f, const auto_partitioner& p) {
+    parallel_for_impl<Index,Function,const auto_partitioner>(first, last, step, f, p);
+}
+//! Parallel iteration over a range of integers with explicit step and affinity partitioner
+template <typename Index, typename Function>
+void parallel_for(Index first, Index last, Index step, const Function& f, affinity_partitioner& p) {
+    parallel_for_impl(first, last, step, f, p);
+}
+
+//! Parallel iteration over a range of integers with default step and default partitioner
 template <typename Index, typename Function>
 void parallel_for(Index first, Index last, const Function& f) {
-    parallel_for(first, last, static_cast<Index>(1), f);
+    parallel_for_impl<Index,Function,const auto_partitioner>(first, last, static_cast<Index>(1), f, auto_partitioner());
+}
+//! Parallel iteration over a range of integers with default step and simple partitioner
+template <typename Index, typename Function>
+void parallel_for(Index first, Index last, const Function& f, const simple_partitioner& p) {
+    parallel_for_impl<Index,Function,const simple_partitioner>(first, last, static_cast<Index>(1), f, p);
+}
+//! Parallel iteration over a range of integers with default step and auto partitioner
+template <typename Index, typename Function>
+    void parallel_for(Index first, Index last, const Function& f, const auto_partitioner& p) {
+    parallel_for_impl<Index,Function,const auto_partitioner>(first, last, static_cast<Index>(1), f, p);
+}
+//! Parallel iteration over a range of integers with default step and affinity_partitioner
+template <typename Index, typename Function>
+void parallel_for(Index first, Index last, const Function& f, affinity_partitioner& p) {
+    parallel_for_impl(first, last, static_cast<Index>(1), f, p);
 }
 
 } // namespace interface6

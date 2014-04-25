@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -69,11 +69,9 @@ struct Invariant {
     M mutex;
     const char* mutex_name;
     volatile long value[N];
-    volatile long single_value;
     Invariant( const char* mutex_name_ ) :
         mutex_name(mutex_name_)
     {
-        single_value = 0;
         for( long k=0; k<N; ++k )
             value[k] = 0;
     }

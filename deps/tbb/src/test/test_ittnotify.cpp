@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -69,7 +69,7 @@ volatile size_t WorkEmulator<M>::s_anchor = 0;
 
 template<class M>
 void Test( const char * name ) {
-    REMARK("%s time = ",name);
+    REMARK("Testing %s\n",name);
     M mtx;
     tbb::profiling::set_name(mtx, name);
 

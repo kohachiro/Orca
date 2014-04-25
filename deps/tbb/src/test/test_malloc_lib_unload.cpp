@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -124,37 +124,17 @@ extern "C" size_t safer_scalable_msize (void *, size_t (*)(void*))
 #include <cstdlib>
 #include "tbb/tbb_stddef.h"
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
+#define HARNESS_TBBMALLOC_THREAD_SHUTDOWN 1
 #include "harness.h"
+
+#if __TBB_WIN8UI_SUPPORT
+int TestMain() {
+    return Harness::Skipped;
+}
+#else /* __TBB_WIN8UI_SUPPORT */
+
 #include "harness_memory.h"
 #include "harness_dynamic_libs.h"
-
-#if TBB_USE_DEBUG
-#define SUFFIX1 "_debug"
-#define SUFFIX2
-#else
-#define SUFFIX1
-#define SUFFIX2 "_debug"
-#endif /* TBB_USE_DEBUG */
-
-#if _WIN32||_WIN64
-#define PREFIX
-#define EXT ".dll"
-#else
-#define PREFIX "lib"
-#if __APPLE__
-#define EXT ".dylib"
-#elif __linux__
-#define EXT __TBB_STRING(.so.TBB_COMPATIBLE_INTERFACE_VERSION)
-#elif __FreeBSD__ || __NetBSD__ || __sun || _AIX
-#define EXT ".so"
-#else
-#error Unknown OS
-#endif
-#endif
-
-// Form the names of the TBB memory allocator binaries.
-#define MALLOCLIB_NAME1 PREFIX "tbbmalloc" SUFFIX1 EXT
-#define MALLOCLIB_NAME2 PREFIX "tbbmalloc" SUFFIX2 EXT
 
 extern "C" {
 #if _WIN32||_WIN64
@@ -237,5 +217,7 @@ int TestMain () {
 
     return Harness::Done;
 }
+
+#endif /* __TBB_WIN8UI_SUPPORT */
 
 #endif // _USRDLL

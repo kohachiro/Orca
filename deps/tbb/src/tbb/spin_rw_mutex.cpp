@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -28,6 +28,7 @@
 
 #include "tbb/spin_rw_mutex.h"
 #include "tbb/tbb_machine.h"
+#include "tbb/atomic.h"
 #include "itt_notify.h"
 
 #if defined(_MSC_VER) && defined(_Wp64)
@@ -41,7 +42,7 @@ template<typename T> // a template can work with private spin_rw_mutex::state_t
 static inline T CAS(volatile T &addr, T newv, T oldv) {
     // ICC (9.1 and 10.1 tried) unable to do implicit conversion
     // from "volatile T*" to "volatile void*", so explicit cast added.
-    return T(__TBB_CompareAndSwapW((volatile void *)&addr, (intptr_t)newv, (intptr_t)oldv));
+    return tbb::internal::as_atomic(addr).compare_and_swap( newv, oldv );
 }
 
 //! Acquire write lock on the given mutex.
@@ -73,7 +74,7 @@ void spin_rw_mutex_v3::internal_release_writer()
 void spin_rw_mutex_v3::internal_acquire_reader()
 {
     ITT_NOTIFY(sync_prepare, this);
-    for( internal::atomic_backoff backoff;;backoff.pause() ){
+    for( internal::atomic_backoff b;;b.pause() ){
         state_t s = const_cast<volatile state_t&>(state); // ensure reloading
         if( !(s & (WRITER|WRITER_PENDING)) ) { // no writer or write requests
             state_t t = (state_t)__TBB_FetchAndAddW( &state, (intptr_t) ONE_READER );
@@ -101,8 +102,8 @@ bool spin_rw_mutex_v3::internal_upgrade()
         state_t old_s = s;
         if( (s=CAS(state, s | WRITER | WRITER_PENDING, s))==old_s ) {
             ITT_NOTIFY(sync_prepare, this);
-            for( internal::atomic_backoff backoff; (state & READERS) != ONE_READER; )
-                backoff.pause(); // while more than 1 reader
+            internal::atomic_backoff backoff;
+            while( (state & READERS) != ONE_READER ) backoff.pause();
             __TBB_ASSERT((state&(WRITER_PENDING|WRITER))==(WRITER_PENDING|WRITER),"invalid state when upgrading to writer");
             // both new readers and writers are blocked at this time
             __TBB_FetchAndAddW( &state,  - (intptr_t)(ONE_READER+WRITER_PENDING));

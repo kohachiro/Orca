@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -154,7 +154,7 @@ public:
 void micro_queue::push( const void* item, ticket k, concurrent_queue_base& base ) {
     k &= -concurrent_queue_rep::n_queue;
     page* p = NULL;
-    size_t index = (k/concurrent_queue_rep::n_queue & base.items_per_page-1);
+    size_t index = modulo_power_of_two( k/concurrent_queue_rep::n_queue, base.items_per_page );
     if( !index ) {
         size_t n = sizeof(page) + base.items_per_page*base.item_size;
         p = static_cast<page*>(operator new( n ));
@@ -186,7 +186,7 @@ bool micro_queue::pop( void* dst, ticket k, concurrent_queue_base& base ) {
     spin_wait_while_eq( tail_counter, k );
     page& p = *head_page;
     __TBB_ASSERT( &p, NULL );
-    size_t index = (k/concurrent_queue_rep::n_queue & base.items_per_page-1);
+    size_t index = modulo_power_of_two( k/concurrent_queue_rep::n_queue, base.items_per_page );
     bool success = false;
     {
         pop_finalizer finalizer( *this, k+concurrent_queue_rep::n_queue, index==base.items_per_page-1 ? &p : NULL );
@@ -236,14 +236,11 @@ concurrent_queue_base::~concurrent_queue_base() {
 void concurrent_queue_base::internal_push( const void* src ) {
     concurrent_queue_rep& r = *my_rep;
     concurrent_queue_rep::ticket k  = r.tail_counter++;
-    ptrdiff_t e = my_capacity;
-    if( e<concurrent_queue_rep::infinite_capacity ) {
+    if( my_capacity<concurrent_queue_rep::infinite_capacity ) {
+        // Capacity is limited, wait to not exceed it
         atomic_backoff backoff;
-        for(;;) {
-            if( (ptrdiff_t)(k-r.head_counter)<e ) break;
+        while( (ptrdiff_t)(k-r.head_counter)>=const_cast<volatile ptrdiff_t&>(my_capacity) )
             backoff.pause();
-            e = const_cast<volatile ptrdiff_t&>(my_capacity);
-        }
     }
     r.choose(k).push(src,k,*this);
 }
@@ -260,7 +257,7 @@ bool concurrent_queue_base::internal_pop_if_present( void* dst ) {
     concurrent_queue_rep& r = *my_rep;
     concurrent_queue_rep::ticket k;
     do {
-        for( atomic_backoff backoff;;backoff.pause() ) {
+        for( atomic_backoff b;;b.pause() ) {
             k = r.head_counter;
             if( r.tail_counter<=k ) {
                 // Queue is empty
@@ -279,7 +276,7 @@ bool concurrent_queue_base::internal_pop_if_present( void* dst ) {
 bool concurrent_queue_base::internal_push_if_not_full( const void* src ) {
     concurrent_queue_rep& r = *my_rep;
     concurrent_queue_rep::ticket k;
-    for( atomic_backoff backoff;;backoff.pause() ) {
+    for( atomic_backoff b;;b.pause() ) {
         k = r.tail_counter;
         if( (ptrdiff_t)(k-r.head_counter)>=my_capacity ) {
             // Queue is full
@@ -327,7 +324,7 @@ public:
         else {
             concurrent_queue_base::page* p = array[concurrent_queue_rep::index(k)];
             __TBB_ASSERT(p,NULL);
-            size_t i = k/concurrent_queue_rep::n_queue & my_queue.items_per_page-1;
+            size_t i = modulo_power_of_two( k/concurrent_queue_rep::n_queue, my_queue.items_per_page );
             return static_cast<unsigned char*>(static_cast<void*>(p+1)) + my_queue.item_size*i;
         }
     }
@@ -359,7 +356,7 @@ void concurrent_queue_iterator_base::advance() {
     size_t k = my_rep->head_counter;
     const concurrent_queue_base& queue = my_rep->my_queue;
     __TBB_ASSERT( my_item==my_rep->choose(k), NULL );
-    size_t i = k/concurrent_queue_rep::n_queue & queue.items_per_page-1;
+    size_t i = modulo_power_of_two( k/concurrent_queue_rep::n_queue, queue.items_per_page );
     if( i==queue.items_per_page-1 ) {
         concurrent_queue_base::page*& root = my_rep->array[concurrent_queue_rep::index(k)];
         root = root->next;

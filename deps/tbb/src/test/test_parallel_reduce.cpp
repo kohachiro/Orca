@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,7 +26,6 @@
     the GNU General Public License.
 */
 
-#define TBB_PREVIEW_DETERMINISTIC_REDUCE 1
 #include "tbb/parallel_reduce.h"
 #include "tbb/atomic.h"
 #include "harness_assert.h"
@@ -150,58 +149,6 @@ void Flog( int nthread, bool interference=false ) {
         REMARK("time=%g join_count=%ld ForkCount=%ld nthread=%d%s\n",
                    (T1-T0).seconds(),join_count,long(ForkCount), nthread, interference ? " with interference":"");
     }
-}
-
-class DeepThief: public tbb::task {
-    /*override*/tbb::task* execute() {
-        if( !is_stolen_task() )
-            spawn(*child);
-        wait_for_all();
-        return NULL;
-    }
-    task* child;
-    friend void FlogWithInterference(int);
-public:
-    DeepThief() : child() {}
-};
-
-//! Test for problem in TBB 2.1 parallel_reduce where middle of a range is stolen.
-/** Warning: this test is a somewhat abusive use of TBB because 
-    it requires two or more threads to avoid deadlock. */
-void FlogWithInterference( int nthread ) {
-    ASSERT( nthread>=2, "requires too or more threads" );
-
-    // Build linear chain of tasks. 
-    // The purpose is to drive up "task depth" in TBB 2.1.
-    // An alternative would be to use add_to_depth, but that method is deprecated in TBB 2.2,
-    // and this way we generalize to catching problems with implicit depth calculations.
-    tbb::task* root = new( tbb::task::allocate_root() ) tbb::empty_task;
-    root->set_ref_count(2);
-    tbb::task* t = root;
-    for( int i=0; i<3; ++i ) {
-        t = new( t->allocate_child() ) tbb::empty_task;
-        t->set_ref_count(1);
-    }
-
-    // Append a DeepThief to the chain.
-    DeepThief* deep_thief = new( t->allocate_child() ) DeepThief;
-    deep_thief->set_ref_count(2);
-
-    // Append a leaf to the chain. 
-    tbb::task* leaf = new( deep_thief->allocate_child() ) tbb::empty_task;
-    deep_thief->child = leaf;
-
-    root->spawn(*deep_thief);
-
-    Flog(nthread,true);
-
-    if( root->ref_count()==2 ) {
-        // Spawn leaf, which when it finishes, cause the DeepThief and rest of the chain to finish.
-        root->spawn( *leaf );
-    }
-    // Wait for all tasks in the chain from root to leaf to finish.
-    root->wait_for_all();
-    tbb::task::destroy( *root );
 }
 
 #include "tbb/blocked_range.h"
@@ -330,8 +277,6 @@ int TestMain () {
     for( int p=MinThread; p<=MaxThread; ++p ) {
         tbb::task_scheduler_init init( p );
         Flog(p);
-        if( p>=2 )
-            FlogWithInterference(p);
         ParallelSum();
         if ( p>=2 )
             TestDeterministicReduction<RotOp>();

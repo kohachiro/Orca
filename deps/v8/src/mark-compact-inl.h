@@ -52,32 +52,15 @@ void MarkCompactCollector::SetFlags(int flags) {
 }
 
 
-bool MarkCompactCollector::MarkObjectAndPush(HeapObject* obj) {
-  if (MarkObjectWithoutPush(obj)) {
-    marking_deque_.PushBlack(obj);
-    return true;
-  }
-  return false;
-}
-
-
 void MarkCompactCollector::MarkObject(HeapObject* obj, MarkBit mark_bit) {
   ASSERT(Marking::MarkBitFrom(obj) == mark_bit);
   if (!mark_bit.Get()) {
     mark_bit.Set();
     MemoryChunk::IncrementLiveBytesFromGC(obj->address(), obj->Size());
-    ProcessNewlyMarkedObject(obj);
+    ASSERT(IsMarked(obj));
+    ASSERT(obj->GetIsolate()->heap()->Contains(obj));
+    marking_deque_.PushBlack(obj);
   }
-}
-
-
-bool MarkCompactCollector::MarkObjectWithoutPush(HeapObject* obj) {
-  MarkBit mark_bit = Marking::MarkBitFrom(obj);
-  if (!mark_bit.Get()) {
-    SetMark(obj, mark_bit);
-    return true;
-  }
-  return false;
 }
 
 
@@ -86,9 +69,6 @@ void MarkCompactCollector::SetMark(HeapObject* obj, MarkBit mark_bit) {
   ASSERT(Marking::MarkBitFrom(obj) == mark_bit);
   mark_bit.Set();
   MemoryChunk::IncrementLiveBytesFromGC(obj->address(), obj->Size());
-  if (obj->IsMap()) {
-    heap_->ClearCacheOnMap(Map::cast(obj));
-  }
 }
 
 
@@ -101,14 +81,15 @@ bool MarkCompactCollector::IsMarked(Object* obj) {
 
 void MarkCompactCollector::RecordSlot(Object** anchor_slot,
                                       Object** slot,
-                                      Object* object) {
+                                      Object* object,
+                                      SlotsBuffer::AdditionMode mode) {
   Page* object_page = Page::FromAddress(reinterpret_cast<Address>(object));
   if (object_page->IsEvacuationCandidate() &&
       !ShouldSkipEvacuationSlotRecording(anchor_slot)) {
     if (!SlotsBuffer::AddTo(&slots_buffer_allocator_,
                             object_page->slots_buffer_address(),
                             slot,
-                            SlotsBuffer::FAIL_ON_OVERFLOW)) {
+                            mode)) {
       EvictEvacuationCandidate(object_page);
     }
   }

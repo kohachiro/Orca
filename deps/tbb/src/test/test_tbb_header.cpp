@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -32,11 +32,19 @@
 
     Most of the checks happen at the compilation or link phases.
 **/
+#include "harness_defs.h"
+#if !(__TBB_TEST_SECONDARY && __TBB_CPP11_STD_PLACEHOLDERS_LINKAGE_BROKEN)
 
-#include "tbb/tbb.h"
 #if _MSC_VER
 #pragma warning (disable : 4503)      // decorated name length exceeded, name was truncated
+#if !TBB_USE_EXCEPTIONS
+    // Suppress "C++ exception handler used, but unwind semantics are not enabled" warning in STL headers
+    #pragma warning (push)
+    #pragma warning (disable: 4530)
 #endif
+#endif
+
+#include "tbb/tbb.h"
 #include "tbb/flow_graph.h"
 
 static volatile size_t g_sink;
@@ -44,9 +52,6 @@ static volatile size_t g_sink;
 #define TestTypeDefinitionPresence( Type ) g_sink = sizeof(tbb::Type);
 #define TestTypeDefinitionPresence2(TypeStart, TypeEnd) g_sink = sizeof(tbb::TypeStart,TypeEnd);
 #define TestFuncDefinitionPresence(Fn, Args, ReturnType) { ReturnType (*pfn)Args = &tbb::Fn; (void)pfn; }
-
-//! Utility template function to prevent "unused" warnings by various compilers.
-template<typename T> void squelch_unused_warning( const T& ) {}
 
 struct Body {
     void operator() () const {}
@@ -83,6 +88,12 @@ struct Body3 {
 // Test if all the necessary symbols are exported for the exceptions thrown by TBB.
 // Missing exports result either in link error or in runtime assertion failure.
 #include "tbb/tbb_exception.h"
+#include <stdexcept>
+
+#if !TBB_USE_EXCEPTIONS && _MSC_VER
+    #pragma warning (pop)
+#endif
+
 
 template <typename E>
 void TestExceptionClassExports ( const E& exc, tbb::internal::exception_id eid ) {
@@ -105,9 +116,9 @@ void TestExceptionClassExports ( const E& exc, tbb::internal::exception_id eid )
             ASSERT ( __TBB_EXCEPTION_TYPE_INFO_BROKEN, "Unrecognized exception. Likely RTTI related exports are missing" );
         }
     }
-#else /* !TBB_USE_EXCEPTIONS */
+#else /* TBB_USE_EXCEPTIONS */
     (void)exc;
-#endif /* !TBB_USE_EXCEPTIONS */
+#endif /* TBB_USE_EXCEPTIONS */
 }
 
 void TestExceptionClassesExports () {
@@ -132,6 +143,9 @@ void secondary()
 int TestMain ()
 #endif
 {
+    #if __TBB_CPP11_STD_PLACEHOLDERS_LINKAGE_BROKEN
+        REPORT("Known issue: \"multiple definition\" linker error detection test skipped.\n");
+    #endif
     TestTypeDefinitionPresence2(aligned_space<int, 1> );
     TestTypeDefinitionPresence( atomic<int> );
     TestTypeDefinitionPresence( cache_aligned_allocator<int> );
@@ -147,7 +161,7 @@ int TestMain ()
     TestTypeDefinitionPresence( flow::graph );
     TestTypeDefinitionPresence( flow::source_node<int> );
     TestTypeDefinitionPresence2( flow::function_node<int, int> );
-    typedef std::tuple<int, int> intpair;
+    typedef tbb::flow::tuple<int, int> intpair;
     TestTypeDefinitionPresence2( flow::multifunction_node<int, intpair> );
     TestTypeDefinitionPresence( flow::split_node<intpair> );
     TestTypeDefinitionPresence( flow::continue_node<int> );
@@ -159,10 +173,8 @@ int TestMain ()
     TestTypeDefinitionPresence( flow::sequencer_node<int> );
     TestTypeDefinitionPresence( flow::priority_queue_node<int> );
     TestTypeDefinitionPresence( flow::limiter_node<int> );
-    typedef tbb::flow::interface6::internal::graph_policy_namespace::graph_buffer_policy join_policy;
-    const join_policy a = tbb::flow::interface6::internal::graph_policy_namespace::queueing;
-    TestTypeDefinitionPresence2( flow::join_node< intpair, a > );
-    squelch_unused_warning(a);
+    using tbb::flow::queueing;
+    TestTypeDefinitionPresence2( flow::join_node< intpair, queueing > );
     TestTypeDefinitionPresence( mutex );
     TestTypeDefinitionPresence( null_mutex );
     TestTypeDefinitionPresence( null_rw_mutex );
@@ -210,3 +222,4 @@ int TestMain ()
     return Harness::Done;
 #endif
 }
+#endif //!(__TBB_TEST_SECONDARY && __TBB_CPP11_STD_PLACEHOLDERS_LINKING_BROKEN)

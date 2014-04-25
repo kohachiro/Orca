@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,19 +26,6 @@
     the GNU General Public License.
 */
 
-#if HARNESS_USE_PROXY
-
-// The test includes injects scheduler directly, so skip it when proxy tested.
-
-#undef HARNESS_USE_PROXY
-#include "harness.h"
-
-int TestMain () {
-    return Harness::Skipped;
-}
-
-#else // HARNESS_USE_PROXY
-
 // Test correctness of forceful TBB initialization before any dynamic initialization
 // of static objects inside the library took place.
 namespace tbb { 
@@ -55,9 +42,8 @@ struct StaticInitializationChecker {
 // Test that important assertions in class task fail as expected.
 //------------------------------------------------------------------------
 
-#include "harness_inject_scheduler.h"
-
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
+#include "harness_inject_scheduler.h"
 #include "harness.h"
 #include "harness_bad_expr.h"
 
@@ -99,7 +85,7 @@ void TestTaskAssertions() {
     ASSERT( AbuseOneTaskRan==1, NULL );
     tbb::task::destroy(*AbusedTask);
     // Restore normal assertion handling
-    tbb::set_assertion_handler( NULL );
+    tbb::set_assertion_handler( ReportError );
 }
 
 int TestMain () {
@@ -114,5 +100,3 @@ int TestMain () {
 }
 
 #endif /* !TRY_BAD_EXPR_ENABLED */
-
-#endif // HARNESS_USE_PROXY

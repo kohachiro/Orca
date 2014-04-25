@@ -56,6 +56,21 @@ GTEST_OUTPUT_VAR_NAME = 'GTEST_OUTPUT'
 IS_WINDOWS = os.name == 'nt'
 IS_CYGWIN = os.name == 'posix' and 'CYGWIN' in os.uname()[0]
 
+# The environment variable for specifying the path to the premature-exit file.
+PREMATURE_EXIT_FILE_ENV_VAR = 'TEST_PREMATURE_EXIT_FILE'
+
+environ = os.environ.copy()
+
+
+def SetEnvVar(env_var, value):
+  """Sets/unsets an environment variable to a given value."""
+
+  if value is not None:
+    environ[env_var] = value
+  elif env_var in environ:
+    del environ[env_var]
+
+
 # Here we expose a class from a particular module, depending on the
 # environment. The comment suppresses the 'Invalid variable name' lint
 # complaint.
@@ -63,8 +78,8 @@ TestCase = _test_module.TestCase  # pylint: disable-msg=C6409
 
 # Initially maps a flag to its default value. After
 # _ParseAndStripGTestFlags() is called, maps a flag to its actual value.
-_flag_map = {'gtest_source_dir': os.path.dirname(sys.argv[0]),
-             'gtest_build_dir': os.path.dirname(sys.argv[0])}
+_flag_map = {'source_dir': os.path.dirname(sys.argv[0]),
+             'build_dir': os.path.dirname(sys.argv[0])}
 _gtest_flags_are_parsed = False
 
 
@@ -111,13 +126,13 @@ def GetFlag(flag):
 def GetSourceDir():
   """Returns the absolute path of the directory where the .py files are."""
 
-  return os.path.abspath(GetFlag('gtest_source_dir'))
+  return os.path.abspath(GetFlag('source_dir'))
 
 
 def GetBuildDir():
   """Returns the absolute path of the directory where the test binaries are."""
 
-  return os.path.abspath(GetFlag('gtest_build_dir'))
+  return os.path.abspath(GetFlag('build_dir'))
 
 
 _temp_dir = None
@@ -160,13 +175,9 @@ def GetTestExecutablePath(executable_name, build_dir=None):
 
   if not os.path.exists(path):
     message = (
-        'Unable to find the test binary. Please make sure to provide path\n'
-        'to the binary via the --gtest_build_dir flag or the GTEST_BUILD_DIR\n'
-        'environment variable. For convenient use, invoke this script via\n'
-        'mk_test.py.\n'
-        # TODO(vladl@google.com): change mk_test.py to test.py after renaming
-        # the file.
-        'Please run mk_test.py -h for help.')
+        'Unable to find the test binary "%s". Please make sure to provide\n'
+        'a path to the binary via the --build_dir flag or the BUILD_DIR\n'
+        'environment variable.' % path)
     print >> sys.stderr, message
     sys.exit(1)
 
@@ -245,7 +256,7 @@ class Subprocess:
         # Changes made by os.environ.clear are not inheritable by child
         # processes until Python 2.6. To produce inheritable changes we have
         # to delete environment items with the del statement.
-        for key in dest:
+        for key in dest.keys():
           del dest[key]
         dest.update(src)
 

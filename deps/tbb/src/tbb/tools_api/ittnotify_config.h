@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -256,7 +256,7 @@ INLINE int __itt_interlocked_increment(volatile long* ptr)
 #ifdef __INTEL_COMPILER
 #define __TBB_machine_fetchadd4(addr, val) __fetchadd4_acq((void *)addr, val)
 #else  /* __INTEL_COMPILER */
-/* TODO: Add Support for not Intel compilers for IA64 */
+/* TODO: Add Support for not Intel compilers for IA-64 architecture*/
 #endif /* __INTEL_COMPILER */
 #else /* ITT_ARCH!=ITT_ARCH_IA64 */
 INLINE int __TBB_machine_fetchadd4(volatile void* ptr, long addend)

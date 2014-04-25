@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -38,8 +38,6 @@ EXPORT_KEY = -Wl,--version-script,
 NOINTRINSIC_KEY = -fno-builtin
 LIBDL = -ldl
 
-TBB_NOSTRICT = 1
-
 CPLUS = icpc
 CONLY = icc
 
@@ -53,13 +51,14 @@ endif
 OPENMP_FLAG = -openmp
 LIB_LINK_FLAGS = -shared -i-static -Wl,-soname=$(BUILDING_LIBRARY)
 LIBS += -lpthread -lrt
+LINK_FLAGS = -rdynamic
 C_FLAGS = $(CPLUS_FLAGS)
 # ICC 11.0 and higher support -std=c++0x
 ifneq (,$(shell icc -dumpversion | egrep  "^1[1-9]\."))
     CPP11_FLAGS = -std=c++0x -D_TBB_CPP0X
 endif
 
-# ICC 12.0 and higher provide Intel(R) Cilk Plus
+# ICC 12.0 and higher provide Intel(R) Cilk(TM) Plus
 ifneq (,$(shell icc -dumpversion | egrep  "^1[2-9]\."))
     CILK_AVAILABLE = yes
 endif
@@ -74,7 +73,7 @@ endif
 
 ifeq (ia64,$(arch))
     ITT_NOTIFY =
-# Position-independent code (PIC) is a must on IA-64, even for regular (not shared) executables
+# Position-independent code (PIC) is a must on IA-64 architecture, even for regular (not shared) executables
 # strict-ansi does not work with <signal.h> on RHEL 4 AS
     CPLUS_FLAGS += $(PIC_KEY) $(if $(findstring cc3.,$(runtime)),-ansi,-strict-ansi)
 else
@@ -87,7 +86,7 @@ ifneq (,$(codecov))
 endif
 
 ifneq (00,$(lambdas)$(cpp0x))
-	CPLUS_FLAGS += $(CPP11_FLAGS)
+	CXX_ONLY_FLAGS += $(CPP11_FLAGS)
 endif
 
 #------------------------------------------------------------------------------

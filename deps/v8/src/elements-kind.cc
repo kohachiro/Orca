@@ -35,9 +35,53 @@ namespace v8 {
 namespace internal {
 
 
-void PrintElementsKind(FILE* out, ElementsKind kind) {
+int ElementsKindToShiftSize(ElementsKind elements_kind) {
+  switch (elements_kind) {
+    case EXTERNAL_INT8_ELEMENTS:
+    case EXTERNAL_UINT8_CLAMPED_ELEMENTS:
+    case EXTERNAL_UINT8_ELEMENTS:
+    case UINT8_ELEMENTS:
+    case INT8_ELEMENTS:
+    case UINT8_CLAMPED_ELEMENTS:
+      return 0;
+    case EXTERNAL_INT16_ELEMENTS:
+    case EXTERNAL_UINT16_ELEMENTS:
+    case UINT16_ELEMENTS:
+    case INT16_ELEMENTS:
+      return 1;
+    case EXTERNAL_INT32_ELEMENTS:
+    case EXTERNAL_UINT32_ELEMENTS:
+    case EXTERNAL_FLOAT32_ELEMENTS:
+    case UINT32_ELEMENTS:
+    case INT32_ELEMENTS:
+    case FLOAT32_ELEMENTS:
+      return 2;
+    case EXTERNAL_FLOAT64_ELEMENTS:
+    case FAST_DOUBLE_ELEMENTS:
+    case FAST_HOLEY_DOUBLE_ELEMENTS:
+    case FLOAT64_ELEMENTS:
+      return 3;
+    case FAST_SMI_ELEMENTS:
+    case FAST_ELEMENTS:
+    case FAST_HOLEY_SMI_ELEMENTS:
+    case FAST_HOLEY_ELEMENTS:
+    case DICTIONARY_ELEMENTS:
+    case SLOPPY_ARGUMENTS_ELEMENTS:
+      return kPointerSizeLog2;
+  }
+  UNREACHABLE();
+  return 0;
+}
+
+
+const char* ElementsKindToString(ElementsKind kind) {
   ElementsAccessor* accessor = ElementsAccessor::ForKind(kind);
-  PrintF(out, "%s", accessor->name());
+  return accessor->name();
+}
+
+
+void PrintElementsKind(FILE* out, ElementsKind kind) {
+  PrintF(out, "%s", ElementsKindToString(kind));
 }
 
 
@@ -63,6 +107,14 @@ struct InitializeFastElementsKindSequence {
     fast_elements_kind_sequence[3] = FAST_HOLEY_DOUBLE_ELEMENTS;
     fast_elements_kind_sequence[4] = FAST_ELEMENTS;
     fast_elements_kind_sequence[5] = FAST_HOLEY_ELEMENTS;
+
+    // Verify that kFastElementsKindPackedToHoley is correct.
+    STATIC_ASSERT(FAST_SMI_ELEMENTS + kFastElementsKindPackedToHoley ==
+                  FAST_HOLEY_SMI_ELEMENTS);
+    STATIC_ASSERT(FAST_DOUBLE_ELEMENTS + kFastElementsKindPackedToHoley ==
+                  FAST_HOLEY_DOUBLE_ELEMENTS);
+    STATIC_ASSERT(FAST_ELEMENTS + kFastElementsKindPackedToHoley ==
+                  FAST_HOLEY_ELEMENTS);
   }
 };
 
@@ -78,6 +130,7 @@ ElementsKind GetFastElementsKindFromSequenceIndex(int sequence_number) {
   return fast_elements_kind_sequence.Get()[sequence_number];
 }
 
+
 int GetSequenceIndexFromFastElementsKind(ElementsKind elements_kind) {
   for (int i = 0; i < kFastElementsKindCount; ++i) {
     if (fast_elements_kind_sequence.Get()[i] == elements_kind) {
@@ -89,14 +142,27 @@ int GetSequenceIndexFromFastElementsKind(ElementsKind elements_kind) {
 }
 
 
+ElementsKind GetNextTransitionElementsKind(ElementsKind kind) {
+  switch (kind) {
+#define FIXED_TYPED_ARRAY_CASE(Type, type, TYPE, ctype, size) \
+    case TYPE##_ELEMENTS: return EXTERNAL_##TYPE##_ELEMENTS;
+
+    TYPED_ARRAYS(FIXED_TYPED_ARRAY_CASE)
+#undef FIXED_TYPED_ARRAY_CASE
+    default: {
+      int index = GetSequenceIndexFromFastElementsKind(kind);
+      return GetFastElementsKindFromSequenceIndex(index + 1);
+    }
+  }
+}
+
+
 ElementsKind GetNextMoreGeneralFastElementsKind(ElementsKind elements_kind,
                                                 bool allow_only_packed) {
   ASSERT(IsFastElementsKind(elements_kind));
   ASSERT(elements_kind != TERMINAL_FAST_ELEMENTS_KIND);
   while (true) {
-    int index =
-        GetSequenceIndexFromFastElementsKind(elements_kind) + 1;
-    elements_kind = GetFastElementsKindFromSequenceIndex(index);
+    elements_kind = GetNextTransitionElementsKind(elements_kind);
     if (!IsFastHoleyElementsKind(elements_kind) || !allow_only_packed) {
       return elements_kind;
     }

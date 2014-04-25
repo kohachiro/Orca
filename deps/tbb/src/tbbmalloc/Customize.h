@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -62,34 +62,31 @@
     in a strict block-scoped locking pattern.  Omitting these methods permitted
     further simplification. */
 class MallocMutex : tbb::internal::no_copy {
-    __TBB_atomic_flag value;
+    __TBB_atomic_flag flag;
 
 public:
     class scoped_lock : tbb::internal::no_copy {
-        __TBB_Flag unlock_value;
         MallocMutex& mutex;
+        bool taken;
     public:
-        scoped_lock( MallocMutex& m ) : unlock_value(__TBB_LockByte(m.value)), mutex(m) {}
-        scoped_lock( MallocMutex& m, bool block, bool *locked ) : mutex(m) {
-            unlock_value = 1;
+        scoped_lock( MallocMutex& m ) : mutex(m), taken(true) { __TBB_LockByte(m.flag); }
+        scoped_lock( MallocMutex& m, bool block, bool *locked ) : mutex(m), taken(false) {
             if (block) {
-                unlock_value = __TBB_LockByte(m.value);
-                if (locked) *locked = true;
+                __TBB_LockByte(m.flag);
+                taken = true;
             } else {
-                if (__TBB_TryLockByte(m.value)) {
-                    unlock_value = 0;
-                    if (locked) *locked = true;
-                } else
-                    if (locked) *locked = false;
+                taken = __TBB_TryLockByte(m.flag);
             }
+            if (locked) *locked = taken;
         }
         ~scoped_lock() {
-            if (!unlock_value) __TBB_UnlockByte(mutex.value, unlock_value);
+            if (taken) __TBB_UnlockByte(mutex.flag);
         }
     };
     friend class scoped_lock;
 };
 
+// TODO: use signed/unsigned in atomics more consistently
 inline intptr_t AtomicIncrement( volatile intptr_t& counter ) {
     return __TBB_FetchAndAddW( &counter, 1 )+1;
 }
@@ -100,6 +97,18 @@ inline uintptr_t AtomicAdd( volatile intptr_t& counter, intptr_t value ) {
 
 inline intptr_t AtomicCompareExchange( volatile intptr_t& location, intptr_t new_value, intptr_t comparand) {
     return __TBB_CompareAndSwapW( &location, new_value, comparand );
+}
+
+inline uintptr_t AtomicFetchStore(volatile void* location, uintptr_t value) {
+    return __TBB_FetchAndStoreW(location, value);
+}
+
+inline void AtomicOr(volatile void *operand, uintptr_t addend) {
+    __TBB_AtomicOR(operand, addend);
+}
+
+inline void AtomicAnd(volatile void *operand, uintptr_t addend) {
+    __TBB_AtomicAND(operand, addend);
 }
 
 inline intptr_t FencedLoad( const volatile intptr_t &location ) {
@@ -122,20 +131,26 @@ inline intptr_t BitScanRev(uintptr_t x) {
     return !x? -1 : __TBB_Log2(x);
 }
 
-inline void AtomicOr(volatile void *operand, uintptr_t addend) {
-    __TBB_AtomicOR(operand, addend);
+template<typename T>
+static inline bool isAligned(T* arg, uintptr_t alignment) {
+    return tbb::internal::is_aligned(arg,alignment);
 }
 
-inline void AtomicAnd(volatile void *operand, uintptr_t addend) {
-    __TBB_AtomicAND(operand, addend);
+static inline bool isPowerOfTwo(uintptr_t arg) {
+    return tbb::internal::is_power_of_two(arg);
 }
+static inline bool isPowerOfTwoMultiple(uintptr_t arg, uintptr_t divisor) {
+    return arg && tbb::internal::is_power_of_two_factor(arg,divisor);
+}
+
+#define MALLOC_STATIC_ASSERT(condition,msg) __TBB_STATIC_ASSERT(condition,msg)
 
 #define USE_DEFAULT_MEMORY_MAPPING 1
 
 // To support malloc replacement with LD_PRELOAD
 #include "proxy.h"
 
-#if MALLOC_LD_PRELOAD
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED
 #define malloc_proxy __TBB_malloc_proxy
 extern "C" void * __TBB_malloc_proxy(size_t)  __attribute__ ((weak));
 #else

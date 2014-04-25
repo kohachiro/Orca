@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -39,28 +39,30 @@
 
 #if _WIN32||_WIN64
 #include "tbb/machine/windows_api.h"
-#elif __linux__
+#if __TBB_WIN8UI_SUPPORT
+#include <thread>
+#endif
+#else
+#include <unistd.h>
+#if __linux__
 #include <sys/sysinfo.h>
 #include <string.h>
 #include <sched.h>
 #include <errno.h>
 #elif __sun
 #include <sys/sysinfo.h>
-#include <unistd.h>
 #elif __FreeBSD__
-#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/param.h>  // Required by <sys/cpuset.h>
 #include <sys/cpuset.h>
-#elif _AIX
-#include <unistd.h>
+#endif
 #endif
 
 namespace tbb {
 namespace internal {
 
-#if __linux__ || __FreeBSD_version >= 701000
+#if __TBB_OS_AFFINITY_SYSCALL_PRESENT
 
 static void set_affinity_mask( size_t maskSize, const basic_mask_t* threadMask ) {
 #if __linux__
@@ -184,11 +186,27 @@ int AvailableHwConcurrency() {
     return theNumProcs;
 }
 
-#elif defined(_SC_NPROCESSORS_ONLN)
+#elif __ANDROID__
+// Work-around for Android that reads the correct number of available CPUs since system calls are unreliable.
+// Format of "present" file is: ([<int>-<int>|<int>],)+
+int AvailableHwConcurrency() {
+    FILE *fp = fopen("/sys/devices/system/cpu/present", "r");
+    if (fp == NULL) return 1;
+    int num_args, lower, upper, num_cpus=0;
+    while ((num_args = fscanf(fp, "%u-%u", &lower, &upper)) != EOF) {
+        switch(num_args) {
+            case 2: num_cpus += upper - lower + 1; break;
+            case 1: num_cpus += 1; break;
+        }
+        fscanf(fp, ",");
+    }
+    return (num_cpus > 0) ? num_cpus : 1;
+}
 
+#elif defined(_SC_NPROCESSORS_ONLN)
 int AvailableHwConcurrency() {
     int n = sysconf(_SC_NPROCESSORS_ONLN);
-    return n > 0 ? n : 1;
+    return (n > 0) ? n : 1;
 }
 
 #elif _WIN32||_WIN64
@@ -231,24 +249,29 @@ struct TBB_GROUP_AFFINITY {
     WORD   Reserved[3];
 };
 
-static DWORD (WINAPI *TBB_GetMaximumProcessorCount)( WORD groupIndex ) = NULL;
-static WORD (WINAPI *TBB_GetMaximumProcessorGroupCount)() = NULL;
+static DWORD (WINAPI *TBB_GetActiveProcessorCount)( WORD groupIndex ) = NULL;
+static WORD (WINAPI *TBB_GetActiveProcessorGroupCount)() = NULL;
 static BOOL (WINAPI *TBB_SetThreadGroupAffinity)( HANDLE hThread, 
                         const TBB_GROUP_AFFINITY* newAff, TBB_GROUP_AFFINITY *prevAff );
 static BOOL (WINAPI *TBB_GetThreadGroupAffinity)( HANDLE hThread, TBB_GROUP_AFFINITY* );
 
 static const dynamic_link_descriptor ProcessorGroupsApiLinkTable[] = {
-      DLD(GetMaximumProcessorCount, TBB_GetMaximumProcessorCount)
-    , DLD(GetMaximumProcessorGroupCount, TBB_GetMaximumProcessorGroupCount)
+      DLD(GetActiveProcessorCount, TBB_GetActiveProcessorCount)
+    , DLD(GetActiveProcessorGroupCount, TBB_GetActiveProcessorGroupCount)
     , DLD(SetThreadGroupAffinity, TBB_SetThreadGroupAffinity)
     , DLD(GetThreadGroupAffinity, TBB_GetThreadGroupAffinity)
 };
 
 static void initialize_hardware_concurrency_info () {
-    dynamic_link( GetModuleHandleA( "Kernel32.dll" ), ProcessorGroupsApiLinkTable,
+#if __TBB_WIN8UI_SUPPORT
+    // For these applications processor groups info is unavailable
+    // Setting up a number of processors for one processor group
+    theProcessorGroups[0].numProcs = theProcessorGroups[0].numProcsRunningTotal = std::thread::hardware_concurrency();
+#else /* __TBB_WIN8UI_SUPPORT */
+    dynamic_link( "Kernel32.dll", ProcessorGroupsApiLinkTable,
                   sizeof(ProcessorGroupsApiLinkTable)/sizeof(dynamic_link_descriptor) );
     SYSTEM_INFO si;
-    GetSystemInfo(&si);
+    GetNativeSystemInfo(&si);
     DWORD_PTR pam, sam, m = 1;
     GetProcessAffinityMask( GetCurrentProcess(), &pam, &sam );
     int nproc = 0;
@@ -257,9 +280,12 @@ static void initialize_hardware_concurrency_info () {
             ++nproc;
     }
     __TBB_ASSERT( nproc <= (int)si.dwNumberOfProcessors, NULL );
-    if ( nproc == (int)si.dwNumberOfProcessors && TBB_GetMaximumProcessorCount ) {
+    // By default setting up a number of processors for one processor group
+    theProcessorGroups[0].numProcs = theProcessorGroups[0].numProcsRunningTotal = nproc;
+    // Setting up processor groups in case the process does not restrict affinity mask and more than one processor group is present
+    if ( nproc == (int)si.dwNumberOfProcessors && TBB_GetActiveProcessorCount ) {
         // The process does not have restricting affinity mask and multiple processor groups are possible
-        ProcessorGroupInfo::NumGroups = (int)TBB_GetMaximumProcessorGroupCount();
+        ProcessorGroupInfo::NumGroups = (int)TBB_GetActiveProcessorGroupCount();
         __TBB_ASSERT( ProcessorGroupInfo::NumGroups <= MaxProcessorGroups, NULL );
         // Fail safety bootstrap. Release versions will limit available concurrency
         // level, while debug ones would assert.
@@ -272,17 +298,15 @@ static void initialize_hardware_concurrency_info () {
             int nprocs = 0;
             for ( WORD i = 0; i < ProcessorGroupInfo::NumGroups; ++i ) {
                 ProcessorGroupInfo  &pgi = theProcessorGroups[i];
-                pgi.numProcs = (int)TBB_GetMaximumProcessorCount(i);
+                pgi.numProcs = (int)TBB_GetActiveProcessorCount(i);
                 __TBB_ASSERT( pgi.numProcs <= (int)sizeof(DWORD_PTR) * CHAR_BIT, NULL );
                 pgi.mask = pgi.numProcs == sizeof(DWORD_PTR) * CHAR_BIT ? ~(DWORD_PTR)0 : (DWORD_PTR(1) << pgi.numProcs) - 1;
                 pgi.numProcsRunningTotal = nprocs += pgi.numProcs;
             }
-            __TBB_ASSERT( nprocs == (int)TBB_GetMaximumProcessorCount( TBB_ALL_PROCESSOR_GROUPS ), NULL );
-            return;
+            __TBB_ASSERT( nprocs == (int)TBB_GetActiveProcessorCount( TBB_ALL_PROCESSOR_GROUPS ), NULL );
         }
     }
-    // Either the process has restricting affinity mask or only a single processor groups is present
-    theProcessorGroups[0].numProcs = theProcessorGroups[0].numProcsRunningTotal = nproc;
+#endif /* __TBB_WIN8UI_SUPPORT */
 
     PrintExtraVersionInfo("Processor groups", "%d", ProcessorGroupInfo::NumGroups);
     if (ProcessorGroupInfo::NumGroups>1)

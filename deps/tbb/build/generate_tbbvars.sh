@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -31,7 +31,6 @@ bin_dir="$PWD"  #
 cd "$tbb_root"  # keep this comments here
 tbb_root="$PWD" # to make it unsensible
 cd "$bin_dir"   # to EOL encoding
-[ "`uname`" = "Darwin" ] && dll_path="DYLD_LIBRARY_PATH" || dll_path="LD_LIBRARY_PATH" #
 [ -f ./tbbvars.sh ] || cat >./tbbvars.sh <<EOF
 #!/bin/bash
 export TBBROOT="${tbb_root}" #
@@ -41,15 +40,15 @@ if [ -z "\$CPATH" ]; then #
 else #
     export CPATH="\${TBBROOT}/include:\$CPATH" #
 fi #
-if [ -z "\$LIBRARY_PATH" ]; then #
-    export LIBRARY_PATH="\${tbb_bin}" #
+if [ -z "\$${2}LIBRARY_PATH" ]; then #
+    export ${2}LIBRARY_PATH="\${tbb_bin}" #
 else #
-    export LIBRARY_PATH="\${tbb_bin}:\$LIBRARY_PATH" #
+    export ${2}LIBRARY_PATH="\${tbb_bin}:\$${2}LIBRARY_PATH" #
 fi #
-if [ -z "\$${dll_path}" ]; then #
-    export ${dll_path}="\${tbb_bin}" #
+if [ -z "\$${1}LD_LIBRARY_PATH" ]; then #
+    export ${1}LD_LIBRARY_PATH="\${tbb_bin}" #
 else #
-    export ${dll_path}="\${tbb_bin}:\$${dll_path}" #
+    export ${1}LD_LIBRARY_PATH="\${tbb_bin}:\$${1}LD_LIBRARY_PATH" #
 fi #
 ${TBB_CUSTOM_VARS_SH} #
 EOF
@@ -62,15 +61,19 @@ if (! \$?CPATH) then #
 else #
     setenv CPATH "\${TBBROOT}/include:\$CPATH" #
 endif #
-if (! \$?LIBRARY_PATH) then #
-    setenv LIBRARY_PATH "\${tbb_bin}" #
+if (! \$?${2}LIBRARY_PATH) then #
+    setenv ${2}LIBRARY_PATH "\${tbb_bin}" #
 else #
-    setenv LIBRARY_PATH "\${tbb_bin}:\$LIBRARY_PATH" #
+    setenv ${2}LIBRARY_PATH "\${tbb_bin}:\$${2}LIBRARY_PATH" #
 endif #
-if (! \$?${dll_path}) then #
-    setenv ${dll_path} "\${tbb_bin}" #
+if (! \$?${1}LD_LIBRARY_PATH) then #
+    setenv ${1}LD_LIBRARY_PATH "\${tbb_bin}" #
 else #
-    setenv ${dll_path} "\${tbb_bin}:\$${dll_path}" #
+    setenv ${1}LD_LIBRARY_PATH "\${tbb_bin}:\$${1}LD_LIBRARY_PATH" #
 endif #
 ${TBB_CUSTOM_VARS_CSH} #
 EOF
+# Workaround for copying Android* specific libgnustl_shared.so library to "."
+if [ ! -z "${LIB_GNU_STL_ANDROID}" ]; then #
+	cp ${LIB_GNU_STL_ANDROID}/libgnustl_shared.so . #
+fi #

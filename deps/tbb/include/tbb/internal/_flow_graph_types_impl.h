@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -41,59 +41,59 @@ namespace internal {
 
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<1, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type> >
             type;
     };
 
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<2, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>, 
-                PT<typename std::tuple_element<1,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>, 
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type> >
             type;
     };
 
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<3, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type> >
             type;
     };
 
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<4, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type> >
             type;
     };
 
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<5, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type>,
-                PT<typename std::tuple_element<4,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<4,TypeTuple>::type> >
             type;
     };
 
 #if __TBB_VARIADIC_MAX >= 6
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<6, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type>,
-                PT<typename std::tuple_element<4,TypeTuple>::type>,
-                PT<typename std::tuple_element<5,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<4,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<5,TypeTuple>::type> >
             type;
     };
 #endif
@@ -101,14 +101,14 @@ namespace internal {
 #if __TBB_VARIADIC_MAX >= 7
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<7, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type>,
-                PT<typename std::tuple_element<4,TypeTuple>::type>,
-                PT<typename std::tuple_element<5,TypeTuple>::type>,
-                PT<typename std::tuple_element<6,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<4,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<5,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<6,TypeTuple>::type> >
             type;
     };
 #endif
@@ -116,15 +116,15 @@ namespace internal {
 #if __TBB_VARIADIC_MAX >= 8
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<8, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type>,
-                PT<typename std::tuple_element<4,TypeTuple>::type>,
-                PT<typename std::tuple_element<5,TypeTuple>::type>,
-                PT<typename std::tuple_element<6,TypeTuple>::type>,
-                PT<typename std::tuple_element<7,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<4,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<5,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<6,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<7,TypeTuple>::type> >
             type;
     };
 #endif
@@ -132,16 +132,16 @@ namespace internal {
 #if __TBB_VARIADIC_MAX >= 9
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<9, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type>,
-                PT<typename std::tuple_element<4,TypeTuple>::type>,
-                PT<typename std::tuple_element<5,TypeTuple>::type>,
-                PT<typename std::tuple_element<6,TypeTuple>::type>,
-                PT<typename std::tuple_element<7,TypeTuple>::type>,
-                PT<typename std::tuple_element<8,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<4,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<5,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<6,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<7,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<8,TypeTuple>::type> >
             type;
     };
 #endif
@@ -149,17 +149,17 @@ namespace internal {
 #if __TBB_VARIADIC_MAX >= 10
     template<template<class> class PT, typename TypeTuple>
     struct wrap_tuple_elements<10, PT, TypeTuple> {
-        typedef typename std::tuple<
-                PT<typename std::tuple_element<0,TypeTuple>::type>,
-                PT<typename std::tuple_element<1,TypeTuple>::type>,
-                PT<typename std::tuple_element<2,TypeTuple>::type>,
-                PT<typename std::tuple_element<3,TypeTuple>::type>,
-                PT<typename std::tuple_element<4,TypeTuple>::type>,
-                PT<typename std::tuple_element<5,TypeTuple>::type>,
-                PT<typename std::tuple_element<6,TypeTuple>::type>,
-                PT<typename std::tuple_element<7,TypeTuple>::type>,
-                PT<typename std::tuple_element<8,TypeTuple>::type>,
-                PT<typename std::tuple_element<9,TypeTuple>::type> >
+        typedef typename tbb::flow::tuple<
+                PT<typename tbb::flow::tuple_element<0,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<1,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<2,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<3,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<4,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<5,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<6,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<7,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<8,TypeTuple>::type>,
+                PT<typename tbb::flow::tuple_element<9,TypeTuple>::type> >
             type;
     };
 #endif

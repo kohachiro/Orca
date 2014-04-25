@@ -1,6 +1,6 @@
 @echo off
 REM
-REM Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+REM Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 REM
 REM This file is part of Threading Building Blocks.
 REM
@@ -27,10 +27,56 @@ REM invalidate any other reasons why the executable file might be covered by
 REM the GNU General Public License.
 REM
 
-REM no LD_PRELOAD under Windows
-if "%1"=="-l" (
-    echo skip
-    exit
+set cmd_line=
+if DEFINED run_prefix set cmd_line=%run_prefix%
+:while
+if NOT "%1"=="" (
+    REM Verbose mode
+    if "%1"=="-v" (
+        set verbose=yes
+        GOTO continue
+    )
+    REM Silent mode of 'make' requires additional support for associating
+    REM of test output with the test name. Verbose mode is the simplest way
+    if "%1"=="-q" (
+        set verbose=yes
+        GOTO continue
+    )
+    REM Run in stress mode
+    if "%1"=="-s" (
+        echo Doing stress testing. Press Ctrl-C to terminate
+        set stress=yes
+        GOTO continue
+    )
+    REM Repeat execution specified number of times
+    if "%1"=="-r" (
+        set repeat=%2
+        SHIFT
+        GOTO continue
+    )
+    REM no LD_PRELOAD under Windows
+    REM but run the test to check "#pragma comment" construction
+    if "%1"=="-l" (
+        REM The command line may specify -l with empty dll name,
+        REM e.g. "test_launcher.bat -l  app.exe". If the dll name is
+        REM empty then %2 contains the application name and the SHIFT
+        REM operation is not necessary.
+        if exist "%3" SHIFT
+        GOTO continue
+    )
+    REM no need to setup up stack size under Windows
+    if "%1"=="-u" GOTO continue
+    set cmd_line=%cmd_line% %1
+:continue
+    SHIFT
+    GOTO while
 )
-
-%*
+set cmd_line=%cmd_line:./=.\%
+if DEFINED verbose echo Running %cmd_line%
+if DEFINED stress set cmd_line=%cmd_line% ^& IF NOT ERRORLEVEL 1 GOTO stress
+:stress
+if DEFINED repeat (
+    for /L %%i in (1,1,%repeat%) do echo %%i of %repeat%: & %cmd_line%
+) else (
+    %cmd_line%
+)

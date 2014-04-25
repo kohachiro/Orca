@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -424,14 +424,12 @@ requested:
         if( n_state & (STATE_COMBINED_READER | STATE_UPGRADE_REQUESTED) ) {
             // save n|FLAG for simplicity of following comparisons
             tmp = tricky_pointer(n)|FLAG;
-            atomic_backoff backoff;
-            while(__TBB_load_relaxed(my_next)==tmp) {
+            for( atomic_backoff b; __TBB_load_relaxed(my_next)==tmp; b.pause() ) {
                 if( my_state & STATE_COMBINED_UPGRADING ) {
                     if( __TBB_load_with_acquire(my_next)==tmp )
                         __TBB_store_relaxed(my_next, n);
                     goto waiting;
                 }
-                backoff.pause();
             }
             __TBB_ASSERT(__TBB_load_relaxed(my_next) != (tricky_pointer(n)|FLAG), NULL);
             goto requested;

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,21 +27,41 @@
 */
 
 /* Some tests in this source file are based on PPL tests provided by Microsoft. */
+#include "harness_defs.h"
+#if !(__TBB_TEST_SECONDARY && __TBB_CPP11_STD_PLACEHOLDERS_LINKAGE_BROKEN)
 
 #define __TBB_EXTRA_DEBUG 1
 #include "tbb/concurrent_unordered_map.h"
 #include "tbb/concurrent_unordered_set.h"
+#include "harness_assert.h"
+
+#if __TBB_TEST_SECONDARY
+
+#include "harness_runtime_loader.h"
+
+#else // __TBB_TEST_SECONDARY
+
 #include "tbb/parallel_for.h"
 #include "tbb/tick_count.h"
-#include <stdio.h>
 #include "harness.h"
+// Test that unordered containers do not require keys have default constructors.
+#define __HARNESS_CHECKTYPE_DEFAULT_CTOR 0
+#include "harness_checktype.h"
+#undef  __HARNESS_CHECKTYPE_DEFAULT_CTOR
 #include "harness_allocator.h"
+
 
 using namespace std;
 
 typedef local_counting_allocator<debug_allocator<std::pair<const int,int>,std::allocator> > MyAllocator;
 typedef tbb::concurrent_unordered_map<int, int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyMap;
+typedef tbb::concurrent_unordered_map<int, check_type<int>, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyCheckedMap;
+typedef tbb::concurrent_unordered_multimap<int, int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyMultiMap;
+typedef tbb::concurrent_unordered_multimap<int, check_type<int>, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyCheckedMultiMap;
 typedef tbb::concurrent_unordered_set<int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MySet;
+typedef tbb::concurrent_unordered_set<check_type<int>, tbb::tbb_hash<check_type<int> >, std::equal_to<check_type<int> >, MyAllocator> MyCheckedSet;
+typedef tbb::concurrent_unordered_multiset<int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyMultiSet;
+typedef tbb::concurrent_unordered_multiset<check_type<int>, tbb::tbb_hash<check_type<int> >, std::equal_to<check_type<int> >, MyAllocator> MyCheckedMultiSet;
 
 #define CheckAllocatorE(t,a,f) CheckAllocator(t,a,f,true,__LINE__)
 #define CheckAllocatorA(t,a,f) CheckAllocator(t,a,f,false,__LINE__)
@@ -121,20 +141,154 @@ struct SpecialTests <MyMap>
         // size_type size() const;
         ASSERT(ccont.size() == 1, "Concurrent container size incorrect");
 
-        ASSERT(cont[1] == 2, "Concurrent container size incorrect");
+        ASSERT(cont[1] == 2, "Concurrent container value incorrect");
 
         // mapped_type& at( const key_type& k );
         // const mapped_type& at(const key_type& k) const;
-        ASSERT(cont.at(1) == 2, "Concurrent container size incorrect");
-        ASSERT(ccont.at(1) == 2, "Concurrent container size incorrect");
+        ASSERT(cont.at(1) == 2, "Concurrent container value incorrect");
+        ASSERT(ccont.at(1) == 2, "Concurrent container value incorrect");
 
         // iterator find(const key_type& k);
         MyMap::const_iterator it = cont.find(1);
         ASSERT(it != cont.end() && Value<MyMap>::get(*(it)) == 2, "Element with key 1 not properly found");
+        cont.unsafe_erase(it);
+        it = cont.find(1);
+        ASSERT(it == cont.end(), "Element with key 1 not properly erased");
 
         REMARK("passed -- specialized %s tests\n", str);
     }
 };
+
+// test assumes the unordered multimap puts items in ascending order, and the insertions
+// occur at the end of a range.  This assumption may not always be valid.
+template <>
+struct SpecialTests <MyMultiMap>
+{
+#define VALUE1 7
+#define VALUE2 2
+    static void Test(const char *str)
+    {
+        MyMultiMap cont(0);
+        const MyMultiMap &ccont(cont);
+        // mapped_type& operator[](const key_type& k);
+        cont.insert(make_pair(1, VALUE1));
+
+        // bool empty() const;    
+        ASSERT(!ccont.empty(), "Concurrent container empty after adding an element");
+
+        // size_type size() const;
+        ASSERT(ccont.size() == 1, "Concurrent container size incorrect");
+        ASSERT((*(cont.begin())).second == VALUE1, "Concurrent container value incorrect");
+        ASSERT((*(cont.equal_range(1)).first).second == VALUE1, "Improper value from equal_range");
+        ASSERT((cont.equal_range(1)).second == cont.end(), "Improper iterator from equal_range");
+
+        cont.insert(make_pair(1,VALUE2));
+
+        // bool empty() const;    
+        ASSERT(!ccont.empty(), "Concurrent container empty after adding an element");
+
+        // size_type size() const;
+        ASSERT(ccont.size() == 2, "Concurrent container size incorrect");
+        ASSERT((*(cont.begin())).second == VALUE1, "Concurrent container value incorrect");
+        ASSERT((*(cont.equal_range(1)).first).second == VALUE1, "Improper value from equal_range");
+        ASSERT((cont.equal_range(1)).second == cont.end(), "Improper iterator from equal_range");
+
+        // check that the second value is part of the range.
+        // though I am not sure there are guarantees what order the insertions appear in the range
+        // if the order differs the ASSERT above will fail already.
+        std::pair<MyMultiMap::iterator, MyMultiMap::iterator> range = cont.equal_range(1);
+        MyMultiMap::iterator ii = range.first;
+        ++ii;
+        ASSERT((*ii).second == VALUE2, "Improper value for second insertion");
+
+        cont.insert(make_pair(0, 4));
+
+        // bool empty() const;    
+        ASSERT(!ccont.empty(), "Concurrent container empty after adding an element");
+
+        // size_type size() const;
+        ASSERT(ccont.size() == 3, "Concurrent container size incorrect");
+        ASSERT((*(cont.begin())).second == 4, "Concurrent container value incorrect");
+        ASSERT((*(cont.equal_range(1)).first).second == VALUE1, "Improper value from equal_range");
+        ASSERT((cont.equal_range(1)).second == cont.end(), "Improper iterator from equal_range");
+
+        REMARK("passed -- specialized %s tests\n", str);
+    }
+};
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+//these operator== are used implicitly in  test_initializer_list.h.
+//For some unknown reason clang is not able to find the if they a declared after the
+//inclusion of test_initializer_list.h.
+template<typename container_type>
+bool equal_containers(container_type const& lhs, container_type const& rhs){
+    if (lhs.size() != rhs.size()){
+        return false;
+    }
+    return std::equal(lhs.begin(),lhs.end(),lhs.begin());
+}
+
+template<typename T>
+bool operator==(tbb::concurrent_unordered_set<T> const& lhs, tbb::concurrent_unordered_set<T> const& rhs){
+    return equal_containers(lhs,rhs);
+}
+
+template<typename T>
+bool operator==(tbb::concurrent_unordered_multiset<T> const& lhs, tbb::concurrent_unordered_multiset<T> const& rhs){
+    return equal_containers(lhs,rhs);
+}
+
+template<typename Key, typename Value>
+bool operator==(tbb::concurrent_unordered_map<Key,Value> const& lhs, tbb::concurrent_unordered_map<Key,Value> const& rhs){
+    return equal_containers(lhs,rhs);
+}
+
+template<typename Key, typename Value>
+bool operator==(tbb::concurrent_unordered_multimap<Key,Value> const& lhs, tbb::concurrent_unordered_multimap<Key,Value> const& rhs){
+    return equal_containers(lhs,rhs);
+}
+
+#include "test_initializer_list.h"
+
+void TestInitList(){
+    using namespace initializer_list_support_tests;
+    REMARK("testing initializer_list methods \n");
+
+    std::initializer_list<int> il = {1,2,3,4,5};
+
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_set<int> >(il);
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_set<int> >({});
+
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_multiset<int> >(il);
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_multiset<int> >({});
+
+    typedef tbb::concurrent_unordered_map<int,int>::value_type value_type;
+    std::initializer_list<value_type > pairs_il = {{1,1},{2,2},{3,3},{4,4},{5,5}};
+
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_map<int,int> >(pairs_il);
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_map<int,int> >({});
+
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_multimap<int,int> >(pairs_il);
+    TestInitListSupportWithoutAssign<tbb::concurrent_unordered_multimap<int,int> >({});
+}
+#endif //if __TBB_INITIALIZER_LISTS_PRESENT
+
+#if __TBB_RANGE_BASED_FOR_PRESENT
+#include "test_range_based_for.h"
+void TestRangeBasedFor(){
+    using namespace range_based_for_support_tests;
+
+    REMARK("testing range based for loop compatibility \n");
+    typedef tbb::concurrent_unordered_map<int,int> cu_map;
+    cu_map a_cu_map;
+    const int sequence_length = 100;
+    for (int i =1; i<= sequence_length; ++i){
+        a_cu_map.insert(cu_map::value_type(i,i));
+    }
+
+    ASSERT( range_based_for_accumulate(a_cu_map, pair_second_summer(), 0) == gauss_summ_of_int_sequence(sequence_length), "incorrect accumulated value generated via range based for ?");
+}
+#endif //if __TBB_RANGE_BASED_FOR_PRESENT
 
 template<typename T>
 void test_basic(const char * str)
@@ -321,7 +475,7 @@ void test_basic(const char * str)
     ASSERT(newcont.count(99) == 1, "Element with key 99 not present after swap");
     ASSERT(T::allow_multimapping ? (cont.size() == 3) : (cont.size() == 2), "Wrong number of elements after swap");
 
-    REMARK("passed -- basic %S tests\n", str);
+    REMARK("passed -- basic %s tests\n", str);
 
 #if defined (VERBOSE)
     REMARK("container dump debug:\n");
@@ -345,41 +499,44 @@ template<typename T>
 class FillTable: NoAssign {
     T &table;
     const int items;
+    bool my_asymptotic;
     typedef std::pair<typename T::iterator, bool> pairIB;
 public:
-    FillTable(T &t, int i) : table(t), items(i) {
+    FillTable(T &t, int i, bool asymptotic) : table(t), items(i), my_asymptotic(asymptotic) {
         ASSERT( !(items&1) && items > 100, NULL);
     }
     void operator()(int threadn) const {
         if( threadn == 0 ) { // Fill even keys forward (single thread)
             bool last_inserted = true;
             for( int i = 0; i < items; i+=2 ) {
-                pairIB pib = table.insert(Value<T>::make(i));
-                ASSERT(Value<T>::get(*(pib.first)) == i, "Element not properly inserted");
+                pairIB pib = table.insert(Value<T>::make(my_asymptotic?1:i));
+                ASSERT(Value<T>::get(*(pib.first)) == (my_asymptotic?1:i), "Element not properly inserted");
                 ASSERT( last_inserted || !pib.second, "Previous key was not inserted but this is inserted" );
                 last_inserted = pib.second;
             }
         } else if( threadn == 1 ) { // Fill even keys backward (single thread)
             bool last_inserted = true;
             for( int i = items-2; i >= 0; i-=2 ) {
-                pairIB pib = table.insert(Value<T>::make(i));
-                ASSERT(Value<T>::get(*(pib.first)) == i, "Element not properly inserted");
+                pairIB pib = table.insert(Value<T>::make(my_asymptotic?1:i));
+                ASSERT(Value<T>::get(*(pib.first)) == (my_asymptotic?1:i), "Element not properly inserted");
                 ASSERT( last_inserted || !pib.second, "Previous key was not inserted but this is inserted" );
                 last_inserted = pib.second;
             }
         } else if( !(threadn&1) ) { // Fill odd keys forward (multiple threads)
             for( int i = 1; i < items; i+=2 ) {
-                pairIB pib = table.insert(Value<T>::make(i));
-                ASSERT(Value<T>::get(*(pib.first)) == i, "Element not properly inserted");
+                pairIB pib = table.insert(Value<T>::make(my_asymptotic?1:i));
+                ASSERT(Value<T>::get(*(pib.first)) == (my_asymptotic?1:i), "Element not properly inserted");
             }
         } else { // Check odd keys backward (multiple threads)
-            bool last_found = false;
-            for( int i = items-1; i >= 0; i-=2 ) {
-                typename T::iterator it = table.find(i);
-                if( it != table.end() ) { // found
-                    ASSERT(Value<T>::get(*it) == i, "Element not properly inserted");
-                    last_found = true;
-                } else ASSERT( !last_found, "Previous key was found but this is not" );
+            if (!my_asymptotic) {
+                bool last_found = false;
+                for( int i = items-1; i >= 0; i-=2 ) {
+                    typename T::iterator it = table.find(i);
+                    if( it != table.end() ) { // found
+                        ASSERT(Value<T>::get(*it) == i, "Element not properly inserted");
+                        last_found = true;
+                    } else ASSERT( !last_found, "Previous key was found but this is not" );
+                }
             }
         }
     }
@@ -404,11 +561,31 @@ struct ParallelTraverseBody: NoAssign {
     }
 };
 
-void CheckRange( AtomicByte array[], int n ) {
-    for( int k=0; k<n; ++k ) {
-        if( array[k] != 1 ) {
-            REPORT("array[%d]=%d\n", k, int(array[k]));
-            ASSERT(false,NULL);
+// if multimapping, oddCount is the value that each odd-indexed array element should have.
+// not meaningful for non-multimapped case.
+void CheckRange( AtomicByte array[], int n, bool allowMultiMapping, int oddCount ) {
+    if(allowMultiMapping) {
+        for( int k = 0; k<n; ++k) {
+            if(k%2) {
+                if( array[k] != oddCount ) {
+                    REPORT("array[%d]=%d (should be %d)\n", k, int(array[k]), oddCount);
+                    ASSERT(false,NULL);
+                }
+            }
+            else {
+                if(array[k] != 2) {
+                    REPORT("array[%d]=%d\n", k, int(array[k]));
+                    ASSERT(false,NULL);
+                }
+            }
+        }
+    }
+    else {
+        for( int k=0; k<n; ++k ) {
+            if( array[k] != 1 ) {
+                REPORT("array[%d]=%d\n", k, int(array[k]));
+                ASSERT(false,NULL);
+            }
         }
     }
 }
@@ -435,6 +612,16 @@ public:
 };
 
 template<>
+class AssignBody<MyCheckedMap>: NoAssign {
+    MyCheckedMap &table;
+public:
+    AssignBody(MyCheckedMap &t) : NoAssign(), table(t) {}
+    void operator()(int i) const {
+        table.insert(MyCheckedMap::value_type(i, check_type<int>(i)));
+    }
+};
+
+template<>
 class AssignBody<MySet>: NoAssign {
     MySet &table;
 public:
@@ -444,56 +631,213 @@ public:
     }
 };
 
+template<>
+class AssignBody<MyCheckedSet>: NoAssign {
+    MyCheckedSet &table;
+public:
+    AssignBody(MyCheckedSet &t) : NoAssign(), table(t) {}
+    void operator()(int i) const {
+        table.insert(check_type<int>(i));
+    }
+};
+
+// multiset: for i, inserts i i%3+1 times
+template<>
+class AssignBody<MyMultiSet>: NoAssign {
+    MyMultiSet &table;
+public:
+    AssignBody(MyMultiSet &t) : NoAssign(), table(t) {}
+    void operator()(int i) const {
+        int num = i % 3 + 1;
+        for( int j = 0; j < num; ++j) {
+            table.insert(i);
+        }
+    }
+};
+
+// multiset: for i, inserts i i%3+1 times
+template<>
+class AssignBody<MyCheckedMultiSet>: NoAssign {
+    MyCheckedMultiSet &table;
+public:
+    AssignBody(MyCheckedMultiSet &t) : NoAssign(), table(t) {}
+    void operator()(int i) const {
+        int num = i % 3 + 1;
+        for( int j = 0; j < num; ++j) {
+            table.insert(i);
+        }
+    }
+};
+
+// for multimap insert (i%3)+1 items  [i,3*i], [i,3*i+1] ..
+template<>
+class AssignBody<MyMultiMap>: NoAssign {
+    MyMultiMap &table;
+public:
+    AssignBody(MyMultiMap &t) : NoAssign(), table(t) {}
+    void operator()(int i) const {
+        for(int j = 0; j < (i % 3) + 1; ++j) {
+            table.insert(std::pair<int,int>(i,3*i+j-1));
+        }
+    }
+};
+
+// for multimap insert (i%3)+1 items  [i,3*i], [i,3*i+1] ..
+template<>
+class AssignBody<MyCheckedMultiMap>: NoAssign {
+    MyCheckedMultiMap &table;
+public:
+    AssignBody(MyCheckedMultiMap &t) : NoAssign(), table(t) {}
+    void operator()(int i) const {
+        for(int j = 0; j < (i % 3) + 1; ++j) {
+            table.insert(std::pair<int,int>(i,3*i+j-1));
+        }
+    }
+};
+
 template<typename T>
-void test_concurrent(const char *tablename) {
+void test_concurrent(const char *tablename, bool asymptotic = false) {
 #if TBB_USE_ASSERT
     int items = 2000;
 #else
-    int items = 100000;
+    int items = 20000;
 #endif
+    int nItemsInserted = 0;
+    int nThreads = 0;
     T table(items/1000);
-    tbb::tick_count t0 = tbb::tick_count::now();
     #if __bgp__
-    NativeParallelFor(  6/*min 6*/, FillTable<T>(table, items) );
+    nThreads = 6;
     #else
-    NativeParallelFor( 16/*min 6*/, FillTable<T>(table, items) );
+    nThreads = 16;
     #endif
+    if(T::allow_multimapping) {
+        // even passes (threads 0 & 1) put N/2 items each
+        // odd passes  (threads > 1)   put N/2 if thread is odd, else checks if even.
+        items = 4*items / (nThreads + 2);  // approximately same number of items inserted.
+        nItemsInserted = items + (nThreads-2) * items / 4;
+    }
+    else {
+        nItemsInserted = items;
+    }
+    REMARK("%s items == %d\n", tablename, items);
+    tbb::tick_count t0 = tbb::tick_count::now();
+    NativeParallelFor( nThreads, FillTable<T>(table, items, asymptotic) );
     tbb::tick_count t1 = tbb::tick_count::now();
-    REMARK( "time for filling '%s' by %d items = %g\n", tablename, items, (t1-t0).seconds() );
-    ASSERT( int(table.size()) == items, NULL);
+    REMARK( "time for filling '%s' by %d items = %g\n", tablename, table.size(), (t1-t0).seconds() );
+    ASSERT( int(table.size()) == nItemsInserted, NULL);
 
-    AtomicByte* array = new AtomicByte[items];
-    memset( array, 0, items*sizeof(AtomicByte) );
+    if(!asymptotic) {
+        AtomicByte* array = new AtomicByte[items];
+        memset( array, 0, items*sizeof(AtomicByte) );
 
-    typename T::range_type r = table.range();
-    ASSERT((items == CheckRecursiveRange<T,typename T::iterator>(r).first), NULL);
-    tbb::parallel_for( r, ParallelTraverseBody<T, typename T::const_range_type>( array, items ));
-    CheckRange( array, items );
+        typename T::range_type r = table.range();
+        std::pair<int,int> p = CheckRecursiveRange<T,typename T::iterator>(r);
+        ASSERT((nItemsInserted == p.first), NULL);
+        tbb::parallel_for( r, ParallelTraverseBody<T, typename T::const_range_type>( array, items ));
+        CheckRange( array, items, T::allow_multimapping, (nThreads - 1)/2 );
 
-    const T &const_table = table;
-    memset( array, 0, items*sizeof(AtomicByte) );
-    typename T::const_range_type cr = const_table.range();
-    ASSERT((items == CheckRecursiveRange<T,typename T::const_iterator>(cr).first), NULL);
-    tbb::parallel_for( cr, ParallelTraverseBody<T, typename T::const_range_type>( array, items ));
-    CheckRange( array, items );
-    delete[] array;
+        const T &const_table = table;
+        memset( array, 0, items*sizeof(AtomicByte) );
+        typename T::const_range_type cr = const_table.range();
+        ASSERT((nItemsInserted == CheckRecursiveRange<T,typename T::const_iterator>(cr).first), NULL);
+        tbb::parallel_for( cr, ParallelTraverseBody<T, typename T::const_range_type>( array, items ));
+        CheckRange( array, items, T::allow_multimapping, (nThreads - 1) / 2 );
+        delete[] array;
 
-    tbb::parallel_for( 0, items, CheckTable<T>( table ) );
-  
+        tbb::parallel_for( 0, items, CheckTable<T>( table ) );
+    }
+
     table.clear();
     CheckAllocatorA(table, items+1, items); // one dummy is always allocated
 
-    for(int i=0; i<10000; ++i) {
+    for(int i=0; i<1000; ++i) {
         tbb::parallel_for( 0, 8, AssignBody<T>( table ) );
         table.clear();
     }
 }
+#endif //#if !__TBB_TEST_SECONDARY
 
+
+namespace test_select_size_t_constant{
+    __TBB_STATIC_ASSERT((tbb::internal::select_size_t_constant<1234,1234>::value == 1234),"select_size_t_constant::value is not compile time constant");
+//    There will be two constant used in the test 32 bit and 64 bit one.
+//    The 64 bit constant should chosen so that it 32 bit halves adds up to the 32 bit one ( first constant used in the test).
+//    % ~0U is used to sum up 32bit halves of the 64 constant.  ("% ~0U" essentially adds the 32-bit "digits", like "%9" adds
+//    the digits (modulo 9) of a number in base 10).
+//    So iff select_size_t_constant is correct result of the calculation below will be same on both 32bit and 64bit platforms.
+    __TBB_STATIC_ASSERT((tbb::internal::select_size_t_constant<0x12345678U,0x091A2B3C091A2B3CULL>::value % ~0U == 0x12345678U),
+            "select_size_t_constant have chosen the wrong constant");
+
+}
+
+#if !__TBB_TEST_SECONDARY
+#define INITIALIZATION_TIME_TEST_NAMESPACE            initialization_time_test
+#define TEST_INITIALIZATION_TIME_OPERATIONS_NAME      test_initialization_time_operations
+void test_initialization_time_operations_external();
+#else
+#define INITIALIZATION_TIME_TEST_NAMESPACE            initialization_time_test_external
+#define TEST_INITIALIZATION_TIME_OPERATIONS_NAME      test_initialization_time_operations_external
+#endif
+
+namespace INITIALIZATION_TIME_TEST_NAMESPACE{
+    tbb::concurrent_unordered_set<int> static_init_time_set;
+    int any_non_zero_value = 89432;
+    bool static_init_time_inserted = (static_init_time_set.insert(any_non_zero_value)).second;
+    bool static_init_time_found = ((static_init_time_set.find(any_non_zero_value)) != static_init_time_set.end());
+}
+void TEST_INITIALIZATION_TIME_OPERATIONS_NAME(){
+    using namespace INITIALIZATION_TIME_TEST_NAMESPACE;
+    #define LOCATION ",in function: " __TBB_STRING(TEST_INITIALIZATION_TIME_OPERATIONS_NAME)
+    ASSERT(static_init_time_inserted,"failed to insert an item during initialization of global objects" LOCATION);
+    ASSERT(static_init_time_found,"failed to find an item during initialization of global objects" LOCATION);
+
+    bool static_init_time_found_in_main = ((static_init_time_set.find(any_non_zero_value)) != static_init_time_set.end());
+    ASSERT(static_init_time_found_in_main,"failed to find during main() an item inserted during initialization of global objects" LOCATION);
+    #undef LOCATION
+}
+
+#if !__TBB_TEST_SECONDARY
 int TestMain () {
     test_machine();
-    test_basic<MyMap>("concurrent unordered map");
-    test_concurrent<MyMap>("concurrent unordered map");
-    test_basic<MySet>("concurrent unordered set");
-    test_concurrent<MySet>("concurrent unordered set");
+    test_basic<MyMap>("concurrent unordered Map");
+    test_concurrent<MyMap>("concurrent unordered Map");
+    test_basic<MySet>("concurrent unordered Set");
+    test_concurrent<MySet>("concurrent unordered Set");
+    test_basic<MyMultiMap>("concurrent unordered MultiMap");
+    test_concurrent<MyMultiMap>("concurrent unordered MultiMap");
+    test_concurrent<MyMultiMap>("concurrent unordered MultiMap asymptotic", true);
+    test_basic<MyMultiSet>("concurrent unordered MultiSet");
+    test_concurrent<MyMultiSet>("concurrent unordered MultiSet");
+    test_concurrent<MyMultiSet>("concurrent unordered MultiSet asymptotic", true);
+
+    { Check<MyCheckedSet::value_type> checkit; test_basic<MyCheckedSet>("concurrent_unordered_set (checked)"); }
+    { Check<MyCheckedSet::value_type> checkit; test_concurrent<MyCheckedSet>("concurrent unordered set (checked)"); }
+
+    { Check<MyCheckedMultiSet::value_type> checkit; test_basic<MyCheckedMultiSet>("concurrent_unordered_multiset (checked)"); }
+    { Check<MyCheckedMultiSet::value_type> checkit; test_concurrent<MyCheckedMultiSet>("concurrent unordered multiset (checked)"); }
+
+    { Check<MyCheckedMap::value_type> checkit; test_basic<MyCheckedMap>("concurrent unordered map (checked)"); }
+    { Check<MyCheckedMap::value_type> checkit; test_concurrent<MyCheckedMap>("concurrent unordered map (checked)"); }
+
+    { Check<MyCheckedMultiMap::value_type> checkit; test_basic<MyCheckedMultiMap>("concurrent unordered MultiMap (checked)"); }
+    { Check<MyCheckedMultiMap::value_type> checkit; test_concurrent<MyCheckedMultiMap>("concurrent unordered MultiMap (checked)"); }
+
+    test_initialization_time_operations();
+    #if !__TBB_CPP11_STD_PLACEHOLDERS_LINKAGE_BROKEN
+        test_initialization_time_operations_external();
+    #else
+        REPORT("Known issue: global objects initialization time tests skipped.\n");
+    #endif //!__TBB_CPP11_STD_PLACEHOLDERS_LINKING_BROKEN
+
+    #if __TBB_INITIALIZER_LISTS_PRESENT
+        TestInitList();
+    #endif
+
+    #if __TBB_RANGE_BASED_FOR_PRESENT
+        TestRangeBasedFor();
+    #endif
+
     return Harness::Done;
 }
+#endif //#if !__TBB_TEST_SECONDARY
+#endif //!(__TBB_TEST_SECONDARY && __TBB_CPP11_STD_PLACEHOLDERS_LINKING_BROKEN)

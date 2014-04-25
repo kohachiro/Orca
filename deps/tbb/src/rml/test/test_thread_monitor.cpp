@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,8 +26,13 @@
     the GNU General Public License.
 */
 
-#include "thread_monitor.h"
 #include "harness.h"
+#if __TBB_MIC_OFFLOAD
+int TestMain () {
+    return Harness::Skipped;
+}
+#else
+#include "thread_monitor.h"
 #include "harness_memory.h"
 #include "tbb/semaphore.cpp"
 
@@ -73,7 +78,7 @@ void ThreadState::loop() {
     }
 }
 
-// Linux on IA-64 seems to require at least 1<<18 bytes per stack.
+// Linux on IA-64 architecture seems to require at least 1<<18 bytes per stack.
 const size_t MinStackSize = 1<<18;
 const size_t MaxStackSize = 1<<22;
 
@@ -117,3 +122,4 @@ int TestMain () {
 
     return Harness::Done;
 }
+#endif /* __TBB_MIC_OFFLOAD */

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -33,23 +33,13 @@
     by no more than AcceptableDeviation percent.
 **/
 
-#if HARNESS_USE_PROXY
-
-// The test includes injects scheduler directly, so skip it when proxy tested.
-
-#undef HARNESS_USE_PROXY
-#include "harness.h"
-
-int TestMain () {
-    return Harness::Skipped;
-}
-
-#else // HARNESS_USE_PROXY
-
-#include "harness_inject_scheduler.h"
-
 #define HARNESS_DEFAULT_MIN_THREADS 2
 #define HARNESS_DEFAULT_MAX_THREADS 32
+
+#include <algorithm> // include it first to avoid error on define below
+#define private public
+#include "harness_inject_scheduler.h"
+#undef private
 
 #define TEST_TOTAL_SEQUENCE 0
 
@@ -59,7 +49,7 @@ int TestMain () {
 //! Coefficient defining tolerable deviation from ideal random distribution
 const double AcceptableDeviation = 2.1;
 //! Tolerable probability of failure to achieve tolerable distribution
-const double AcceptableProbabilityOfOutliers = 1e-6;
+const double AcceptableProbabilityOfOutliers = 1e-5;
 //! Coefficient defining the length of random numbers series used to estimate the distribution
 /** Number of random values generated per each range element. I.e. the larger is 
     the range, the longer is the series of random values. **/
@@ -72,19 +62,19 @@ const uintptr_t NumSeeds = 100;
 tbb::atomic<uintptr_t> NumHighOutliers;
 tbb::atomic<uintptr_t> NumLowOutliers;
 
-inline void CheckProbability ( double probability, double expectedProbability, int index, int numIndices ) {
+inline void CheckProbability ( double probability, double expectedProbability, int index, int numIndices, void* seed ) {
     double lowerBound = expectedProbability / AcceptableDeviation,
            upperBound = expectedProbability * AcceptableDeviation;
     if ( probability < lowerBound ) {
         if ( !NumLowOutliers )
-            REMARK( "Warning: Probability %.3f of hitting index %d among %d elements is out of acceptable range (%.3f - %.3f)\n",
-                    probability, index, numIndices, lowerBound, upperBound );
+            REMARK( "Warning: Probability %.3f of hitting index %d among %d elements is out of acceptable range (%.3f - %.3f) for seed %p\n",
+                    probability, index, numIndices, lowerBound, upperBound, seed );
         ++NumLowOutliers;
     }
     else if ( probability > upperBound ) {
         if ( !NumHighOutliers )
-            REMARK( "Warning: Probability %.3f of hitting index %d among %d elements is out of acceptable range (%.3f - %.3f)\n",
-                    probability, index, numIndices, lowerBound, upperBound );
+            REMARK( "Warning: Probability %.3f of hitting index %d among %d elements is out of acceptable range (%.3f - %.3f) for seed %p\n",
+                    probability, index, numIndices, lowerBound, upperBound, seed );
         ++NumHighOutliers;
     }
 }
@@ -100,10 +90,15 @@ struct CheckDistributionBody {
         double expectedProbability = 1./randomRange;
         // Loop through different seeds
         for ( uintptr_t i = 0; i < NumSeeds; ++i ) {
-            // Seed value is selected in two ways, the first of which mimics 
-            // the one used by the TBB task scheduler
-            void* seed = i % 2 ? (char*)&curHits + i * 16 : (void*)(i * 8);
-            tbb::internal::FastRandom random( (unsigned)(uintptr_t)seed );
+            // Seed value mimics the one used by the TBB task scheduler
+            void* seed = (char*)&curHits + i * 16;
+            tbb::internal::FastRandom random( seed );
+            // According to Section 3.2.1.2 of Volume 2 of Knuth's Art of Computer Programming
+            // the following conditions must be hold for m=2^32:
+            ASSERT((random.c&1)!=0, "c is relatively prime to m");
+            ASSERT((random.a-1)%4==0, "a-1 is a multiple of p, for every prime p dividing m."
+                   " And a-1 is a multiple of 4, if m is a multiple of 4");
+
             memset( curHits, 0, randomRange * sizeof(uintptr_t) );
 #if TEST_TOTAL_SEQUENCE
             memset( totalHits, 0, randomRange * sizeof(uintptr_t) );
@@ -123,9 +118,9 @@ struct CheckDistributionBody {
             }
             while ( randsGenerated < experimentLen ) {
                 for ( uintptr_t j = 0; j < randomRange; ++j ) {
-                    CheckProbability( double(curHits[j])/seriesLen, expectedProbability, j, randomRange );
+                    CheckProbability( double(curHits[j])/seriesLen, expectedProbability, j, randomRange, seed );
 #if TEST_TOTAL_SEQUENCE
-                    CheckProbability( double(totalHits[j])/randsGenerated, expectedProbability, j, randomRange );
+                    CheckProbability( double(totalHits[j])/randsGenerated, expectedProbability, j, randomRange, seed );
 #endif
                 }
                 --curHits[curSeries[randsGenerated % seriesLen]];
@@ -150,8 +145,6 @@ struct rng {
     rng (unsigned seed):my_fast_random(seed) {}
     unsigned short operator()(){return my_fast_random.get();}
 };
-
-#include <algorithm>
 
 template <std::size_t seriesLen >
 struct SingleCheck{
@@ -200,8 +193,9 @@ int TestMain () {
     CheckReproducibilityBody<reproducibilitySeriesLen,reproducibilitySeedsToTest>  CheckReproducibility(reproducibilitySeedsToTest/MaxThread);
     while ( MinThread <= MaxThread ) {
         int ThreadsToRun = min(P, MaxThread - MinThread + 1);
+        REMARK("Checking random range [%d;%d)\n", MinThread, MinThread+ThreadsToRun);
         NativeParallelFor( ThreadsToRun, CheckDistributionBody() );
-        NativeParallelFor(ThreadsToRun, CheckReproducibility);
+        NativeParallelFor( ThreadsToRun, CheckReproducibility );
         MinThread += P;
     }
     double observedProbabilityOfOutliers = (NumLowOutliers + NumHighOutliers) / NumChecks;
@@ -214,4 +208,3 @@ int TestMain () {
     }
     return Harness::Done;
 }
-#endif // HARNESS_USE_PROXY

@@ -24,6 +24,7 @@
 
 #include <stdint.h> /* uintptr_t */
 
+#include <errno.h>
 #include <unistd.h> /* usleep */
 #include <string.h> /* strdup */
 #include <stdio.h>
@@ -40,23 +41,28 @@
 
 /* Do platform-specific initialization. */
 void platform_init(int argc, char **argv) {
-  /* Running the tests as root is not smart - don't do it. */
-  if (getuid() == 0) {
-    fprintf(stderr, "Running the tests as root is not safe.\n");
-    exit(1);
-  }
+  const char* tap;
+
+  tap = getenv("UV_TAP_OUTPUT");
+  tap_output = (tap != NULL && atoi(tap) > 0);
+
   /* Disable stdio output buffering. */
   setvbuf(stdout, NULL, _IONBF, 0);
   setvbuf(stderr, NULL, _IONBF, 0);
-  strcpy(executable_path, argv[0]);
+  strncpy(executable_path, argv[0], sizeof(executable_path) - 1);
   signal(SIGPIPE, SIG_IGN);
 }
 
 
 /* Invoke "argv[0] test-name [test-part]". Store process info in *p. */
 /* Make sure that all stdio output of the processes is buffered up. */
-int process_start(char* name, char* part, process_info_t* p) {
-  FILE* stdout_file = tmpfile();
+int process_start(char* name, char* part, process_info_t* p, int is_helper) {
+  FILE* stdout_file;
+  const char* arg;
+  char* args[16];
+  int n;
+
+  stdout_file = tmpfile();
   if (!stdout_file) {
     perror("tmpfile");
     return -1;
@@ -68,17 +74,34 @@ int process_start(char* name, char* part, process_info_t* p) {
   pid_t pid = fork();
 
   if (pid < 0) {
-    perror("vfork");
+    perror("fork");
     return -1;
   }
 
   if (pid == 0) {
     /* child */
+    arg = getenv("UV_USE_VALGRIND");
+    n = 0;
+
+    /* Disable valgrind for helpers, it complains about helpers leaking memory.
+     * They're killed after the test and as such never get a chance to clean up.
+     */
+    if (is_helper == 0 && arg != NULL && atoi(arg) != 0) {
+      args[n++] = "valgrind";
+      args[n++] = "--quiet";
+      args[n++] = "--leak-check=full";
+      args[n++] = "--show-reachable=yes";
+      args[n++] = "--error-exitcode=125";
+    }
+
+    args[n++] = executable_path;
+    args[n++] = name;
+    args[n++] = part;
+    args[n++] = NULL;
+
     dup2(fileno(stdout_file), STDOUT_FILENO);
     dup2(fileno(stdout_file), STDERR_FILENO);
-
-    char* args[] = { executable_path, name, part, NULL };
-    execvp(executable_path, args);
+    execvp(args[0], args);
     perror("execvp()");
     _exit(127);
   }
@@ -121,8 +144,11 @@ static void* dowait(void* data) {
 
   if (args->pipe[1] >= 0) {
     /* Write a character to the main thread to notify it about this. */
-    char c = 0;
-    write(args->pipe[1], &c, 1);
+    ssize_t r;
+
+    do
+      r = write(args->pipe[1], "", 1);
+    while (r == -1 && errno == EINTR);
   }
 
   return NULL;
@@ -232,23 +258,58 @@ int process_copy_output(process_info_t *p, int fd) {
     return -1;
   }
 
-  ssize_t nread, nwritten;
+  ssize_t nwritten;
   char buf[1024];
 
-  while ((nread = read(fileno(p->stdout_file), buf, 1024)) > 0) {
-    nwritten = write(fd, buf, nread);
-    /* TODO: what if write doesn't write the whole buffer... */
+  /* TODO: what if the line is longer than buf */
+  while (fgets(buf, sizeof(buf), p->stdout_file) != NULL) {
+   /* TODO: what if write doesn't write the whole buffer... */
+    nwritten = 0;
+
+    if (tap_output)
+      nwritten += write(fd, "#", 1);
+
+    nwritten += write(fd, buf, strlen(buf));
+
     if (nwritten < 0) {
       perror("write");
       return -1;
     }
   }
 
-  if (nread < 0) {
+  if (ferror(p->stdout_file)) {
     perror("read");
     return -1;
   }
 
+  return 0;
+}
+
+
+/* Copy the last line of the stdio output buffer to `buffer` */
+int process_read_last_line(process_info_t *p,
+                           char* buffer,
+                           size_t buffer_len) {
+  char* ptr;
+
+  int r = fseek(p->stdout_file, 0, SEEK_SET);
+  if (r < 0) {
+    perror("fseek");
+    return -1;
+  }
+
+  buffer[0] = '\0';
+
+  while (fgets(buffer, buffer_len, p->stdout_file) != NULL) {
+    for (ptr = buffer; *ptr && *ptr != '\r' && *ptr != '\n'; ptr++);
+    *ptr = '\0';
+  }
+
+  if (ferror(p->stdout_file)) {
+    perror("read");
+    buffer[0] = '\0';
+    return -1;
+  }
   return 0;
 }
 
@@ -284,7 +345,7 @@ void process_cleanup(process_info_t *p) {
 
 
 /* Move the console cursor one line up and back to the first column. */
-void rewind_cursor() {
+void rewind_cursor(void) {
   fprintf(stderr, "\033[2K\r");
 }
 

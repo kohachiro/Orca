@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -283,7 +283,7 @@ namespace internal {
         public:
             Initializer () {
                 SYSTEM_INFO si;
-                GetSystemInfo(&si);
+                GetNativeSystemInfo(&si);
                 ASSERT( si.dwNumberOfProcessors <= MaxAffinitySetSize, "Too many CPUs" );
                 AffinitySetSize = min (si.dwNumberOfProcessors, MaxAffinitySetSize);
                 cpu_set_t systemMask = 0;
@@ -353,10 +353,12 @@ namespace internal {
 #endif /* __linux__ */
 
     bool PinTheThread ( int cpu_idx, tbb::atomic<int>& nThreads ) {
+    #if _MSC_VER || __linux__
         cpu_set_t orig_mask, target_mask;
         CPU_ZERO( &target_mask );
         CPU_SET( cpu_idx, &target_mask );
         ASSERT ( CPU_ISSET(cpu_idx, &target_mask), "CPU_SET failed" );
+    #endif
     #if _MSC_VER
         orig_mask = SetThreadAffinityMask( GetCurrentThread(), target_mask );
         if ( !orig_mask )
@@ -772,11 +774,11 @@ inline bool __TBB_bool( bool b ) { return b; }
     void PrintResults () {
         if ( theSettings.my_resFile )
             ResFile = fopen( theSettings.my_resFile, "w" );
-        Report( "%-*s %-*s %s", TitleFieldLen, "Test name", WorkloadFieldLen, "Workload", 
+        Report( "%-*s %-*s %s", TitleFieldLen, "Test-name", WorkloadFieldLen, "Workload", 
                                 MaxTbbMasters > 1 ? "W    M    " : "T    " );
         if ( theSettings.my_opts & UseAffinityModes )
             Report( "Aff  " );
-        Report( "%-*s SD, %%  %-*s %-*s %-*s ",
+        Report( "%-*s SD,%%  %-*s %-*s %-*s ",
                 RateFieldLen, "Avg.time", OvhdFieldLen, "Par.ovhd,%",
                 RateFieldLen, "Min.time", RateFieldLen, "Max.time" );
         Report( " | Repeats = %lu, CPUs %d\n", (unsigned long)NumRuns, NumCpus );

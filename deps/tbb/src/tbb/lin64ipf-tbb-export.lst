@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -60,13 +60,25 @@ __TBB_SYMBOL( _ZN3tbb19task_scheduler_init19default_num_threadsEv )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEim )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEi )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init9terminateEv )
+#if __TBB_SCHEDULER_OBSERVER
 __TBB_SYMBOL( _ZN3tbb8internal26task_scheduler_observer_v37observeEb )
+#endif /* __TBB_SCHEDULER_OBSERVER */
 __TBB_SYMBOL( _ZN3tbb10empty_task7executeEv )
 __TBB_SYMBOL( _ZN3tbb10empty_taskD0Ev )
 __TBB_SYMBOL( _ZN3tbb10empty_taskD1Ev )
 __TBB_SYMBOL( _ZTIN3tbb10empty_taskE )
 __TBB_SYMBOL( _ZTSN3tbb10empty_taskE )
 __TBB_SYMBOL( _ZTVN3tbb10empty_taskE )
+
+#if __TBB_TASK_ARENA
+/* arena.cpp */
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base19internal_initializeEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base18internal_terminateEv )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base16internal_enqueueERNS_4taskEl )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base16internal_executeERNS1_13delegate_baseE )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base13internal_waitEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base21internal_current_slotEv )
+#endif /* __TBB_TASK_ARENA */
 
 #if !TBB_NO_LEGACY
 /* task_v2.cpp */

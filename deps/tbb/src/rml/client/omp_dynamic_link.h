@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -32,6 +32,7 @@
 #define OPEN_INTERNAL_NAMESPACE namespace __kmp {
 #define CLOSE_INTERNAL_NAMESPACE }
 
+#include "library_assert.h"
 #include "tbb/dynamic_link.h" // Refers to src/tbb, not include/tbb 
 
 #endif /* __KMP_omp_dynamic_link_H */

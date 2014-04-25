@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -37,6 +37,8 @@
 #       define __ARCH_ipf 1
 #   elif defined(_M_IX86)||defined(__i386__) // the latter for MinGW support
 #       define __ARCH_x86_32 1
+#   elif defined(_M_ARM)
+#       define __ARCH_other 1
 #   else
 #       error Unknown processor architecture for Windows
 #   endif
@@ -60,13 +62,19 @@
 #define __STDC_LIMIT_MACROS 1
 #endif
 
+//! PROVIDE YOUR OWN Customize.h IF YOU FEEL NECESSARY
+#include "Customize.h"
+
 // Include files containing declarations of intptr_t and uintptr_t
 #include <stddef.h>  // size_t
 #if _MSC_VER
 typedef unsigned __int16 uint16_t;
 typedef unsigned __int32 uint32_t;
 typedef unsigned __int64 uint64_t;
-#else
+ #if !UINTPTR_MAX
+  #define UINTPTR_MAX SIZE_MAX
+ #endif
+#else // _MSC_VER
 #include <stdint.h>
 #endif
 
@@ -78,9 +86,6 @@ extern void* (*original_malloc_ptr)(size_t);
 extern void  (*original_free_ptr)(void*);
 
 } } // namespaces
-
-//! PROVIDE YOUR OWN Customize.h IF YOU FEEL NECESSARY
-#include "Customize.h"
 
 /*
  * Functions to align an integer down or up to the given power of two,
@@ -101,18 +106,6 @@ static inline T alignUpGeneric(T arg, uintptr_t alignment) {
         arg += alignment - rem;
     }
     return arg;
-}
-template<typename T>
-static inline bool isAligned(T arg, uintptr_t alignment) {
-    return 0==((uintptr_t)arg & (alignment-1));
-}
-static inline bool isPowerOfTwo(uintptr_t arg) {
-    return arg && (0==(arg & (arg-1)));
-}
-static inline bool isPowerOfTwoMultiple(uintptr_t arg, uintptr_t divisor) {
-    // Divisor is assumed to be a power of two (which is valid for current uses).
-    MALLOC_ASSERT( isPowerOfTwo(divisor), "Divisor should be a power of two" );
-    return arg && (0==(arg & (arg-divisor)));
 }
 
 #endif /* _itt_shared_malloc_TypeDefinitions_H_ */

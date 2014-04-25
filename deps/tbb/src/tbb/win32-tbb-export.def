@@ -1,4 +1,4 @@
-; Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+; Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 ;
 ; This file is part of Threading Building Blocks.
 ;
@@ -27,5 +27,10 @@
 EXPORTS
 
 #define __TBB_SYMBOL( sym ) sym
+#if _M_ARM
+#include "winrt-tbb-export.lst"
+#else
 #include "win32-tbb-export.lst"
+#endif
+
 

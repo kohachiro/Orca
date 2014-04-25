@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -29,13 +29,14 @@
 #include "spin_rw_mutex_v2.h"
 #include "tbb/tbb_machine.h"
 #include "../tbb/itt_notify.h"
+#include "tbb/atomic.h"
 
 namespace tbb {
 
 using namespace internal;
 
 static inline bool CAS(volatile uintptr_t &addr, uintptr_t newv, uintptr_t oldv) {
-    return __TBB_CompareAndSwapW((volatile void *)&addr, (intptr_t)newv, (intptr_t)oldv) == (intptr_t)oldv;
+    return as_atomic(addr).compare_and_swap(newv, oldv) == oldv;
 }
 
 //! Signal that write lock is released
@@ -99,8 +100,8 @@ bool spin_rw_mutex::internal_upgrade(spin_rw_mutex *mutex) {
         if( CAS(mutex->state, s | WRITER_PENDING, s) )
         {
             ITT_NOTIFY(sync_prepare, mutex);
-            for( atomic_backoff backoff; (mutex->state & READERS) != ONE_READER; )
-                backoff.pause(); // while more than 1 reader
+            atomic_backoff backoff;
+            while( (mutex->state & READERS) != ONE_READER ) backoff.pause();
             __TBB_ASSERT(mutex->state == (ONE_READER | WRITER_PENDING),"invalid state when upgrading to writer");
             // both new readers and writers are blocked at this time
             mutex->state = WRITER;
@@ -138,7 +139,7 @@ void spin_rw_mutex::internal_release_reader(spin_rw_mutex *mutex)
 bool spin_rw_mutex::internal_try_acquire_writer( spin_rw_mutex * mutex )
 {
     // for a writer: only possible to acquire if no active readers or writers
-    state_t s = mutex->state; // on IA-64, this volatile load has acquire semantic
+    state_t s = mutex->state; // on IA-64 architecture, this volatile load has acquire semantic
     if( !(s & BUSY) ) // no readers, no writers; mask is 1..1101
         if( CAS(mutex->state, WRITER, s) ) {
             ITT_NOTIFY(sync_acquired, mutex);
@@ -151,7 +152,7 @@ bool spin_rw_mutex::internal_try_acquire_writer( spin_rw_mutex * mutex )
 bool spin_rw_mutex::internal_try_acquire_reader( spin_rw_mutex * mutex )
 {
     // for a reader: acquire if no active or waiting writers
-    state_t s = mutex->state;    // on IA-64, a load of volatile variable has acquire semantic
+    state_t s = mutex->state;    // on IA-64 architecture, a load of volatile variable has acquire semantic
     while( !(s & (WRITER|WRITER_PENDING)) ) // no writers
         if( CAS(mutex->state, s+ONE_READER, s) ) {
             ITT_NOTIFY(sync_acquired, mutex);

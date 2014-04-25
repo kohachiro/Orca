@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,6 +26,8 @@
     the GNU General Public License.
 */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "governor.h"
 #include "tbb_main.h"
 #include "scheduler.h"
@@ -44,7 +46,7 @@ namespace internal {
 //------------------------------------------------------------------------
 
 #if __TBB_SURVIVE_THREAD_SWITCH
-// Support for interoperability with Intel(R) Cilk(tm) Plus.
+// Support for interoperability with Intel(R) Cilk(TM) Plus.
 
 #if _WIN32
 #define CILKLIB_NAME "cilkrts20.dll"
@@ -52,17 +54,13 @@ namespace internal {
 #define CILKLIB_NAME "libcilkrts.so"
 #endif
 
-//! Handler for memory allocation
+//! Handler for interoperation with cilkrts library.
 static __cilk_tbb_retcode (*watch_stack_handler)(struct __cilk_tbb_unwatch_thunk* u,
                                                  struct __cilk_tbb_stack_op_thunk o);
 
-#if __TBB_WEAK_SYMBOLS
-    #pragma weak __cilkrts_watch_stack
-#endif
-
 //! Table describing how to link the handlers.
 static const dynamic_link_descriptor CilkLinkTable[] = {
-    DLD(__cilkrts_watch_stack, watch_stack_handler)
+    { "__cilkrts_watch_stack", (pointer_to_handler*)(void*)(&watch_stack_handler) }
 };
 
 static atomic<do_once_state> cilkrts_load_state;
@@ -70,7 +68,7 @@ static atomic<do_once_state> cilkrts_load_state;
 bool initialize_cilk_interop() {
     // Pinning can fail. This is a normal situation, and means that the current
     // thread does not use cilkrts and consequently does not need interop.
-    return dynamic_link( CILKLIB_NAME, CilkLinkTable, 1 );
+    return dynamic_link( CILKLIB_NAME, CilkLinkTable, 1,  /*handle=*/0, DYNAMIC_LINK_GLOBAL );
 }
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
 
@@ -86,6 +84,9 @@ void governor::acquire_resources () {
 #endif
     if( status )
         handle_perror(status, "TBB failed to initialize task scheduler TLS\n");
+#if __TBB_CPF_BUILD || TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+    is_speculation_enabled = cpu_has_speculation();
+#endif
 }
 
 void governor::release_resources () {
@@ -96,7 +97,7 @@ void governor::release_resources () {
 #endif
     int status = theTLS.destroy();
     if( status )
-        handle_perror(status, "TBB failed to destroy task scheduler TLS");
+        runtime_warning("failed to destroy task scheduler TLS: %s", strerror(status));
     dynamic_unlink_all();
 }
 
@@ -148,6 +149,13 @@ void governor::sign_off(generic_scheduler* s) {
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
 }
 
+void governor::setBlockingTerminate(const task_scheduler_init *tsi) {
+    __TBB_ASSERT(!IsBlockingTermiantionInProgress, "It's impossible to create task_scheduler_init while blocking termination is in progress.");
+    if (BlockingTSI)
+        throw_exception(eid_blocking_sch_init);
+    BlockingTSI = tsi;
+}
+
 generic_scheduler* governor::init_scheduler( unsigned num_threads, stack_size_type stack_size, bool auto_init ) {
     if( !__TBB_InitOnce::initialization_done() )
         DoOneTimeInitializations();
@@ -168,20 +176,39 @@ generic_scheduler* governor::init_scheduler( unsigned num_threads, stack_size_ty
     return s;
 }
 
-void governor::terminate_scheduler( generic_scheduler* s ) {
+void governor::terminate_scheduler( generic_scheduler* s, const task_scheduler_init* tsi_ptr ) {
     __TBB_ASSERT( s == theTLS.get(), "Attempt to terminate non-local scheduler instance" );
-    if( !--(s->my_ref_count) )
+    if (--(s->my_ref_count)) {
+        if (BlockingTSI && BlockingTSI==tsi_ptr) {
+            // can't throw exception, because this is on dtor's call chain
+            fprintf(stderr, "Attempt to terminate nested scheduler in blocking mode\n");
+            exit(1);
+        }
+    } else {
+#if TBB_USE_ASSERT
+        if (BlockingTSI) {
+            __TBB_ASSERT( BlockingTSI == tsi_ptr, "For blocking termiantion last terminate_scheduler must be blocking." );
+            IsBlockingTermiantionInProgress = true;
+        }
+#endif
         s->cleanup_master();
+        BlockingTSI = NULL;
+#if TBB_USE_ASSERT
+        IsBlockingTermiantionInProgress = false;
+#endif
+    }
 }
 
 void governor::auto_terminate(void* arg){
     generic_scheduler* s = static_cast<generic_scheduler*>(arg);
     if( s && s->my_auto_initialized ) {
         if( !--(s->my_ref_count) ) {
+            __TBB_ASSERT( !BlockingTSI, "Blocking auto-termiante is not supported." );
             // If the TLS slot is already cleared by OS or underlying concurrency
             // runtime, restore its value.
             if ( !theTLS.get() )
                 theTLS.set(s);
+            else __TBB_ASSERT( s == theTLS.get(), NULL );
             s->cleanup_master();
             __TBB_ASSERT( !theTLS.get(), "cleanup_master has not cleared its TLS slot" );
         }
@@ -274,10 +301,17 @@ void task_scheduler_init::initialize( int number_of_threads, stack_size_type thr
 #endif
     thread_stack_size &= ~(stack_size_type)propagation_mode_mask;
     if( number_of_threads!=deferred ) {
+        bool blocking_terminate = false;
+        if (my_scheduler == (scheduler*)wait_workers_in_terminate_flag) {
+            blocking_terminate = true;
+            my_scheduler = NULL;
+        }
         __TBB_ASSERT( !my_scheduler, "task_scheduler_init already initialized" );
         __TBB_ASSERT( number_of_threads==-1 || number_of_threads>=1,
                     "number_of_threads for task_scheduler_init must be -1 or positive" );
-        internal::generic_scheduler *s = governor::init_scheduler( number_of_threads, thread_stack_size );
+        if (blocking_terminate)
+            governor::setBlockingTerminate(this);
+        internal::generic_scheduler *s = governor::init_scheduler( number_of_threads, thread_stack_size, /*auto_init=*/false );
 #if __TBB_TASK_GROUP_CONTEXT && TBB_USE_EXCEPTIONS
         if ( s->master_outermost_level() ) {
             uintptr_t &vt = s->default_context()->my_version_and_traits;
@@ -312,7 +346,7 @@ void task_scheduler_init::terminate() {
                                         : vt & ~task_group_context::exact_exception;
     }
 #endif /* __TBB_TASK_GROUP_CONTEXT && TBB_USE_EXCEPTIONS */
-    governor::terminate_scheduler(s);
+    governor::terminate_scheduler(s, this);
 }
 
 int task_scheduler_init::default_num_threads() {

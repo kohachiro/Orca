@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -63,8 +63,15 @@
 static tbb::atomic<int> construction_counter;
 static tbb::atomic<int> destruction_counter;
 
+#if TBB_USE_DEBUG
+const int REPETITIONS = 4;
+const int N = 10000;
+const int RANGE_MIN=1000;
+#else
 const int REPETITIONS = 10;
 const int N = 100000;
+const int RANGE_MIN=10000;
+#endif
 const int VALID_NUMBER_OF_KEYS = 100;
 const double EXPECTED_SUM = (REPETITIONS + 1) * N;
 
@@ -278,15 +285,15 @@ void run_parallel_scalar_tests_nocombine(const char *test_name) {
             ets_type finit_ets(my_finit);
 
             ASSERT( sums.empty(), NULL);
-            tbb::parallel_for( tbb::blocked_range<int>( 0, N, 10000 ), parallel_scalar_body<T>( sums ) );
+            tbb::parallel_for( tbb::blocked_range<int>( 0, N, RANGE_MIN ), parallel_scalar_body<T>( sums ) );
             ASSERT( !sums.empty(), NULL);
 
             ASSERT( finit_ets.empty(), NULL);
-            tbb::parallel_for( tbb::blocked_range<int>( 0, N, 10000 ), parallel_scalar_body<T>( finit_ets ) );
+            tbb::parallel_for( tbb::blocked_range<int>( 0, N, RANGE_MIN ), parallel_scalar_body<T>( finit_ets ) );
             ASSERT( !finit_ets.empty(), NULL);
 
             ASSERT(static_sums.empty(), NULL);
-            tbb::parallel_for( tbb::blocked_range<int>( 0, N, 10000 ), parallel_scalar_body<T>( static_sums ) );
+            tbb::parallel_for( tbb::blocked_range<int>( 0, N, RANGE_MIN ), parallel_scalar_body<T>( static_sums ) );
             ASSERT( !static_sums.empty(), NULL);
 
             // use iterator
@@ -411,11 +418,11 @@ void run_parallel_scalar_tests(const char *test_name) {
             ets_type sums(exemplar);
 
             ASSERT( sums.empty(), NULL);
-            tbb::parallel_for( tbb::blocked_range<int>( 0, N, 10000 ), parallel_scalar_body<T>( sums ) );
+            tbb::parallel_for( tbb::blocked_range<int>( 0, N, RANGE_MIN ), parallel_scalar_body<T>( sums ) );
             ASSERT( !sums.empty(), NULL);
 
             ASSERT(static_sums.empty(), NULL);
-            tbb::parallel_for( tbb::blocked_range<int>( 0, N, 10000 ), parallel_scalar_body<T>( static_sums ) );
+            tbb::parallel_for( tbb::blocked_range<int>( 0, N, RANGE_MIN ), parallel_scalar_body<T>( static_sums ) );
             ASSERT( !static_sums.empty(), NULL);
 
 
@@ -502,7 +509,7 @@ void run_parallel_vector_tests(const char *test_name) {
             ets_type vs;
 
             ASSERT( vs.empty(), NULL);
-            tbb::parallel_for ( tbb::blocked_range<int> (0, N, 10000), parallel_vector_for_body<T>( vs ) );
+            tbb::parallel_for ( tbb::blocked_range<int> (0, N, RANGE_MIN), parallel_vector_for_body<T>( vs ) );
             ASSERT( !vs.empty(), NULL);
 
             // copy construct
@@ -559,7 +566,7 @@ void run_cross_type_vector_tests(const char *test_name) {
             ets_nokey_type vs;
 
             ASSERT( vs.empty(), NULL);
-            tbb::parallel_for ( tbb::blocked_range<int> (0, N, 10000), parallel_vector_for_body<T>( vs ) );
+            tbb::parallel_for ( tbb::blocked_range<int> (0, N, RANGE_MIN), parallel_vector_for_body<T>( vs ) );
             ASSERT( !vs.empty(), NULL);
 
             // copy construct

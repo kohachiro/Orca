@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -91,28 +91,29 @@ public:
         real_ids[num] = THIS_THREAD::get_id();
 
         const double WAIT = .1;
-        const double SHORT_TOLERANCE = 1e-8;
 #if _WIN32 || _WIN64
         const double LONG_TOLERANCE = 0.120;  // maximal scheduling quantum for Windows Server
 #else
         const double LONG_TOLERANCE = 0.200;  // reasonable upper bound
 #endif
+        tbb::tick_count::interval_t test_interval(WAIT);
         tbb::tick_count t0 = tbb::tick_count::now();
-        tbb::this_tbb_thread::sleep( tbb::tick_count::interval_t(WAIT) );
+        THIS_THREAD_SLEEP ( test_interval );
         tbb::tick_count t1 = tbb::tick_count::now();
-        double delta = (t1-t0).seconds() - WAIT;
-        if(delta+SHORT_TOLERANCE <= 0.0)
-            REPORT("ERROR: Sleep interval too short (%g outside short tolerance(%g))\n", (t1-t0).seconds(), WAIT - SHORT_TOLERANCE);
+        double delta = ((t1-t0)-test_interval).seconds();
+        if(delta < 0.0)
+            REPORT("ERROR: Sleep interval too short (%g < %g)\n",
+                (t1-t0).seconds(), test_interval.seconds() );
         if(delta > LONG_TOLERANCE)
-            REPORT("Warning: Sleep interval too long (%g outside long tolerance(%g))\n", (t1-t0).seconds(), WAIT + LONG_TOLERANCE);
-
+            REPORT("Warning: Sleep interval too long (%g outside long tolerance(%g))\n",
+                (t1-t0).seconds(), test_interval.seconds() + LONG_TOLERANCE);
         init_barrier.wait();
 
         sum.fetch_and_add(num);
         sum.fetch_and_add(dx.value);
     }
     void operator()(Data<0> d) {
-        tbb::this_tbb_thread::sleep( tbb::tick_count::interval_t(d.value*1.) );
+        THIS_THREAD_SLEEP ( tbb::tick_count::interval_t(d.value*1.) );
     }
 };
 
@@ -234,8 +235,15 @@ void RunTests() {
 
     for (int i=0; i<THRDS; i++)
         thrs[i].join();
+
+#if !__TBB_WIN8UI_SUPPORT
+    //  TODO: to find out the way to find thread_id without GetThreadId and other
+    //  desktop functions.
+    //  Now tbb_thread does have its own thread_id that stores std::thread object
+    //  Test will fail in case it is run in desktop mode against New Windows*8 UI library
     for (int i=0; i<THRDS; i++)
         ASSERT(  real_ids[i] == uniq_ids[i], NULL );
+#endif
 
     int current_sum = sum;
     ASSERT( current_sum == 104, NULL );

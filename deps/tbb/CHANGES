@@ -1,14 +1,321 @@
-TBB 4.0 Update 5
+------------------------------------------------------------------------
+The list of most significant changes made over time in
+Intel(R) Threading Building Blocks (Intel(R) TBB).
+------------------------------------------------------------------------
 
-Changes (w.r.t. TBB 4.0 Update 4):
+Intel TBB 4.2 Update 3
+TBB_INTERFACE_VERSION == 7003
+
+- Added support for Microsoft* Visual Studio* 2013.
+- Improved Microsoft* PPL-compatible form of parallel_for for better 
+    support of auto-vectorization.
+- Added a new example for cancellation and reset in the flow graph:
+    Kohonen self-organizing map (examples/graph/som).
+- Various improvements in source code, tests, and makefiles.
+
+Bugs fixed:
+- Added dynamic replacement of _aligned_msize() previously missed.
+- Fixed task_group::run_and_wait() to throw invalid_multiple_scheduling
+    exception if the specified task handle is already scheduled.
+
+Open-source contributions integrated:
+
+- A fix for ARM* processors by Steve Capper.
+- Improvements in std::swap calls by Robert Maynard.
+
+------------------------------------------------------------------------
+Intel TBB 4.2 Update 2
+TBB_INTERFACE_VERSION == 7002
+
+Changes (w.r.t. Intel TBB 4.2 Update 1):
+
+- Enable C++11 features for Microsoft* Visual Studio* 2013 Preview.
+- Added a test for compatibility of TBB containers with C++11
+    range-based for loop.
+
+Changes affecting backward compatibility:
+
+- Internal layout changed for class tbb::flow::limiter_node.
+
+Bugs fixed:
+
+- When building for Intel(R) Xeon Phi(tm) coprocessor, TBB programs
+    no longer require explicit linking with librt and libpthread.
+
+Open-source contributions integrated:
+
+- Fixes for ARM* processors by Steve Capper, Leif Lindholm
+    and Steven Noonan.
+- Support for Clang on Linux by Raf Schietekat.
+- Typo correction in scheduler.cpp by Julien Schueller.
+
+------------------------------------------------------------------------
+Intel TBB 4.2 Update 1
+TBB_INTERFACE_VERSION == 7001
+
+Changes (w.r.t. Intel TBB 4.2):
+
+- Added project files for Microsoft* Visual Studio* 2010.
+- Initial support of Microsoft* Visual Studio* 2013 Preview.
+- Enable C++11 features available in Intel(R) C++ Compiler 14.0.
+- scalable_allocation_mode(TBBMALLOC_SET_SOFT_HEAP_LIMIT, <size>) can be
+    used to urge releasing memory from tbbmalloc internal buffers when
+    the given limit is exceeded.
+
+Community Preview Features:
+
+- Class task_arena no longer requires linking with a preview library,
+    though still remains a community preview feature.
+- The method task_arena::wait_until_empty() is removed.
+- The method task_arena::current_slot() now returns -1 if 
+    the task scheduler is not initialized in the thread.
+
+Changes affecting backward compatibility:
+
+- Because of changes in internal layout of graph nodes, the namespace
+    interface number of flow::graph has been incremented from 6 to 7.
+
+Bugs fixed:
+
+- Fixed a race in lazy initialization of task_arena.
+- Fixed flow::graph::reset() to prevent situations where tasks would be
+    spawned in the process of resetting the graph to its initial state.
+- Fixed decrement bug in limiter_node.
+- Fixed a race in arc deletion in the flow graph.
+
+Open-source contributions integrated:
+
+- Improved support for IBM* Blue Gene* by Raf Schietekat.
+
+------------------------------------------------------------------------
+Intel TBB 4.2
+TBB_INTERFACE_VERSION == 7000
+
+Changes (w.r.t. Intel TBB 4.1 Update 4):
+
+- Added speculative_spin_mutex, which uses Intel(R) Transactional
+    Synchronization Extensions when they are supported by hardware.
+- Binary files linked with libc++ (the C++ standard library in Clang)
+    were added on OS X*.
+- For OS X* exact exception propagation is supported with Clang;
+    it requires use of libc++ and corresponding Intel TBB binaries.
+- Support for C++11 initilizer lists in constructor and assigment
+    has been added to concurrent_hash_map, concurrent_unordered_set,
+    concurrent_unordered_multiset, concurrent_unordered_map,
+    concurrent_unordered_multimap.
+- The memory allocator may now clean its per-thread memory caches
+    when it cannot get more memory.
+- Added the scalable_allocation_command() function for on-demand
+    cleaning of internal memory caches.
+- Reduced the time overhead for freeing memory objects smaller than ~8K.
+- Simplified linking with the debug library for applications that use
+    Intel TBB in code offloaded to Intel(R) Xeon Phi(tm) coprocessors.
+    See an example in
+    examples/GettingStarted/sub_string_finder/Makefile.
+- Various improvements in source code, scripts and makefiles.
+
+Changes affecting backward compatibility:
+
+- tbb::flow::graph has been modified to spawn its tasks;
+    the old behaviour (task enqueuing) is deprecated. This change may
+    impact applications that expected a flow graph to make progress
+    without calling wait_for_all(), which is no longer guaranteed. See
+    the documentation for more details.
+- Changed the return values of the scalable_allocation_mode() function.
+
+Bugs fixed:
+
+- Fixed a leak of parallel_reduce body objects when execution is
+    cancelled or an exception is thrown, as suggested by Darcy Harrison.
+- Fixed a race in the task scheduler which can lower the effective
+    priority despite the existence of higher priority tasks.
+- On Linux an error during destruction of the internal thread local
+    storage no longer results in an exception.
+
+Open-source contributions integrated:
+
+- Fixed task_group_context state propagation to unrelated context trees
+    by Raf Schietekat.
+
+------------------------------------------------------------------------
+Intel TBB 4.1 Update 4
+TBB_INTERFACE_VERSION == 6105
+
+Changes (w.r.t. Intel TBB 4.1 Update 3):
+
+- Use /volatile:iso option with VS 2012 to disable extended
+    semantics for volatile variables.
+- Various improvements in affinity_partitioner, scheduler,
+    tests, examples, makefiles.
+- Concurrent_priority_queue class now supports initialization/assignment
+    via C++11 initializer list feature (std::initializer_list<T>).
+
+Bugs fixed:
+
+- Fixed more possible stalls in concurrent invocations of
+    task_arena::execute(), especially waiting for enqueued tasks.
+- Fixed requested number of workers for task_arena(P,0).
+- Fixed interoperability with Intel(R) VTune(TM) Amplifier XE in
+    case of using task_arena::enqueue() from a terminating thread.
+
+Open-source contributions integrated:
+
+- Type fixes, cleanups, and code beautification by Raf Schietekat.
+- Improvements in atomic operations for big endian platforms
+    by Raf Schietekat.
+
+------------------------------------------------------------------------
+Intel TBB 4.1 Update 3
+TBB_INTERFACE_VERSION == 6103
+
+Changes (w.r.t. Intel TBB 4.1 Update 2):
+
+- Binary files for Android* applications were added to the Linux* OS
+    package.
+- Binary files for Windows Store* applications were added to the
+    Windows* OS package.
+- Exact exception propagation (exception_ptr) support on Linux OS is
+    now turned on by default for GCC 4.4 and higher.
+- Stopped implicit use of large memory pages by tbbmalloc (Linux-only).
+    Now use of large pages must be explicitly enabled with
+    scalable_allocation_mode() function or TBB_MALLOC_USE_HUGE_PAGES
+    environment variable.
+
+Community Preview Features:
+
+- Extended class task_arena constructor and method initialize() to
+    allow some concurrency to be reserved strictly for application
+    threads.
+- New methods terminate() and is_active() were added to class
+    task_arena.
+
+Bugs fixed:
+
+- Fixed initialization of hashing helper constant in the hash
+    containers.
+- Fixed possible stalls in concurrent invocations of
+    task_arena::execute() when no worker thread is available to make
+    progress.
+- Fixed incorrect calculation of hardware concurrency in the presence
+    of inactive processor groups, particularly on systems running
+    Windows* 8 and Windows* Server 2012.
+
+Open-source contributions integrated:
+
+- The fix for the GUI examples on OS X* systems by Raf Schietekat.
+- Moved some power-of-2 calculations to functions to improve readability
+    by Raf Schietekat.
+- C++11/Clang support improvements by arcata.
+- ARM* platform isolation layer by Steve Capper, Leif Lindholm, Leo Lara
+    (ARM).
+
+------------------------------------------------------------------------
+Intel TBB 4.1 Update 2
+TBB_INTERFACE_VERSION == 6102
+
+Changes (w.r.t. Intel TBB 4.1 Update 1):
+
+- Objects up to 128 MB are now cached by the tbbmalloc. Previously
+    the threshold was 8MB. Objects larger than 128 MB are still
+    processed by direct OS calls.
+- concurrent_unordered_multiset and concurrent_unordered_multimap
+    have been added, based on Microsoft* PPL prototype.
+- Ability to value-initialize a tbb::atomic<T> variable on construction
+    in C++11, with const expressions properly supported.
+
+Community Preview Features:
+
+- Added a possibility to wait until all worker threads terminate.
+    This is necessary before calling fork() from an application.
+
+Bugs fixed:
+
+- Fixed data race in tbbmalloc that might lead to memory leaks
+    for large object allocations.
+- Fixed task_arena::enqueue() to use task_group_context of target arena.
+- Improved implementation of 64 bit atomics on ia32.
+
+------------------------------------------------------------------------
+Intel TBB 4.1 Update 1
+TBB_INTERFACE_VERSION == 6101
+
+Changes (w.r.t. Intel TBB 4.1):
+
+- concurrent_vector class now supports initialization/assignment
+    via C++11 initializer list feature (std::initializer_list<T>)
+- Added implementation of the platform isolation layer based on
+    Intel compiler atomic built-ins; it is supposed to work on
+    any platform supported by compiler version 12.1 and newer.
+- Using GetNativeSystemInfo() instead of GetSystemInfo() to support
+    more than 32 processors for 32-bit applications under WOW64.
+- The following form of parallel_for: 
+    parallel_for(first, last, [step,] f[, context]) now accepts an
+    optional partitioner parameter after the function f.
+
+Backward-incompatible API changes:
+
+- The library no longer injects tuple in to namespace std.
+    In previous releases, tuple was injected into namespace std by
+    flow_graph.h when std::tuple was not available.  In this release,
+    flow_graph.h now uses tbb::flow::tuple.  On platforms where
+    std::tuple is available, tbb::flow::tuple is typedef'ed to
+    std::tuple.  On all other platforms, tbb::flow::tuple provides
+    a subset of the functionality defined by std::tuple. Users of
+    flow_graph.h may need to change their uses of std::tuple to
+    tbb::flow::tuple to ensure compatibility with non-C++11 compliant
+    compilers.
+
+Bugs fixed:
+
+- Fixed local observer to be able to override propagated CPU state and
+    to provide correct value of task_arena::current_slot() in callbacks.
+
+------------------------------------------------------------------------
+Intel TBB 4.1
+TBB_INTERFACE_VERSION == 6100
+
+Changes (w.r.t. Intel TBB 4.0 Update 5):
+
+- _WIN32_WINNT must be set to 0x0501 or greater in order to use TBB
+    on Microsoft* Windows*.
+- parallel_deterministic_reduce template function is fully supported.
+- TBB headers can be used with C++0x/C++11 mode (-std=c++0x) of GCC
+    and Intel(R) Compiler.
+- C++11 std::make_exception_ptr is used where available, instead of
+    std::copy_exception from earlier C++0x implementations.
+- Improvements in the TBB allocator to reduce extra memory consumption.
+- Partial refactoring of the task scheduler data structures.
+- TBB examples allow more flexible specification of the thread number,
+    including arithmetic and geometric progression.
+
+Bugs fixed:
+
+- On Linux & OS X*, pre-built TBB binaries do not yet support exact
+    exception propagation via C++11 exception_ptr. To prevent run time
+    errors, by default TBB headers disable exact exception propagation
+    even if the C++ implementation provides exception_ptr.
+
+Community Preview Features:
+
+- Added: class task_arena, for work submission by multiple application
+    threads with thread-independent control of concurrency level.
+- Added: task_scheduler_observer can be created as local to a master
+    thread, to observe threads that work on behalf of that master.
+    Local observers may have new on_scheduler_leaving() callback.
+
+------------------------------------------------------------------------
+Intel TBB 4.0 Update 5
+TBB_INTERFACE_VERSION == 6005
+
+Changes (w.r.t. Intel TBB 4.0 Update 4):
 
 - Parallel pipeline optimization (directly storing small objects in the
     interstage data buffers) limited to trivially-copyable types for
     C++11 and a short list of types for earlier compilers.
 - _VARIADIC_MAX switch is honored for TBB tuple implementation
     and flow::graph nodes based on tuple.
-- Support of Cocoa framework was added to the GUI examples on Mac OS* X
-    systems
+- Support of Cocoa framework was added to the GUI examples on OS X*
+    systems.
 
 Bugs fixed:
 
@@ -20,9 +327,10 @@ Bugs fixed:
     units that include flow_graph.h on VC 10.
 
 ------------------------------------------------------------------------
-TBB 4.0 Update 4
+Intel TBB 4.0 Update 4
+TBB_INTERFACE_VERSION == 6004
 
-Changes (w.r.t. TBB 4.0 Update 3):
+Changes (w.r.t. Intel TBB 4.0 Update 3):
 
 - The TBB memory allocator transparently supports large pages on Linux.
 - A new flow_graph example, logic_sim, was added.
@@ -51,14 +359,15 @@ Bugs fixed:
 Open-source contributions integrated:
 
 - Multiple improvements by Raf Schietekat.
-- Basic support for Clang on Mac OS X* by Blas Rodriguez Somoza.
+- Basic support for Clang on OS X* by Blas Rodriguez Somoza.
 - Fixes for warnings and corner-case bugs by Blas Rodriguez Somoza
     and Edward Lam.
 
 ------------------------------------------------------------------------
-TBB 4.0 Update 3
+Intel TBB 4.0 Update 3
+TBB_INTERFACE_VERSION == 6003
 
-Changes (w.r.t. TBB 4.0 Update 2):
+Changes (w.r.t. Intel TBB 4.0 Update 2):
 
 - Modifications to the low-level API for memory pools:
     added support for aligned allocations;
@@ -95,9 +404,10 @@ Bugs fixed:
     64 cores split by Windows into several processor groups.
 
 ------------------------------------------------------------------------
-TBB 4.0 Update 2 commercial-aligned release
+Intel TBB 4.0 Update 2 commercial-aligned release
+TBB_INTERFACE_VERSION == 6002
 
-Changes (w.r.t. TBB 4.0 Update 1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 4.0 Update 1 commercial-aligned release):
 
 - concurrent_bounded_queue now has an abort() operation that releases 
     threads involved in pending push or pop operations. The released 
@@ -114,17 +424,19 @@ Bugs fixed:
     early, especially in presense of affinitized tasks.
 
 ------------------------------------------------------------------------
-TBB 4.0 Update 1 commercial-aligned release
+Intel TBB 4.0 Update 1 commercial-aligned release
+TBB_INTERFACE_VERSION == 6000 (forgotten to increment)
 
-Changes (w.r.t. TBB 4.0 commercial-aligned release):
+Changes (w.r.t. Intel TBB 4.0 commercial-aligned release):
 
 - Memory leaks fixed in binpack example.
 - Improvements and fixes in the TBB allocator.
 
 ------------------------------------------------------------------------
-TBB 4.0 commercial-aligned release
+Intel TBB 4.0 commercial-aligned release
+TBB_INTERFACE_VERSION == 6000
 
-Changes (w.r.t. TBB 3.0 Update 8 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 8 commercial-aligned release):
 
 - concurrent_priority_queue is now a fully supported feature.
     Capacity control methods were removed.
@@ -155,9 +467,10 @@ Community Preview Features:
     and collective deallocation.
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 8 commercial-aligned release
+Intel TBB 3.0 Update 8 commercial-aligned release
+TBB_INTERFACE_VERSION == 5008
 
-Changes (w.r.t. TBB 3.0 Update 7 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 7 commercial-aligned release):
 
 - Task priorities become an official feature of TBB,
     not community preview as before.
@@ -185,9 +498,10 @@ Community Preview Features:
 - parallel_deterministic_reduce template function was added.
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 7 commercial-aligned release
+Intel TBB 3.0 Update 7 commercial-aligned release
+TBB_INTERFACE_VERSION == 5006 (forgotten to increment)
 
-Changes (w.r.t. TBB 3.0 Update 6 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 6 commercial-aligned release):
 
 - Added implementation of the platform isolation layer based on 
     GCC atomic built-ins; it is supposed to work on any platform 
@@ -200,9 +514,10 @@ Community Preview Features:
 
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 6 commercial-aligned release
+Intel TBB 3.0 Update 6 commercial-aligned release
+TBB_INTERFACE_VERSION == 5006
 
-Changes (w.r.t. TBB 3.0 Update 5 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 5 commercial-aligned release):
 
 - Added Community Preview feature: task and task group priority, and
     Fractal example demonstrating it.
@@ -233,14 +548,15 @@ Bugs fixed:
     items to successors
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 5 commercial-aligned release
+Intel TBB 3.0 Update 5 commercial-aligned release
+TBB_INTERFACE_VERSION == 5005
 
-Changes (w.r.t. TBB 3.0 Update 4 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 4 commercial-aligned release):
 
 - Added Community Preview feature: graph.
 - Added automatic propagation of master thread FPU settings to
     TBB worker threads.
-- Added a public function to perform a sequentially consistent full 
+- Added a public function to perform a sequentially consistent full
     memory fence: tbb::atomic_fence() in tbb/atomic.h.
 
 Bugs fixed:
@@ -256,14 +572,15 @@ Open-source contributions integrated:
 - Patch for calls to internal::atomic_do_once() by Andrey Semashev.
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 4 commercial-aligned release
+Intel TBB 3.0 Update 4 commercial-aligned release
+TBB_INTERFACE_VERSION == 5004
 
-Changes (w.r.t. TBB 3.0 Update 3 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 3 commercial-aligned release):
 
 - Added Community Preview feature: concurrent_priority_queue.
 - Fixed library loading to avoid possibility for remote code execution,
     see http://www.microsoft.com/technet/security/advisory/2269637.mspx.
-- Added support of more than 64 cores for appropriate Microsoft* 
+- Added support of more than 64 cores for appropriate Microsoft*
     Windows* versions. For more details, see 
     http://msdn.microsoft.com/en-us/library/dd405503.aspx.
 - Default number of worker threads is adjusted in accordance with 
@@ -271,19 +588,20 @@ Changes (w.r.t. TBB 3.0 Update 3 commercial-aligned release):
 
 Bugs fixed:
 
-- Calls of scalable_* functions from inside the allocator library 
+- Calls of scalable_* functions from inside the allocator library
     caused issues if the functions were overridden by another module.
 - A crash occurred if methods run() and wait() were called concurrently
     for an empty tbb::task_group (1736).
-- The tachyon example exhibited build problems associated with 
+- The tachyon example exhibited build problems associated with
     bug 554339 on Microsoft* Visual Studio* 2010. Project files were
-    modified as a partial workaround to overcome the problem. See 
+    modified as a partial workaround to overcome the problem. See
     http://connect.microsoft.com/VisualStudio/feedback/details/554339.
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 3 commercial-aligned release
+Intel TBB 3.0 Update 3 commercial-aligned release
+TBB_INTERFACE_VERSION == 5003
 
-Changes (w.r.t. TBB 3.0 Update 2 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 2 commercial-aligned release):
 
 - cache_aligned_allocator class reworked to use scalable_aligned_malloc.
 - Improved performance of count() and equal_range() methods
@@ -291,7 +609,7 @@ Changes (w.r.t. TBB 3.0 Update 2 commercial-aligned release):
 - Improved implementation of 64-bit atomic loads and stores on 32-bit
     platforms, including compilation with VC 7.1.
 - Added implementation of atomic operations on top of OSAtomic API
-    provided by Mac OS* X.
+    provided by OS X*.
 - Removed gratuitous try/catch blocks surrounding thread function calls
   in tbb_thread.
 - Xcode* projects were added for sudoku and game_of_life examples.
@@ -311,9 +629,10 @@ Open-source contributions integrated:
 - Various improvements by Raf Schietekat.
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 2 commercial-aligned release
+Intel TBB 3.0 Update 2 commercial-aligned release
+TBB_INTERFACE_VERSION == 5002
 
-Changes (w.r.t. TBB 3.0 Update 1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 Update 1 commercial-aligned release):
 
 - Destructor of tbb::task_group class throws missing_wait exception
     if there are tasks running when it is invoked.
@@ -330,9 +649,10 @@ Bugs fixed:
     Mac OS* X 10.6.4 (1711).
 
 ------------------------------------------------------------------------
-TBB 3.0 Update 1 commercial-aligned release
+Intel TBB 3.0 Update 1 commercial-aligned release
+TBB_INTERFACE_VERSION == 5000 (forgotten to increment)
 
-Changes (w.r.t. TBB 3.0 commercial-aligned release):
+Changes (w.r.t. Intel TBB 3.0 commercial-aligned release):
 
 - Decreased memory fragmentation by allocations bigger than 8K.
 - Lazily allocate worker threads, to avoid creating unnecessary stacks.
@@ -355,9 +675,10 @@ Bugs fixed:
 - Return type of postfix form of operator++ for hash map's iterators.
 
 ------------------------------------------------------------------------
-TBB 3.0 commercial-aligned release
+Intel TBB 3.0 commercial-aligned release
+TBB_INTERFACE_VERSION == 5000
 
-Changes (w.r.t. TBB 2.2 Update 3 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.2 Update 3 commercial-aligned release):
 
 - All open-source-release changes down to TBB 2.2 U3 below
     were incorporated into this release.
@@ -390,7 +711,7 @@ Bugs fixed:
 ------------------------------------------------------------------------
 20100310 open-source release
 
-Changes (w.r.t. TBB 2.2 Update 3 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.2 Update 3 commercial-aligned release):
 
 - Version macros changed in anticipation of a future release.
 - Directory structure aligned with Intel(R) C++ Compiler;
@@ -437,9 +758,10 @@ Open-source contributions integrated:
     an internal class used in the implementation of concurrent_queue.
 
 ------------------------------------------------------------------------
-TBB 2.2 Update 3 commercial-aligned release
+Intel TBB 2.2 Update 3 commercial-aligned release
+TBB_INTERFACE_VERSION == 4003
 
-Changes (w.r.t. TBB 2.2 Update 2 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.2 Update 2 commercial-aligned release):
 
 - PDF documentation updated.
 
@@ -452,9 +774,10 @@ Bugs fixed:
 - construct() methods of allocator classes now use global operator new.
 
 ------------------------------------------------------------------------
-TBB 2.2 Update 2 commercial-aligned release
+Intel TBB 2.2 Update 2 commercial-aligned release
+TBB_INTERFACE_VERSION == 4002
 
-Changes (w.r.t. TBB 2.2 Update 1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.2 Update 1 commercial-aligned release):
 
 - parallel_invoke and parallel_for_each now take function objects
     by const reference, not by value.
@@ -486,9 +809,10 @@ Bugs fixed:
 - crash in concurrent_queue<char> (1616).
 
 ------------------------------------------------------------------------
-TBB 2.2 Update 1 commercial-aligned release
+Intel TBB 2.2 Update 1 commercial-aligned release
+TBB_INTERFACE_VERSION == 4001
 
-Changes (w.r.t. TBB 2.2 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.2 commercial-aligned release):
 
 - Incorporates all changes from open-source releases below.
 - Documentation was updated.
@@ -522,7 +846,7 @@ Changes (w.r.t. TBB 2.2 commercial-aligned release):
 ------------------------------------------------------------------------
 20090809 open-source release
 
-Changes (w.r.t. TBB 2.2 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.2 commercial-aligned release):
 
 - Fixed known exception safety issues in concurrent_vector.
 - Better concurrency of simultaneous grow requests in concurrent_vector.
@@ -532,9 +856,10 @@ Changes (w.r.t. TBB 2.2 commercial-aligned release):
 - A few other small changes in code and documentation.
 
 ------------------------------------------------------------------------
-TBB 2.2 commercial-aligned release
+Intel TBB 2.2 commercial-aligned release
+TBB_INTERFACE_VERSION == 4000
 
-Changes (w.r.t. TBB 2.1 U4 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.1 U4 commercial-aligned release):
 
 - Incorporates all changes from open-source releases below.
 - Architecture folders renamed from em64t to intel64 and from itanium
@@ -581,9 +906,10 @@ Changes affecting backward compatibility:
     iterators; old semantics is deprecated.
 
 ------------------------------------------------------------------------
-TBB 2.1 Update 4 commercial-aligned release
+Intel TBB 2.1 Update 4 commercial-aligned release
+TBB_INTERFACE_VERSION == 3016
 
-Changes (w.r.t. TBB 2.1 U3 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.1 U3 commercial-aligned release):
 
 - Added tests for aligned memory allocations and malloc replacement.
 - Several improvements for better bundling with Intel(R) C++ Compiler.
@@ -626,9 +952,10 @@ Bugs fixed:
 - The same list as in TBB 2.1 Update 4 right above.
 
 ------------------------------------------------------------------------
-TBB 2.1 Update 3 commercial-aligned release
+Intel TBB 2.1 Update 3 commercial-aligned release
+TBB_INTERFACE_VERSION == 3015
 
-Changes (w.r.t. TBB 2.1 U2 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.1 U2 commercial-aligned release):
 
 - Added support for aligned allocations to the TBB memory allocator.
 - Added a special library to use with LD_PRELOAD on Linux* in order to
@@ -650,9 +977,10 @@ Bugs fixed:
     with different vector instances.
 
 ------------------------------------------------------------------------
-TBB 2.1 Update 2 commercial-aligned release
+Intel TBB 2.1 Update 2 commercial-aligned release
+TBB_INTERFACE_VERSION == 3014
 
-Changes (w.r.t. TBB 2.1 U1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.1 U1 commercial-aligned release):
 
 - Incorporates all open-source-release changes down to TBB 2.1 U1,
     except for:
@@ -723,12 +1051,14 @@ Changes (w.r.t. previous open-source release):
     and documents.
 
 ------------------------------------------------------------------------
-TBB 2.1 Update 1 commercial-aligned release
+Intel TBB 2.1 Update 1 commercial-aligned release
+TBB_INTERFACE_VERSION == 3013
 
-Changes (w.r.t. TBB 2.1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.1 commercial-aligned release):
 
 - Fixed small memory leak in the memory allocator.
-- Incorporates all open-source-release changes since TBB 2.1, except for:
+- Incorporates all open-source-release changes since TBB 2.1,
+    except for:
     - 20080825 changes for parallel_do;
 
 ------------------------------------------------------------------------
@@ -785,9 +1115,10 @@ Changes (w.r.t. previous open-source release):
 - A few more improvements to the code.
 
 ------------------------------------------------------------------------
-TBB 2.1 commercial-aligned release
+Intel TBB 2.1 commercial-aligned release
+TBB_INTERFACE_VERSION == 3011
 
-Changes (w.r.t. TBB 2.0 U3 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.0 U3 commercial-aligned release):
 
 - All open-source-release changes down to, and including, TBB 2.0 below,
     were incorporated into this release.
@@ -845,12 +1176,12 @@ Bugs fixed:
 - 112 - fix for soname support.
 
 ------------------------------------------------------------------------
-TBB 2.0 U3 commercial-aligned release (package 017, April 20, 2008)
+Intel TBB 2.0 U3 commercial-aligned release (package 017, April 20, 2008)
 
 Corresponds to commercial 019 (for Linux*, 020; for Mac OS* X, 018)
 packages.
 
-Changes (w.r.t. TBB 2.0 U2 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.0 U2 commercial-aligned release):
 
 - Does not contain open-source-release changes below; this release is
     only a minor update of TBB 2.0 U2.
@@ -950,12 +1281,12 @@ Changes (w.r.t. previous open-source release):
 - Various improvements to code, tests, examples and Makefiles.
 
 ------------------------------------------------------------------------
-TBB 2.0 U2 commercial-aligned release (package 017, February 14, 2008)
+Intel TBB 2.0 U2 commercial-aligned release (package 017, February 14, 2008)
 
 Corresponds to commercial 017 (for Linux*, 018; for Mac OS* X, 016)
 packages.
 
-Changes (w.r.t. TBB 2.0 U1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.0 U1 commercial-aligned release):
 
 - Does not contain open-source-release changes below; this release is
     only a minor update of TBB 2.0 U1.
@@ -1089,21 +1420,21 @@ Changes (w.r.t. previous open-source release):
 ------------------------------------------------------------------------
 20070927 open-source release
 
-Changes (w.r.t. TBB 2.0 U1 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.0 U1 commercial-aligned release):
 
 - Minor update to TBB 2.0 U1 below.
 - Begin introduction of new concurrent_vector interfaces not released
     with TBB 2.0 U1.
 
 ------------------------------------------------------------------------
-TBB 2.0 U1 commercial-aligned release (package 014, October 1, 2007)
+Intel TBB 2.0 U1 commercial-aligned release (package 014, October 1, 2007)
 
 Corresponds to commercial 014 (for Linux*, 016) packages.
 
-Changes (w.r.t. TBB 2.0 commercial-aligned release):
+Changes (w.r.t. Intel TBB 2.0 commercial-aligned release):
 
-- All open-source-release changes down to, and including, TBB 2.0 below,
-    were incorporated into this release.
+- All open-source-release changes down to, and including, TBB 2.0
+    below, were incorporated into this release.
 - Made a number of changes to the officially supported OS list:
     Added Linux* OSs:
 	Asianux* 3, Debian* 4.0, Fedora Core* 6, Fedora* 7,
@@ -1155,40 +1486,40 @@ Changes:
 - Changes to eliminate spurious build warnings.
 
 ------------------------------------------------------------------------
-TBB 2.0 commercial-aligned release (package 010, July 19, 2007)
+Intel TBB 2.0 commercial-aligned release (package 010, July 19, 2007)
 
 Corresponds to commercial 010 (for Linux*, 012) packages.
 
 - TBB open-source debut release.
 
 ------------------------------------------------------------------------
-TBB 1.1 commercial release (April 10, 2007)
+Intel TBB 1.1 commercial release (April 10, 2007)
 
-Changes (w.r.t. TBB 1.0 commercial release):
+Changes (w.r.t. Intel TBB 1.0 commercial release):
 
 - auto_partitioner which offered an automatic alternative to specifying
     a grain size parameter to estimate the best granularity for tasks.
 - The release was added to the Intel(R) C++ Compiler 10.0 Pro.
 
 ------------------------------------------------------------------------
-TBB 1.0 Update 2 commercial release
+Intel TBB 1.0 Update 2 commercial release
 
-Changes (w.r.t. TBB 1.0 Update 1 commercial release):
+Changes (w.r.t. Intel TBB 1.0 Update 1 commercial release):
 
 - Mac OS* X 64-bit support added.
 - Source packages for commercial releases introduced.
 
 ------------------------------------------------------------------------
-TBB 1.0 Update 1 commercial-aligned release
+Intel TBB 1.0 Update 1 commercial-aligned release
 
-Changes (w.r.t. TBB 1.0 commercial release):
+Changes (w.r.t. Intel TBB 1.0 commercial release):
 
 - Fix for critical package issue on Mac OS* X.
 
 ------------------------------------------------------------------------
-TBB 1.0 commercial release (August 29, 2006)
+Intel TBB 1.0 commercial release (August 29, 2006)
 
-Changes (w.r.t. TBB 1.0 beta commercial release):
+Changes (w.r.t. Intel TBB 1.0 beta commercial release):
 
 - New namespace (and compatibility headers for old namespace).
     Namespaces are tbb and tbb::internal and all classes are in the
@@ -1207,7 +1538,7 @@ Changes (w.r.t. TBB 1.0 beta commercial release):
 - Added push_back() interface to concurrent_vector().
 
 ------------------------------------------------------------------------
-TBB 1.0 beta commercial release
+Intel TBB 1.0 beta commercial release
 
 Initial release.
 

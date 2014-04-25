@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -29,14 +29,20 @@
 /** This test checks the automatic propagation of master thread FPU settings
     into the worker threads. **/
 
+#define TBB_PREVIEW_LOCAL_OBSERVER 1
+
 #include "harness.h"
 #include "tbb/parallel_for.h"
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tbb_machine.h"
 
+#if __TBB_SCHEDULER_OBSERVER
+#include "tbb/task_scheduler_observer.h"
+#endif
+
 const int N = 500000;
 
-#if ( __TBB_x86_32 || __TBB_x86_64 ) && __TBB_CPU_CTL_ENV_PRESENT
+#if ( __TBB_x86_32 || __TBB_x86_64 ) && __TBB_CPU_CTL_ENV_PRESENT && !defined(__TBB_WIN32_USE_CL_BUILTINS)
 
 const int FE_TONEAREST = 0x0000,
           FE_DOWNWARD = 0x0400,
@@ -51,7 +57,7 @@ const int FE_TONEAREST = 0x0000,
 const int NumSseModes = 4;
 const int SseModes[NumSseModes] = { 0, SSE_DAZ, SSE_FTZ, SSE_DAZ | SSE_FTZ };
 
-#if _WIN64 && !__MINGW64__
+#if _WIN64 && !__TBB_X86_MSVC_INLINE_ASM_AVAILABLE && !__MINGW64__
 // MinGW uses inline implementation from tbb/machine/linux_intel64.h
 
 #include <float.h>
@@ -66,7 +72,7 @@ inline void __TBB_set_cpu_ctl_env ( const __TBB_cpu_ctl_env_t* fe ) {
     _mm_setcsr( fe->mxcsr );
 }
 
-#endif /* _WIN64 */
+#endif /*  _WIN64 && !__TBB_X86_MSVC_INLINE_ASM_AVAILABLE && !__MINGW64__ */
 
 inline int GetRoundingMode ( bool checkConsistency = true ) {
     __TBB_cpu_ctl_env_t ctl = { 0, 0 };
@@ -96,6 +102,28 @@ inline void SetSseMode ( int mode ) {
     __TBB_set_cpu_ctl_env(&ctl);
 }
 
+
+#elif defined(_M_ARM) || defined(__TBB_WIN32_USE_CL_BUILTINS)
+const int NumSseModes = 1;
+const int SseModes[NumSseModes] = { 0 };
+
+inline int GetSseMode () { return 0; }
+inline void SetSseMode ( int ) {}
+
+const int FE_TONEAREST = _RC_NEAR,
+          FE_DOWNWARD = _RC_DOWN,
+          FE_UPWARD = _RC_UP,
+          FE_TOWARDZERO = _RC_CHOP;
+
+inline int GetRoundingMode ( bool = true ) { 
+    __TBB_cpu_ctl_env_t ctl = 0;
+    __TBB_get_cpu_ctl_env(&ctl);
+    return ctl;
+}
+inline void SetRoundingMode ( int mode ) { 
+    __TBB_cpu_ctl_env_t ctl = mode;
+    __TBB_set_cpu_ctl_env(&ctl);
+}
 
 #else /* Other archs */
 
@@ -144,6 +172,23 @@ public:
     {}
 };
 
+#if __TBB_SCHEDULER_OBSERVER
+class LocalObserver : public tbb::task_scheduler_observer {
+    int m_sse, m_rounding;
+    /*override*/
+    void on_scheduler_entry( bool is_worker ) {
+        if(is_worker) {
+            SetSseMode( m_sse );
+            SetRoundingMode( m_rounding );
+        }
+    }
+public:
+    LocalObserver(int fpu, int sse) : tbb::task_scheduler_observer(true), m_sse(sse), m_rounding(fpu) {
+        observe(true);
+    }
+};
+#endif
+
 class LauncherBody {
 public:
     void operator() ( int id ) const {
@@ -179,6 +224,21 @@ public:
                 ASSERT( GetRoundingMode() == mode, NULL );
             }
         }
+#if __TBB_SCHEDULER_OBSERVER
+        // but using observers, it is possible to redefine the mode again
+        for( int k = 0; k < NumSseModes; ++k ) {
+            int sse_mode = SseModes[(k + id) % NumSseModes];
+            SetSseMode( sse_mode );
+            for( int i = 0; i < NumRoundingModes; ++i ) {
+                int mode = RoundingModes[(i + id) % NumRoundingModes];
+                SetRoundingMode( mode );
+                // New mode must be set before TBB scheduler is initialized
+                LocalObserver restorer(mode, sse_mode);
+                tbb::parallel_for( 0, N, 1, RoundingModeCheckBody(tid, mode, mode, sse_mode, sse_mode) );
+                ASSERT( GetRoundingMode() == mode, NULL );
+            }
+        }
+#endif
     }
 };
 

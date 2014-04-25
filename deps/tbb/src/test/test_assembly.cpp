@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -28,8 +28,10 @@
 
 // Program for basic correctness testing of assembly-language routines.
 #include "harness_defs.h"
-
-#if __TBB_TEST_SKIP_BUILTINS_MODE
+//for ICC builtins mode the test will be skipped as
+//macro __TBB_GCC_BUILTIN_ATOMICS_PRESENT used to define __TBB_TEST_SKIP_GCC_BUILTINS_MODE
+//will not be defined (it is explicitly disabled for ICC)
+#if __TBB_TEST_SKIP_GCC_BUILTINS_MODE
 #include "harness.h"
 int TestMain() {
     REPORT("Known issue: GCC builtins aren't available\n");
@@ -44,6 +46,7 @@ int TestMain() {
 
 using tbb::internal::reference_count;
 
+//TODO: remove this function when atomic function __TBB_XXX are dropped
 //! Test __TBB_CompareAndSwapW
 static void TestCompareExchange() {
     ASSERT( intptr_t(-10)<10, "intptr_t not a signed integral type?" ); 
@@ -67,6 +70,7 @@ static void TestCompareExchange() {
             }
 }
 
+//TODO: remove this function when atomic function __TBB_XXX are dropped
 //! Test __TBB___TBB_FetchAndIncrement and __TBB___TBB_FetchAndDecrement
 static void TestAtomicCounter() {
     // "canary" is a value used to detect illegal overwrites.
@@ -108,12 +112,12 @@ static void TestTinyLock() {
 #endif
     __TBB_LockByte(flags[8]);
     for( unsigned int i=0; i<16; ++i )
-	#ifdef __sparc
+        #ifdef __sparc
         ASSERT( flags[i]==(i==8?0xff:i), NULL );
-	#else
+        #else
         ASSERT( flags[i]==(i==8?1:i), NULL );
-	#endif
-    __TBB_UnlockByte(flags[8], 0);
+        #endif
+    __TBB_UnlockByte(flags[8]);
     for( unsigned int i=0; i<16; ++i )
         ASSERT( flags[i] == (i==8?0:i), NULL );
 }

@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define EXPECTED "RANG TANG DING DONG I AM THE JAPANESE SANDMAN" /* "Take eight!" */
+#define EXPECTED "RANG TANG DING DONG I AM THE JAPANESE SANDMAN"
 
 #define TEST_DURATION 5000 /* ms */
 
@@ -43,7 +43,8 @@ struct receiver_state {
   uv_udp_t udp_handle;
 };
 
-static unsigned int packet_counter = 1e6; /* not used in timed mode */
+/* not used in timed mode */
+static unsigned int packet_counter = (unsigned int) 1e6;
 
 static int n_senders_;
 static int n_receivers_;
@@ -55,12 +56,16 @@ static unsigned int send_cb_called;
 static unsigned int recv_cb_called;
 static unsigned int close_cb_called;
 static int timed;
+static int exiting;
 
 
-static uv_buf_t alloc_cb(uv_handle_t* handle, size_t suggested_size) {
+static void alloc_cb(uv_handle_t* handle,
+                     size_t suggested_size,
+                     uv_buf_t* buf) {
   static char slab[65536];
-  ASSERT(suggested_size <= sizeof slab);
-  return uv_buf_init(slab, sizeof slab);
+  ASSERT(suggested_size <= sizeof(slab));
+  buf->base = slab;
+  buf->len = sizeof(slab);
 }
 
 
@@ -70,10 +75,12 @@ static void send_cb(uv_udp_send_t* req, int status) {
   ASSERT(req != NULL);
 
   if (status != 0) {
-    ASSERT(status == -1);
-    ASSERT(uv_last_error(req->handle->loop).code == UV_EINTR);
+    ASSERT(status == UV_ECANCELED);
     return;
   }
+
+  if (exiting)
+    return;
 
   s = container_of(req, struct sender_state, send_req);
   ASSERT(req->handle == &s->udp_handle);
@@ -93,7 +100,7 @@ send:
                           &s->udp_handle,
                           bufs,
                           ARRAY_SIZE(bufs),
-                          s->addr,
+                          (const struct sockaddr*) &s->addr,
                           send_cb));
   send_cb_called++;
 }
@@ -101,19 +108,19 @@ send:
 
 static void recv_cb(uv_udp_t* handle,
                     ssize_t nread,
-                    uv_buf_t buf,
-                    struct sockaddr* addr,
+                    const uv_buf_t* buf,
+                    const struct sockaddr* addr,
                     unsigned flags) {
   if (nread == 0)
     return;
 
-  if (nread == -1) {
-    ASSERT(uv_last_error(handle->loop).code == UV_ECANCELED);
+  if (nread < 0) {
+    ASSERT(nread == UV_ECANCELED);
     return;
   }
 
   ASSERT(addr->sa_family == AF_INET);
-  ASSERT(!memcmp(buf.base, EXPECTED, nread));
+  ASSERT(!memcmp(buf->base, EXPECTED, nread));
 
   recv_cb_called++;
 }
@@ -125,8 +132,10 @@ static void close_cb(uv_handle_t* handle) {
 }
 
 
-static void timeout_cb(uv_timer_t* timer, int status) {
+static void timeout_cb(uv_timer_t* timer) {
   int i;
+
+  exiting = 1;
 
   for (i = 0; i < n_senders_; i++)
     uv_close((uv_handle_t*)&senders[i].udp_handle, close_cb);
@@ -136,13 +145,13 @@ static void timeout_cb(uv_timer_t* timer, int status) {
 }
 
 
-static int do_packet_storm(int n_senders,
-                           int n_receivers,
-                           unsigned long timeout) {
+static int pummel(unsigned int n_senders,
+                  unsigned int n_receivers,
+                  unsigned long timeout) {
   uv_timer_t timer_handle;
   uint64_t duration;
   uv_loop_t* loop;
-  int i;
+  unsigned int i;
 
   ASSERT(n_senders <= ARRAY_SIZE(senders));
   ASSERT(n_receivers <= ARRAY_SIZE(receivers));
@@ -162,9 +171,10 @@ static int do_packet_storm(int n_senders,
 
   for (i = 0; i < n_receivers; i++) {
     struct receiver_state* s = receivers + i;
-    struct sockaddr_in addr = uv_ip4_addr("0.0.0.0", BASE_PORT + i);
+    struct sockaddr_in addr;
+    ASSERT(0 == uv_ip4_addr("0.0.0.0", BASE_PORT + i, &addr));
     ASSERT(0 == uv_udp_init(loop, &s->udp_handle));
-    ASSERT(0 == uv_udp_bind(&s->udp_handle, addr, 0));
+    ASSERT(0 == uv_udp_bind(&s->udp_handle, (const struct sockaddr*) &addr, 0));
     ASSERT(0 == uv_udp_recv_start(&s->udp_handle, alloc_cb, recv_cb));
     uv_unref((uv_handle_t*)&s->udp_handle);
   }
@@ -177,22 +187,25 @@ static int do_packet_storm(int n_senders,
 
   for (i = 0; i < n_senders; i++) {
     struct sender_state* s = senders + i;
-    s->addr = uv_ip4_addr("127.0.0.1", BASE_PORT + (i % n_receivers));
+    ASSERT(0 == uv_ip4_addr("127.0.0.1",
+                            BASE_PORT + (i % n_receivers),
+                            &s->addr));
     ASSERT(0 == uv_udp_init(loop, &s->udp_handle));
     ASSERT(0 == uv_udp_send(&s->send_req,
                             &s->udp_handle,
                             bufs,
                             ARRAY_SIZE(bufs),
-                            s->addr,
+                            (const struct sockaddr*) &s->addr,
                             send_cb));
   }
 
   duration = uv_hrtime();
-  ASSERT(0 == uv_run(loop));
+  ASSERT(0 == uv_run(loop, UV_RUN_DEFAULT));
   duration = uv_hrtime() - duration;
-  duration = duration / 1e6; /* convert from nanoseconds to milliseconds */
+  /* convert from nanoseconds to milliseconds */
+  duration = duration / (uint64_t) 1e6;
 
-  printf("udp_packet_storm_%dv%d: %.0f/s received, %.0f/s sent. "
+  printf("udp_pummel_%dv%d: %.0f/s received, %.0f/s sent. "
          "%u received, %u sent in %.1f seconds.\n",
          n_receivers,
          n_senders,
@@ -202,16 +215,17 @@ static int do_packet_storm(int n_senders,
          send_cb_called,
          duration / 1000.0);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
 
 #define X(a, b)                                                               \
   BENCHMARK_IMPL(udp_pummel_##a##v##b) {                                      \
-    return do_packet_storm(a, b, 0);                                          \
+    return pummel(a, b, 0);                                                   \
   }                                                                           \
   BENCHMARK_IMPL(udp_timed_pummel_##a##v##b) {                                \
-    return do_packet_storm(a, b, TEST_DURATION);                              \
+    return pummel(a, b, TEST_DURATION);                                       \
   }
 
 X(1, 1)

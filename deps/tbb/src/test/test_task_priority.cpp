@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -35,10 +35,15 @@
 #include "tbb/atomic.h"
 #include <cstdlib>
 
+#if _MSC_VER && __TBB_NO_IMPLICIT_LINKAGE
+// plays around __TBB_NO_IMPLICIT_LINKAGE. __TBB_LIB_NAME should be defined (in makefiles)
+    #pragma comment(lib, __TBB_STRING(__TBB_LIB_NAME))
+#endif
+
 const int NumIterations = 100;
 const int NumLeafTasks = 2;
-int MinBaseDepth = 9;
-int MaxBaseDepth = 11;
+int MinBaseDepth = 8;
+int MaxBaseDepth = 10;
 int BaseDepth = 0;
 
 const int NumTests = 8;
@@ -215,8 +220,8 @@ public:
         tbb::empty_task &r = *new( tbb::task::allocate_root(ctx) ) tbb::empty_task;
         const int R = 4;
         r.set_ref_count( R * P + 1 );
-        // Only thread 1 changes its task tree priority in preemption test mode
-        uintptr_t opts = m_opts & (id == PreemptionActivatorId ? ~0u : ~(uintptr_t)TestPreemption);
+        // Only PreemptionActivator thread changes its task tree priority in preemption test mode
+        const uintptr_t opts = (id == PreemptionActivatorId) ? m_opts : (m_opts & ~(uintptr_t)TestPreemption);
         for ( int i = 0; i < R; ++i ) {
             for ( int j = 1; j < P; ++j )
                 r.spawn( *new(r.allocate_child()) NodeType(id, MinBaseDepth + id, opts, &r) );
@@ -284,7 +289,7 @@ public:
 template<class NodeType>
 void RunPrioritySwitchBetweenTwoMasters ( int idx, uintptr_t opts ) {
     ASSERT( idx < NumTests, NULL );
-    REMARK( "Config %d\r", ++g_CurConfig );
+    REMARK( "Config %d: idx=%i, opts=%u\r", ++g_CurConfig, idx, (unsigned)opts );
     NativeParallelFor ( 2, MasterBody<NodeType>(idx, opts) );
     Harness::Sleep(50);
 }
@@ -395,11 +400,12 @@ void TestPriorityAssertions () {
     tbb::task &t = *new( tbb::task::allocate_root() ) tbb::empty_task;
     TRY_BAD_EXPR( tbb::task::enqueue( t, bad_high_priority ), "Invalid priority level value" );
     // Restore normal assertion handling
-    tbb::set_assertion_handler( NULL );
+    tbb::set_assertion_handler( ReportError );
 #endif /* TRY_BAD_EXPR_ENABLED && __TBB_TASK_PRIORITY */
 }
 
 #if __TBB_TASK_PRIORITY
+
 tbb::atomic<tbb::priority_t> g_order;
 tbb::atomic<bool> g_order_established;
 class OrderedTask : public tbb::task {
@@ -443,18 +449,113 @@ void TestEnqueueOrder () {
     while( g_order == tbb::priority_low ) __TBB_Yield();
     while( g_order != tbb::priority_low ) __TBB_Yield();
 }
+
+namespace test_propagation {
+
+// This test creates two binary trees of task_group_context objects.
+// Indices in a binary tree have the following layout:
+//  [1]--> [2] -> [4],[5]
+//     \-> [3] -> [6],[7]
+static const int first = 1, last = 7;
+tbb::task_group_context* g_trees[2][/*last+1*/8];
+tbb::task_group_context* g_default_ctx;
+tbb::atomic<int> g_barrier;
+tbb::atomic<bool> is_finished;
+
+class TestSetPriorityTask : public tbb::task {
+    const int m_tree, m_i;
+public:
+    TestSetPriorityTask(int t, int i) : m_tree(t), m_i(i) {}
+    tbb::task* execute() {
+        if( !m_i ) { // the first task creates two trees
+            g_default_ctx = group();
+            for( int i = 0; i <= 1; ++i ) {
+                g_trees[i][1] = new tbb::task_group_context( tbb::task_group_context::isolated );
+                tbb::task::spawn(*new(tbb::task::allocate_root(*g_trees[i][1])) TestSetPriorityTask(i, 1));
+            }
+        }
+        else if( m_i <= last/2 ) { // is divisible
+            for( int i = 0; i <= 1; ++i ) {
+                const int index = 2*m_i + i;
+                g_trees[m_tree][index] = new tbb::task_group_context ( tbb::task_group_context::bound );
+                tbb::task::spawn(*new(tbb::task::allocate_root(*g_trees[m_tree][index])) TestSetPriorityTask(m_tree, index));
+            }
+        }
+        --g_barrier;
+        //REMARK("Task %i executing\n", m_i);
+        while (!is_finished) __TBB_Yield();
+        change_group(*g_default_ctx); // avoid races with destruction of custom contexts
+        --g_barrier;
+        return NULL;
+    }
+};
+
+// Tests task_group_context state propagation, also for cancellation.
+void TestSetPriority() {
+    REMARK("Testing set_priority() with existing forest\n");
+    const int workers = last*2+1; // +1 is worker thread executing the first task
+    tbb::task_scheduler_init init(workers+1); // +1 is master thread
+    g_barrier = workers;
+    is_finished = false;
+    tbb::task::spawn(*new(tbb::task::allocate_root()) TestSetPriorityTask(0,0));
+    while(g_barrier) __TBB_Yield();
+    g_trees[0][2]->set_priority(tbb::priority_high);
+    g_trees[0][4]->set_priority(tbb::priority_normal);
+    g_trees[1][3]->set_priority(tbb::priority_high); // Regression test: it must not set priority_high to g_trees[0][4]
+    //                                         -  1  2  3  4  5  6  7
+    const int expected_priority[2][last+1] = {{0, 0, 1, 0, 0, 1, 0, 0},
+                                              {0, 0, 0, 1, 0, 0, 1, 1}};
+    for (int t = 0; t < 2; ++t)
+        for (int i = first; i <= last; ++i) {
+            REMARK("\r                    \rTask %i... ", i);
+            ASSERT(g_trees[t][i]->priority() == expected_priority[t][i]? tbb::priority_high : tbb::priority_normal, NULL);
+            REMARK("OK");
+        }
+    REMARK("\r                    \r");
+    REMARK("Also testing cancel_group_execution()\n"); // cancellation shares propagation logic with set_priority() but there are also differences
+    g_trees[0][4]->cancel_group_execution();
+    g_trees[0][5]->cancel_group_execution();
+    g_trees[1][3]->cancel_group_execution();
+    //                                             -  1  2  3  4  5  6  7
+    const int expected_cancellation[2][last+1] = {{0, 0, 0, 0, 1, 1, 0, 0},
+                                                  {0, 0, 0, 1, 0, 0, 1, 1}};
+    for (int t = 0; t < 2; ++t)
+        for (int i = first; i <= last; ++i) {
+            REMARK("\r                    \rTask %i... ", i);
+            ASSERT( g_trees[t][i]->is_group_execution_cancelled() == (expected_cancellation[t][i]==1), NULL);
+            REMARK("OK");
+        }
+    REMARK("\r                    \r");
+    g_barrier = workers;
+    is_finished = true;
+    REMARK("waiting tasks to terminate\n");
+    while(g_barrier) __TBB_Yield();
+    for (int t = 0; t < 2; ++t)
+        for (int i = first; i <= last; ++i)
+            delete g_trees[t][i];
+}
+}//namespace test_propagation
 #endif /* __TBB_TASK_PRIORITY */
 
+#if !__TBB_TEST_SKIP_AFFINITY
+#include "harness_concurrency.h"
+#endif
+
 int TestMain () {
+#if !__TBB_TEST_SKIP_AFFINITY
+    Harness::LimitNumberOfThreads( 16 );
+#endif
 #if !__TBB_TASK_PRIORITY
     REMARK( "Priorities disabled: Running as just yet another task scheduler test\n" );
 #else
+    test_propagation::TestSetPriority(); // TODO: move down when bug 1996 is fixed
     TestEnqueueOrder();
 #endif /* __TBB_TASK_PRIORITY */
     TestPriorityAssertions();
     TestSimplePriorityOps(tbb::priority_low);
     TestSimplePriorityOps(tbb::priority_high);
     P = tbb::task_scheduler_init::default_num_threads();
+    REMARK( "The number of threads: %d\n", P );
     if ( P < 3 )
         return Harness::Skipped;
     TestPeriodicConcurrentActivities();

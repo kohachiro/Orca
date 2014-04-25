@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -40,12 +40,22 @@
 #endif
 #endif
 
+// Does the operating system have a system call to pin a thread to a set of OS processors?
+#define __TBB_OS_AFFINITY_SYSCALL_PRESENT ((__linux__ && !__ANDROID__) || (__FreeBSD_version >= 701000))
+
 namespace tbb {
 namespace internal {
 
 const size_t MByte = 1024*1024;
 
+#if __TBB_WIN8UI_SUPPORT
+// In Win8UI mode, TBB uses a thread creation API that does not allow to specify the stack size.
+// Still, the thread stack size value, either explicit or default, is used by the scheduler.
+// So here we set the default value to match the platform's default of 1MB.
+const size_t ThreadStackSize = 1*MByte;
+#else
 const size_t ThreadStackSize = (sizeof(uintptr_t) <= 4 ? 2 : 4 )*MByte;
+#endif
 
 #ifndef __TBB_HardwareConcurrency
 
@@ -114,9 +124,8 @@ T1 max ( const T1& val1, const T2& val2 ) {
     return val1 < val2 ? val2 : val1;
 }
 
-//! Utility template function to prevent "unused" warnings by various compilers.
-template<typename T>
-void suppress_unused_warning( const T& ) {}
+//! Utility helper structure to ease overload resolution
+template<int > struct int_to_type {};
 
 //------------------------------------------------------------------------
 // FastRandom
@@ -128,7 +137,14 @@ unsigned GetPrime ( unsigned seed );
 //! A fast random number generator.
 /** Uses linear congruential method. */
 class FastRandom {
+private:
+#if __TBB_OLD_PRIMES_RNG
     unsigned x, a;
+    static const unsigned c = 1;
+#else
+    unsigned x, c;
+    static const unsigned a = 0x9e3779b1; // a big prime number
+#endif //__TBB_OLD_PRIMES_RNG
 public:
     //! Get a random number.
     unsigned short get() {
@@ -137,13 +153,30 @@ public:
     //! Get a random number for the given seed; update the seed for next use.
     unsigned short get( unsigned& seed ) {
         unsigned short r = (unsigned short)(seed>>16);
-        seed = seed*a+1;
+        __TBB_ASSERT(c&1, "c must be odd for big rng period");
+        seed = seed*a+c;
         return r;
     }
     //! Construct a random number generator.
-    FastRandom( unsigned seed ) {
+    FastRandom( void* unique_ptr ) { init(uintptr_t(unique_ptr)); }
+    FastRandom( uint32_t seed) { init(seed); }
+    FastRandom( uint64_t seed) { init(seed); }
+    template <typename T>
+    void init( T seed ) {
+        return init(seed,int_to_type<sizeof(seed)>());
+    }
+    void init( uint64_t seed , int_to_type<8> ) {
+        init(uint32_t((seed>>32)+seed), int_to_type<4>());
+    }
+    void init( uint32_t seed, int_to_type<4> ) {
+#if __TBB_OLD_PRIMES_RNG
         x = seed;
         a = GetPrime( seed );
+#else
+        // threads use different seeds for unique sequences
+        c = (seed|1)*0xba5703f5; // c must be odd, shuffle by a prime number
+        x = c^(seed>>1); // also shuffle x for the first get() invocation
+#endif
     }
 };
 
@@ -210,12 +243,7 @@ inline void run_initializer( bool (*f)(), atomic<do_once_state>& state ) {
     state = f() ? do_once_executed : do_once_uninitialized;
 }
 
-#ifdef __TBB_HardwareConcurrency
-    class affinity_helper {
-    public:
-        void protect_affinity_mask() {}
-    };
-#elif __linux__ || __FreeBSD_version >= 701000
+#if __TBB_OS_AFFINITY_SYSCALL_PRESENT
   #if __linux__
     typedef cpu_set_t basic_mask_t;
   #elif __FreeBSD_version >= 701000
@@ -231,19 +259,16 @@ inline void run_initializer( bool (*f)(), atomic<do_once_state>& state ) {
         ~affinity_helper();
         void protect_affinity_mask();
     };
-#elif defined(_SC_NPROCESSORS_ONLN)
-    class affinity_helper {
-    public:
-        void protect_affinity_mask() {}
-    };
-#elif _WIN32||_WIN64
-    class affinity_helper {
-    public:
-        void protect_affinity_mask() {}
-    };
 #else
-    #error affinity_helper is not implemented in this OS
-#endif /* __TBB_HardwareConcurrency */
+    class affinity_helper {
+    public:
+        void protect_affinity_mask() {}
+    };
+#endif /* __TBB_OS_AFFINITY_SYSCALL_PRESENT */
+
+#if __TBB_CPF_BUILD || TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+extern bool cpu_has_speculation();
+#endif
 
 } // namespace internal
 } // namespace tbb

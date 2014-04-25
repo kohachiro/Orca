@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -53,6 +53,17 @@ else
 endif
 
 CPLUS_FLAGS += -DUSE_PTHREAD
+
+ifeq (libc++,$(stdlib))
+    CPLUS_FLAGS    += -stdlib=libc++
+    LIB_LINK_FLAGS += -stdlib=libc++
+endif
+
+CPP11_FLAGS = -std=c++11 -D_TBB_CPP0X
+    
+ifneq (00,$(lambdas)$(cpp0x))
+    CXX_ONLY_FLAGS += $(CPP11_FLAGS)
+endif
 
 ifeq (intel64,$(arch))
     CPLUS_FLAGS += -m64

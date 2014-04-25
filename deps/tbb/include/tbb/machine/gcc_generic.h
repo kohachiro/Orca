@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -37,14 +37,25 @@
 
 #define __TBB_WORDSIZE      __SIZEOF_POINTER__
 
-#ifdef __BYTE_ORDER__
-    #if __BYTE_ORDER__==__ORDER_BIG_ENDIAN__
-        #define __TBB_BIG_ENDIAN    1
-    #elif __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__
-        #define __TBB_BIG_ENDIAN    0
-    #elif __BYTE_ORDER__==__ORDER_PDP_ENDIAN__
-        #define __TBB_BIG_ENDIAN -1 // not currently supported
-    #endif
+#if __TBB_GCC_64BIT_ATOMIC_BUILTINS_BROKEN
+    #define __TBB_64BIT_ATOMICS 0
+#endif
+
+/** FPU control setting not available for non-Intel architectures on Android **/
+#if __ANDROID__ && __TBB_generic_arch 
+    #define __TBB_CPU_CTL_ENV_PRESENT 0
+#endif
+
+// __BYTE_ORDER__ is used in accordance with http://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html,
+// but __BIG_ENDIAN__ or __LITTLE_ENDIAN__ may be more commonly found instead.
+#if __BIG_ENDIAN__ || (defined(__BYTE_ORDER__) && __BYTE_ORDER__==__ORDER_BIG_ENDIAN__)
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_BIG
+#elif __LITTLE_ENDIAN__ || (defined(__BYTE_ORDER__) && __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__)
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_LITTLE
+#elif defined(__BYTE_ORDER__)
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_UNSUPPORTED
+#else
+    #define __TBB_ENDIANNESS __TBB_ENDIAN_DETECT
 #endif
 
 /** As this generic implementation has absolutely no information about underlying
@@ -100,7 +111,7 @@ inline bool __TBB_machine_try_lock_byte( __TBB_atomic_flag &flag ) {
     return __sync_lock_test_and_set(&flag,1)==0;
 }
 
-inline void __TBB_machine_unlock_byte( __TBB_atomic_flag &flag , __TBB_Flag) {
+inline void __TBB_machine_unlock_byte( __TBB_atomic_flag &flag ) {
     __sync_lock_release(&flag);
 }
 
@@ -121,4 +132,8 @@ inline void __TBB_machine_unlock_byte( __TBB_atomic_flag &flag , __TBB_Flag) {
 
 #if __TBB_WORDSIZE==4
     #define __TBB_USE_GENERIC_DWORD_LOAD_STORE              1
+#endif
+
+#if __TBB_x86_32 || __TBB_x86_64
+#include "gcc_itsx.h"
 #endif

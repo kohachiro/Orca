@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -34,6 +34,35 @@
 
 namespace Harness {
 
+#if TBB_USE_DEBUG
+#define SUFFIX1 "_debug"
+#define SUFFIX2
+#else
+#define SUFFIX1
+#define SUFFIX2 "_debug"
+#endif /* TBB_USE_DEBUG */
+
+#if _WIN32||_WIN64
+#define PREFIX
+#define EXT ".dll"
+#else
+#define PREFIX "lib"
+#if __APPLE__
+#define EXT ".dylib"
+// Android SDK build system does not support .so file name versioning
+#elif __FreeBSD__ || __NetBSD__ || __sun || _AIX || __ANDROID__
+#define EXT ".so"
+#elif __linux__  // Order of these elif's matters!
+#define EXT __TBB_STRING(.so.TBB_COMPATIBLE_INTERFACE_VERSION)
+#else
+#error Unknown OS
+#endif
+#endif
+
+// Form the names of the TBB memory allocator binaries.
+#define MALLOCLIB_NAME1 PREFIX "tbbmalloc" SUFFIX1 EXT
+#define MALLOCLIB_NAME2 PREFIX "tbbmalloc" SUFFIX2 EXT
+
 #if _WIN32 || _WIN64
 typedef  HMODULE LIBRARY_HANDLE;
 #else
@@ -51,7 +80,13 @@ typedef void *LIBRARY_HANDLE;
 LIBRARY_HANDLE OpenLibrary(const char *name)
 {
 #if _WIN32 || _WIN64
+#if __TBB_WIN8UI_SUPPORT	
+    TCHAR wlibrary[MAX_PATH];
+    if ( MultiByteToWideChar(CP_UTF8, 0, name, -1, wlibrary, MAX_PATH) == 0 ) return false;
+    return :: LoadPackagedLibrary( wlibrary, 0 );
+#else
     return ::LoadLibrary(name);
+#endif
 #else
     return dlopen(name, RTLD_NOW|RTLD_GLOBAL);
 #endif

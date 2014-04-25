@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -93,11 +93,9 @@ void concurrent_vector_base::helper::extend_segment( concurrent_vector_base& v )
     // If other threads are trying to set pointers in the short segment, wait for them to finish their
     // assignments before we copy the short segment to the long segment.
     atomic_backoff backoff;
-    while( !v.my_storage[0].array || !v.my_storage[1].array ) {
-        backoff.pause();
-    }
-    s[0] = v.my_storage[0]; 
-    s[1] = v.my_storage[1]; 
+    while( !v.my_storage[0].array || !v.my_storage[1].array ) backoff.pause();
+    s[0] = v.my_storage[0];
+    s[1] = v.my_storage[1];
     if( v.my_segment.compare_and_swap( s, v.my_storage )!=v.my_storage )
         NFS_Free(s);
 }

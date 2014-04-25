@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -30,14 +30,15 @@
 #include "tbb/reader_writer_lock.h"
 #include "tbb/atomic.h"
 #include "tbb/tbb_exception.h"
-#include "harness_assert.h"
 #include "harness.h"
+#include "harness_barrier.h"
 
 tbb::reader_writer_lock the_mutex;
 const int MAX_WORK = 10000;
 
 tbb::atomic<size_t> active_readers, active_writers;
 tbb::atomic<bool> sim_readers;
+size_t n_tested__sim_readers;
 
 
 int BusyWork(int percentOfMaxWork) {
@@ -119,10 +120,12 @@ struct StressRWLBody : NoAssign {
 
 struct CorrectRWLScopedBody : NoAssign {
     const int nThread;
+    Harness::SpinBarrier& my_barrier;
 
-    CorrectRWLScopedBody(int nThread_) : nThread(nThread_) {}
+    CorrectRWLScopedBody(int nThread_, Harness::SpinBarrier& b_) : nThread(nThread_),my_barrier(b_) {}
 
     void operator()(const int /* threadID */ ) const {
+        my_barrier.wait();
         for (int i=0; i<50; i++) {
             const bool is_reader = i%5==0; // 1 writer for every 4 readers
 
@@ -148,10 +151,12 @@ struct CorrectRWLScopedBody : NoAssign {
 
 struct CorrectRWLBody : NoAssign {
     const int nThread;
+    Harness::SpinBarrier& my_barrier;
 
-    CorrectRWLBody(int nThread_) : nThread(nThread_) {}
+    CorrectRWLBody(int nThread_, Harness::SpinBarrier& b_ ) : nThread(nThread_), my_barrier(b_) {}
 
     void operator()(const int /* threadID */ ) const {
+        my_barrier.wait();
         for (int i=0; i<50; i++) {
             const bool is_reader = i%5==0; // 1 writer for every 4 readers
 
@@ -188,20 +193,40 @@ void TestReaderWriterLockOnNThreads(int nThreads) {
         REMARK(" OK.\n");
     }
 
+    int i;
+    n_tested__sim_readers = 0;
     REMARK("Testing with %d threads, direct/unscoped locking mode...", nThreads); // TODO: choose direct or unscoped?
-    CorrectRWLBody myCorrectBody(nThreads);
-    active_writers = active_readers = 0;
-    sim_readers = false;
-    NativeParallelFor(nThreads, myCorrectBody);
-    ASSERT(sim_readers || nThreads<2, "There were no simultaneous readers.");
+    // TODO: refactor the following two for loops into a shared function 
+    for( i=0; i<100; ++i ) {
+        Harness::SpinBarrier bar0(nThreads);
+
+        CorrectRWLBody myCorrectBody(nThreads,bar0);
+        active_writers = active_readers = 0;
+        sim_readers = false;
+        NativeParallelFor(nThreads, myCorrectBody);
+
+        if( sim_readers || nThreads==1 ) {
+            if( ++n_tested__sim_readers>5 )
+                break;
+        }
+    }
+    ASSERT(i<100, "There were no simultaneous readers.");
     REMARK(" OK.\n");
 
+    n_tested__sim_readers = 0;
     REMARK("Testing with %d threads, scoped locking mode...", nThreads);
-    CorrectRWLScopedBody myCorrectScopedBody(nThreads);
-    active_writers = active_readers = 0;
-    sim_readers = false;
-    NativeParallelFor(nThreads, myCorrectScopedBody);
-    ASSERT(sim_readers || nThreads<2, "There were no simultaneous readers.");
+    for( i=0; i<100; ++i ) {
+        Harness::SpinBarrier bar0(nThreads);
+        CorrectRWLScopedBody myCorrectScopedBody(nThreads, bar0);
+        active_writers = active_readers = 0;
+        sim_readers = false;
+        NativeParallelFor(nThreads, myCorrectScopedBody);
+        if( sim_readers || nThreads==1 ) {
+            if( ++n_tested__sim_readers>5 )
+                break;
+        }
+    }
+    ASSERT(i<100, "There were no simultaneous readers.");
     REMARK(" OK.\n");
 }
 

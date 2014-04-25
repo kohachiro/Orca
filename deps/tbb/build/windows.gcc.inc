@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -48,6 +48,8 @@ MALLOC.DEF = $(MALLOC_ROOT)/$(def_prefix)-gcc-tbbmalloc-export.def
 RML.DEF = $(RML_SERVER_ROOT)/lin-rml-export.def
 
 LINK_TBB.LIB = $(TBB.LIB)
+# no TBB proxy for the configuration
+PROXY.LIB =
 
 #------------------------------------------------------------------------------
 # End of overridden settings
@@ -81,7 +83,7 @@ LIBS = -lpsapi
 LINK_FLAGS = -Wl,--enable-auto-import
 LIB_LINK_FLAGS = $(DYLIB_KEY)
 # gcc 4.4 and higher support -std=c++0x
-ifeq (ok,$(shell cmd /C "cscript /nologo /E:jscript $(tbb_root)/build/detect.js /minversion gcc 4.4"))
+ifeq (ok,$(call detect_js,/minversion gcc 4.4))
     CPP11_FLAGS = -std=c++0x -D_TBB_CPP0X
 endif
 
@@ -91,6 +93,11 @@ endif
 ifeq ($(cfg), debug)
         CPLUS_FLAGS = -g -O0 -DTBB_USE_DEBUG
 endif
+
+ifneq (00,$(lambdas)$(cpp0x))
+    CXX_ONLY_FLAGS += $(CPP11_FLAGS)
+endif
+
 CPLUS_FLAGS += -DUSE_WINTHREAD
 CPLUS_FLAGS += -D_WIN32_WINNT=$(_WIN32_WINNT)
 
@@ -98,6 +105,7 @@ CPLUS_FLAGS += -D_WIN32_WINNT=$(_WIN32_WINNT)
 CPLUS_FLAGS += -DMINGW_HAS_SECURE_API=1 -D__MSVCRT_VERSION__=0x0700 -msse -mthreads
 
 CONLY = gcc
+debugger = gdb
 C_FLAGS = $(CPLUS_FLAGS)
 
 ifeq (intel64,$(arch))

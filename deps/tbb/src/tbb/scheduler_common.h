@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -30,6 +30,7 @@
 #define _TBB_scheduler_common_H
 
 #include "tbb/tbb_stddef.h"
+#include "tbb/cache_aligned_allocator.h"
 
 #include <string.h>  // for memset, memcpy, memmove
 
@@ -54,16 +55,20 @@
     #undef private
 #endif
 
-#if __TBB_TASK_GROUP_CONTEXT
+#ifndef __TBB_SCHEDULER_MUTEX_TYPE
+#define __TBB_SCHEDULER_MUTEX_TYPE tbb::spin_mutex
+#endif
+// TODO: add conditional inclusion based on specified type
 #include "tbb/spin_mutex.h"
-#endif /* __TBB_TASK_GROUP_CONTEXT */
 
 // This macro is an attempt to get rid of ugly ifdefs in the shared parts of the code.
 // It drops the second argument depending on whether the controlling macro is defined.
 // The first argument is just a convenience allowing to keep comma before the macro usage.
 #if __TBB_TASK_GROUP_CONTEXT
+    #define __TBB_CONTEXT_ARG1(context) context
     #define __TBB_CONTEXT_ARG(arg1, context) arg1, context
 #else /* !__TBB_TASK_GROUP_CONTEXT */
+    #define __TBB_CONTEXT_ARG1(context)
     #define __TBB_CONTEXT_ARG(arg1, context) arg1
 #endif /* !__TBB_TASK_GROUP_CONTEXT */
 
@@ -82,7 +87,15 @@
 #endif
 
 namespace tbb {
+namespace interface7 {
 namespace internal {
+class task_arena_base;
+class delegated_task;
+class wait_task;
+struct wait_body;
+}}
+namespace internal {
+using namespace interface7::internal;
 
 class generic_scheduler;
 
@@ -107,6 +120,9 @@ inline intptr_t& priority ( task& t ) {
 }
 #endif /* __TBB_TASK_PRIORITY */
 
+//! Mutex type for global locks in the scheduler
+typedef __TBB_SCHEDULER_MUTEX_TYPE scheduler_mutex_type;
+
 #if __TBB_TASK_GROUP_CONTEXT
 //! Task group state change propagation global epoch
 /** Together with generic_scheduler::my_context_state_propagation_epoch forms
@@ -122,7 +138,8 @@ extern uintptr_t the_context_state_propagation_epoch;
 
 //! Mutex guarding state change propagation across task groups forest.
 /** Also protects modification of related data structures. **/
-extern spin_mutex the_context_state_propagation_mutex;
+typedef scheduler_mutex_type context_state_propagation_mutex_type;
+extern context_state_propagation_mutex_type the_context_state_propagation_mutex;
 #endif /* __TBB_TASK_GROUP_CONTEXT */
 
 //! Alignment for a task object
@@ -172,7 +189,7 @@ enum free_task_hint {
 
 #if TBB_USE_ASSERT
 
-static const uintptr_t venom = tbb::internal::size_t_select(0xDEADBEEFU,0xDDEEAADDDEADBEEFULL);
+static const uintptr_t venom = tbb::internal::select_size_t_constant<0xDEADBEEFU,0xDDEEAADDDEADBEEFULL>::value;
 
 template <typename T>
 void poison_value ( T& val ) { val = * punned_cast<T*>(&venom); }
@@ -186,7 +203,11 @@ inline void assert_task_valid( const task& task ) {
     __TBB_ASSERT( &task!=NULL, NULL );
     __TBB_ASSERT( !is_poisoned(&task), NULL );
     __TBB_ASSERT( (uintptr_t)&task % task_alignment == 0, "misaligned task" );
+#if __TBB_RECYCLE_TO_ENQUEUE
+    __TBB_ASSERT( (unsigned)task.state()<=(unsigned)task::to_enqueue, "corrupt task (invalid state)" );
+#else
     __TBB_ASSERT( (unsigned)task.state()<=(unsigned)task::recycle, "corrupt task (invalid state)" );
+#endif
 }
 
 #else /* !TBB_USE_ASSERT */
@@ -248,13 +269,13 @@ inline bool ConcurrentWaitsEnabled ( task& t ) { return false; }
 //------------------------------------------------------------------------
 // arena_slot
 //------------------------------------------------------------------------
-
-struct arena_slot {
+struct arena_slot_line1 {
+    //TODO: make this tbb:atomic<>.
     //! Scheduler of the thread attached to the slot
     /** Marks the slot as busy, and is used to iterate through the schedulers belonging to this arena **/
     generic_scheduler* my_scheduler;
 
-    // Task pool (the deque of task pointers) of the scheduler that owns this slot
+    // Synchronization of access to Task pool
     /** Also is used to specify if the slot is empty or locked:
          0 - empty
         -1 - locked **/
@@ -263,29 +284,63 @@ struct arena_slot {
     //! Index of the first ready task in the deque.
     /** Modified by thieves, and by the owner during compaction/reallocation **/
     __TBB_atomic size_t head;
+};
 
-    //! Padding to avoid false sharing caused by the thieves accessing this slot
-    char pad1[NFS_MaxLineSize - sizeof(size_t) - sizeof(task**) - sizeof(generic_scheduler*)];
+struct arena_slot_line2 {
+    //! Hint provided for operations with the container of starvation-resistant tasks.
+    /** Modified by the owner thread (during these operations). **/
+    unsigned hint_for_pop;
 
     //! Index of the element following the last ready task in the deque.
     /** Modified by the owner thread. **/
     __TBB_atomic size_t tail;
 
-    //! Hints provided for operations with the container of starvation-resistant tasks.
-    /** Modified by the owner thread (during these operations). **/
-    unsigned hint_for_push, hint_for_pop;
+    //! Capacity of the primary task pool (number of elements - pointers to task).
+    size_t my_task_pool_size;
+
+    // Task pool of the scheduler that owns this slot
+    task* *__TBB_atomic task_pool_ptr;
 
 #if __TBB_STATISTICS
     //! Set of counters to accumulate internal statistics related to this arena
     statistics_counters *my_counters;
 #endif /* __TBB_STATISTICS */
-    //! Padding to avoid false sharing caused by the thieves accessing the next slot
-    char pad2[NFS_MaxLineSize - sizeof(size_t) - 2*sizeof(unsigned)
-#if __TBB_STATISTICS
-              - sizeof(statistics_counters*)
-#endif /* __TBB_STATISTICS */
-             ];
-}; // class arena_slot
+};
+
+struct arena_slot : padded<arena_slot_line1>, padded<arena_slot_line2> {
+#if TBB_USE_ASSERT
+    void fill_with_canary_pattern ( size_t first, size_t last ) {
+        for ( size_t i = first; i < last; ++i )
+            poison_pointer(task_pool_ptr[i]);
+    }
+#else
+    void fill_with_canary_pattern ( size_t, size_t ) {}
+#endif /* TBB_USE_ASSERT */
+
+    void allocate_task_pool( size_t n ) {
+        size_t byte_size = ((n * sizeof(task*) + NFS_MaxLineSize - 1) / NFS_MaxLineSize) * NFS_MaxLineSize;
+        my_task_pool_size = byte_size / sizeof(task*);
+        task_pool_ptr = (task**)NFS_Allocate( 1, byte_size, NULL );
+        // No need to clear the fresh deque since valid items are designated by the head and tail members.
+        // But fill it with a canary pattern in the high vigilance debug mode.
+        fill_with_canary_pattern( 0, my_task_pool_size );
+    }
+
+    //! Deallocate task pool that was allocated by means of allocate_task_pool.
+    void free_task_pool( ) {
+#if !__TBB_TASK_ARENA
+        __TBB_ASSERT( !task_pool /*TODO: == EmptyTaskPool*/, NULL);
+#else
+        //TODO: understand the assertion and modify
+#endif
+        if( task_pool_ptr ) {
+           __TBB_ASSERT( my_task_pool_size, NULL);
+           NFS_Free( task_pool_ptr );
+           task_pool_ptr = NULL;
+           my_task_pool_size = 0;
+        }
+    }
+};
 
 } // namespace internal
 } // namespace tbb

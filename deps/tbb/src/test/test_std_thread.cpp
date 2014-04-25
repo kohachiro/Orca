@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,6 +27,15 @@
 */
 
 #define TBB_IMPLEMENT_CPP0X 1
+#include "tbb/tbb_config.h"
+
+#if __TBB_WIN8UI_SUPPORT
+#define HARNESS_NO_PARSE_COMMAND_LINE 1
+#include "harness.h"
+int TestMain() {
+    return Harness::Skipped;
+}
+#else
 #include "tbb/compat/thread"
 #define THREAD std::thread
 #define THIS_THREAD std::this_thread
@@ -39,3 +48,4 @@ int TestMain () {
     RunTests();
     return Harness::Done;
 }
+#endif

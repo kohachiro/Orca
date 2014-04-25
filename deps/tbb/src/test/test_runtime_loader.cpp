@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,7 +26,13 @@
     the GNU General Public License.
 */
 
-#if !(_WIN32||_WIN64)
+#if !TBB_USE_EXCEPTIONS && _MSC_VER
+    // Suppress "C++ exception handler used, but unwind semantics are not enabled" warning in STL headers
+    #pragma warning (push)
+    #pragma warning (disable: 4530)
+#endif
+
+#if !(_WIN32||_WIN64) || (__MINGW64__||__MINGW32__)
 
 #include "harness.h"
 
@@ -45,26 +51,20 @@ int TestMain () {
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>
-
-#if !TBB_USE_EXCEPTIONS && _MSC_VER
-    // Suppress "C++ exception handler used, but unwind semantics are not enabled" warning in STL headers
-    #pragma warning (push)
-    #pragma warning (disable: 4530)
-#endif
-
 #include <vector>
 #include <string>
 #include <utility>
 #include <typeinfo>
-
-#if !TBB_USE_EXCEPTIONS && _MSC_VER
-    #pragma warning (pop)
-#endif
+#include <stdexcept>
 
 #ifdef HARNESS_USE_RUNTIME_LOADER
     #undef HARNESS_USE_RUNTIME_LOADER    // We do not want harness to preload tbb.
 #endif
 #include "harness.h"
+
+#if !TBB_USE_EXCEPTIONS && _MSC_VER
+    #pragma warning (pop)
+#endif
 
 static int errors = 0;
 
@@ -204,7 +204,7 @@ int TestMain() {
                     // Check what?
                 }
 
-                // There was a problem on Linux, and still a problem on Mac OS X.
+                // There was a problem on Linux* OS, and still a problem on OS X*.
                 SAY( "Throw an exception." );
                 // Iterate thru all the ids first.
                 for ( int id = 1; id < tbb::internal::eid_max; ++ id ) {

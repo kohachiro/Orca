@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -28,11 +28,11 @@
 
 #include "harness_defs.h"
 
-#if __TBB_TEST_SKIP_PIC_MODE || __TBB_TEST_SKIP_BUILTINS_MODE
+#if __TBB_TEST_SKIP_PIC_MODE || (__TBB_TEST_SKIP_GCC_BUILTINS_MODE && __TBB_TEST_SKIP_ICC_BUILTINS_MODE)
 #include "harness.h"
 int TestMain() {
     REPORT("Known issue: %s\n",
-           __TBB_TEST_SKIP_PIC_MODE? "PIC mode is not supported" : "GCC builtins aren't available");
+           __TBB_TEST_SKIP_PIC_MODE? "PIC mode is not supported" : "Compiler builtins for atomic operations aren't available");
     return Harness::Skipped;
 }
 #else
@@ -42,12 +42,21 @@ int TestMain() {
 
 #include "tbb/atomic.h"
 #include "harness_assert.h"
-#include <string.h> // memcmp
+#include <cstring>  // memcmp
+#include "tbb/aligned_space.h"
+#include <new>      //for placement new
+
+using std::memcmp;
 
 #if _MSC_VER && !defined(__INTEL_COMPILER)
     // Unary minus operator applied to unsigned type, result still unsigned
     // Constant conditional expression
     #pragma warning( disable: 4127 4310 )
+#endif
+
+#if __TBB_GCC_STRICT_ALIASING_BROKEN && __TBB_GCC_WARNING_SUPPRESSION_PRESENT
+    // Suppress crazy warnings about strict aliasing
+    #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
 
 enum LoadStoreExpression {
@@ -281,8 +290,261 @@ void TestConst( T i ) {
     ASSERT( z.counter.template load<tbb::full_fence>() == i, "sequentially consistent read of atomic<T> broken?" );
 }
 
+#include "harness.h"
+
+#include <sstream>
+
+//TODO: consider moving it to separate file, and unify with one in examples command line interface
+template<typename T>
+std::string to_string(const T& a){
+    std::stringstream str; str <<a;
+    return str.str();
+}
+namespace initialization_tests {
+    template<typename T>
+    struct test_initialization_fixture{
+        typedef tbb::atomic<T> atomic_t;
+        tbb::aligned_space<atomic_t,1> non_zeroed_storage;
+        enum {fill_value = 0xFF };
+        test_initialization_fixture(){
+            memset(non_zeroed_storage.begin(),fill_value,sizeof(non_zeroed_storage));
+            ASSERT( char(fill_value)==*(reinterpret_cast<char*>(non_zeroed_storage.begin()))
+                    ,"failed to fill the storage; memset error?");
+        }
+        //TODO: consider move it to destructor, even in a price of UB
+        void tear_down(){
+            non_zeroed_storage.begin()->~atomic_t();
+        }
+    };
+
+    template<typename T>
+    struct TestValueInitialization : test_initialization_fixture<T>{
+        void operator()(){
+            typedef typename test_initialization_fixture<T>::atomic_t atomic_type;
+            //please note that explicit braces below are needed to get zero initialization.
+            //in C++11, 8.5 Initializers [dcl.init], see  paragraphs 10,7,5
+            new (this->non_zeroed_storage.begin()) atomic_type();
+            //TODO: add use of KNOWN_ISSUE macro on SunCC 5.11
+            #if !__SUNPRO_CC || __SUNPRO_CC > 0x5110
+                //TODO: add printing of typename to the assertion
+                ASSERT(char(0)==*(reinterpret_cast<char*>(this->non_zeroed_storage.begin()))
+                        ,("value initialization for tbb::atomic should do zero initialization; "
+                          "actual value:"+to_string(this->non_zeroed_storage.begin()->load())).c_str());
+            #endif
+            this->tear_down();
+        };
+    };
+
+    template<typename T>
+    struct TestDefaultInitialization : test_initialization_fixture<T>{
+        void operator ()(){
+            typedef typename test_initialization_fixture<T>::atomic_t atomic_type;
+            new (this->non_zeroed_storage.begin()) atomic_type;
+            ASSERT( char(this->fill_value)==*(reinterpret_cast<char*>(this->non_zeroed_storage.begin()))
+                    ,"default initialization for atomic should do no initialization");
+            this->tear_down();
+        }
+    };
+#   if __TBB_ATOMIC_CTORS
+        template<typename T>
+        struct TestDirectInitialization : test_initialization_fixture<T> {
+            void operator()(T i){
+                typedef typename test_initialization_fixture<T>::atomic_t atomic_type;
+                new (this->non_zeroed_storage.begin()) atomic_type(i);
+                ASSERT(i == this->non_zeroed_storage.begin()->load()
+                        ,("tbb::atomic initialization failed; "
+                          "value:"+to_string(this->non_zeroed_storage.begin()->load())+
+                          "; expected:"+to_string(i)).c_str());
+                this->tear_down();
+            }
+        };
+#   endif
+}
+template<typename T>
+void TestValueInitialization(){
+    initialization_tests::TestValueInitialization<T>()();
+}
+template<typename T>
+void TestDefaultInitialization(){
+    initialization_tests::TestDefaultInitialization<T>()();
+}
+
+#if __TBB_ATOMIC_CTORS
+template<typename T>
+void TestDirectInitialization(T i){
+    initialization_tests::TestDirectInitialization<T>()(i);
+}
+//TODO:  it would be great to have constructor doing dynamic initialization of local atomic objects implicitly (with zero?),
+//       but do no dynamic initializations by default for static objects
+namespace test_constexpr_initialization_helper {
+    struct white_box_ad_hoc_type {
+        int _int;
+        constexpr white_box_ad_hoc_type(int a =0) : _int(a) {};
+        constexpr operator int() const { return _int;}
+    };
+}
+//some white boxing
+namespace tbb { namespace internal {
+    template<>
+    struct atomic_impl<test_constexpr_initialization_helper::white_box_ad_hoc_type>: atomic_impl<int> {
+        atomic_impl() = default;
+        constexpr atomic_impl(test_constexpr_initialization_helper::white_box_ad_hoc_type value):atomic_impl<int>(value){}
+        constexpr operator int(){ return this->my_storage.my_value;}
+    };
+}}
+
+//TODO: make this a parameterized macro
+void TestConstExprInitializationIsTranslationTime(){
+    const char* ct_init_failed_msg = "translation time init failed?";
+    typedef tbb::atomic<int> atomic_t;
+    constexpr atomic_t a(8);
+    ASSERT(a == 8,ct_init_failed_msg);
+
+    constexpr tbb::atomic<test_constexpr_initialization_helper::white_box_ad_hoc_type> ct_atomic(10);
+    //for some unknown reason clang does not managed to enum syntax
+#if __clang__
+    constexpr int ct_atomic_value_ten = (int)ct_atomic;
+#else
+    enum {ct_atomic_value_ten = (int)ct_atomic};
+#endif
+    __TBB_STATIC_ASSERT(ct_atomic_value_ten == 10, "translation time init failed?");
+    ASSERT(ct_atomic_value_ten == 10,ct_init_failed_msg);
+    int array[ct_atomic_value_ten];
+    ASSERT(Harness::array_length(array) == 10,ct_init_failed_msg);
+}
+
+#include <string>
+#include <vector>
+namespace TestConstExprInitializationOfGlobalObjectsHelper{
+    struct static_objects_dynamic_init_order_tester {
+        static int order_hash;
+        template<int N> struct nth {
+            nth(){ order_hash = (order_hash<<4)+N; }
+        };
+
+        static nth<2> second;
+        static nth<3> third;
+    };
+
+    int static_objects_dynamic_init_order_tester::order_hash=1;
+    static_objects_dynamic_init_order_tester::nth<2> static_objects_dynamic_init_order_tester::second;
+    static_objects_dynamic_init_order_tester::nth<3> static_objects_dynamic_init_order_tester::third;
+
+    void TestStaticsDynamicInitializationOrder(){
+        ASSERT(static_objects_dynamic_init_order_tester::order_hash==0x123,"Statics dynamic initialization order is broken? ");
+    }
+
+    template<typename T>
+    void TestStaticInit();
+
+    namespace auto_registered_tests_helper {
+        template<typename T>
+        struct type_name ;
+
+        #define REGISTER_TYPE_NAME(T)                           \
+        namespace auto_registered_tests_helper{                 \
+            template<>                                          \
+            struct type_name<T> {                               \
+                static const char* name;                        \
+            };                                                  \
+            const char* type_name<T>::name = #T;                \
+        }                                                       \
+
+        typedef void (* p_test_function_type)();
+        static std::vector<p_test_function_type> const_expr_tests;
+
+        template <typename T>
+        struct registration{
+            registration(){const_expr_tests.push_back(&TestStaticInit<T>);}
+        };
+    }
+    //according to ISO C++11 [basic.start.init], static data fields of class template have unordered
+    //initialization unless it is an explicit specialization
+    template<typename T>
+    struct tester;
+
+    #define TESTER_SPECIALIZATION(T,ct_value)                            \
+    template<>                                                           \
+    struct tester<T> {                                                   \
+        struct static_before;                                            \
+        static bool result;                                              \
+        static static_before static_before_;                             \
+        static tbb::atomic<T> static_atomic;                             \
+                                                                         \
+        static auto_registered_tests_helper::registration<T> registered; \
+    };                                                                   \
+    bool tester<T>::result = false;                                      \
+                                                                         \
+    struct tester<T>::static_before {                                    \
+       static_before(){ result = (static_atomic==ct_value); }            \
+    } ;                                                                  \
+                                                                         \
+    typename tester<T>::static_before tester<T>::static_before_;         \
+    tbb::atomic<T> tester<T>::static_atomic(ct_value);                   \
+                                                                         \
+    auto_registered_tests_helper::registration<T> tester<T>::registered; \
+    REGISTER_TYPE_NAME(T)                                                \
+
+    template<typename T>
+    void TestStaticInit(){
+        //TODO: add printing of values to the assertion
+        std::string type_name = auto_registered_tests_helper::type_name<T>::name;
+        ASSERT(tester<T>::result,("Static initialization failed for atomic " + type_name).c_str());
+    }
+
+    void CallExprInitTests(){
+        using namespace auto_registered_tests_helper;
+        for (size_t i =0; i<const_expr_tests.size(); ++i){
+            (*const_expr_tests[i])();
+        }
+        REMARK("ran  %d consrexpr static init test \n",const_expr_tests.size());
+    }
+
+    //TODO: unify somehow list of tested types with one in TestMain
+    //TODO: add specializations for:
+    //T,T(-T(1)
+    //T,1
+#   if __TBB_64BIT_ATOMICS
+        TESTER_SPECIALIZATION(long long,8LL)
+        TESTER_SPECIALIZATION(unsigned long long,8ULL)
+#   endif
+    TESTER_SPECIALIZATION(unsigned long,8UL)
+    TESTER_SPECIALIZATION(long,8L)
+    TESTER_SPECIALIZATION(unsigned int,8U)
+    TESTER_SPECIALIZATION(int,8)
+    TESTER_SPECIALIZATION(unsigned short,8)
+    TESTER_SPECIALIZATION(short,8)
+    TESTER_SPECIALIZATION(unsigned char,8)
+    TESTER_SPECIALIZATION(signed char,8)
+    TESTER_SPECIALIZATION(char,8)
+    TESTER_SPECIALIZATION(wchar_t,8)
+
+    int dummy;
+    TESTER_SPECIALIZATION(void*,&dummy);
+    TESTER_SPECIALIZATION(bool,false);
+    //TODO: add test for constexpt initialization of floating types
+    //for some unknown reasons 0.1 becomes 0.10000001 and equality comparison fails
+    enum written_number_enum{one=2,two};
+    TESTER_SPECIALIZATION(written_number_enum,one);
+    //TODO: add test for ArrayElement<> as in TestMain
+}
+
+void TestConstExprInitializationOfGlobalObjects(){
+    //first assert that assumption the test based on are correct
+    TestConstExprInitializationOfGlobalObjectsHelper::TestStaticsDynamicInitializationOrder();
+    TestConstExprInitializationOfGlobalObjectsHelper::CallExprInitTests();
+}
+#endif //__TBB_ATOMIC_CTORS
 template<typename T>
 void TestOperations( T i, T j, T k ) {
+    TestValueInitialization<T>();
+    TestDefaultInitialization<T>();
+#   if __TBB_ATOMIC_CTORS
+        TestConstExprInitializationIsTranslationTime();
+        TestDirectInitialization<T>(i);
+        TestDirectInitialization<T>(j);
+        TestDirectInitialization<T>(k);
+#   endif
     TestConst(i);
     TestCompareAndSwap(i,j,k);
     TestFetchAndStore(i,k);    // Pass i,k instead of i,j, because callee requires two distinct values.
@@ -299,7 +561,59 @@ struct AlignmentChecker {
     tbb::atomic<T> i;
 };
 
-#include "harness.h"
+//TODO: candidate for test_compiler?
+template<typename T>
+void TestAlignment( const char* name ) {
+    AlignmentChecker<T> ac;
+    tbb::atomic<T> x;
+    x = T(0);
+    bool is_stack_variable_aligned = tbb::internal::is_aligned(&x,sizeof(T));
+    bool is_member_variable_aligned = tbb::internal::is_aligned(&ac.i,sizeof(T));
+    bool is_struct_size_correct = (sizeof(AlignmentChecker<T>)==2*sizeof(tbb::atomic<T>));
+    bool known_issue_condition = __TBB_FORCE_64BIT_ALIGNMENT_BROKEN && ( sizeof(T)==8);
+    //TODO: replace these ifs with KNOWN_ISSUE macro when it available
+    if (!is_stack_variable_aligned){
+        std::string msg = "Compiler failed to properly align local atomic variable?; size:"+to_string(sizeof(T)) + " type: "
+                +to_string(name) + " location:" + to_string(&x) +"\n";
+        if (known_issue_condition) {
+            REPORT(("Known issue: "+ msg).c_str());
+        }else{
+            ASSERT(false,msg.c_str());
+        }
+    }
+    if (!is_member_variable_aligned){
+        std::string msg = "Compiler failed to properly align atomic member variable?; size:"+to_string(sizeof(T)) + " type: "
+                +to_string(name) + " location:" + to_string(&ac.i) +"\n";
+        if (known_issue_condition) {
+            REPORT(("Known issue: "+ msg).c_str());
+        }else{
+            ASSERT(false,msg.c_str());
+        }
+    }
+    if (!is_struct_size_correct){
+        std::string msg = "Compiler failed to properly add padding to structure with atomic member variable?; Structure size:"+to_string(sizeof(AlignmentChecker<T>))
+                + " atomic size:"+to_string(sizeof(tbb::atomic<T>)) + " type: " + to_string(name) +"\n";
+        if (known_issue_condition) {
+            REPORT(("Known issue: "+ msg).c_str());
+        }else{
+            ASSERT(false,msg.c_str());
+        }
+    }
+
+    AlignmentChecker<T> array[5];
+    for( int k=0; k<5; ++k ) {
+        bool is_member_variable_in_array_aligned = tbb::internal::is_aligned(&array[k].i,sizeof(T));
+        if (!is_member_variable_in_array_aligned) {
+            std::string msg = "Compiler failed to properly align atomic member variable inside an array?; size:"+to_string(sizeof(T)) + " type:"+to_string(name)
+                    + " location:" + to_string(&array[k].i) + "\n";
+            if (known_issue_condition){
+                REPORT(("Known issue: "+ msg).c_str());
+            }else{
+                ASSERT(false,msg.c_str());
+            }
+        }
+    }
+}
 
 #if _MSC_VER && !defined(__INTEL_COMPILER)
     // unary minus operator applied to unsigned type, result still unsigned
@@ -310,16 +624,7 @@ struct AlignmentChecker {
 template<typename T>
 void TestAtomicInteger( const char* name ) {
     REMARK("testing atomic<%s> (size=%d)\n",name,sizeof(tbb::atomic<T>));
-#if ( __linux__ && __TBB_x86_32 && __GNUC__==3 && __GNUC_MINOR__==3 ) || defined(__SUNPRO_CC)
-    // gcc 3.3 has known problem for 32-bit Linux, so only warn if there is a problem.
-    // SUNPRO_CC does have this problem as well
-    if( sizeof(T)==8 ) {
-        if( sizeof(AlignmentChecker<T>)!=2*sizeof(tbb::atomic<T>) ) {
-            REPORT("Known issue: alignment for atomic<%s> is wrong with gcc 3.3 and sunCC 5.9 2008/01/28 for IA32\n",name);
-        }
-    } else
-#endif /* ( __linux__ && __TBB_x86_32 && __GNUC__==3 && __GNUC_MINOR__==3 ) || defined(__SUNPRO_CC) */
-    ASSERT( sizeof(AlignmentChecker<T>)==2*sizeof(tbb::atomic<T>), NULL );
+    TestAlignment<T>(name);
     TestOperations<T>(0L,T(-T(1)),T(1));
     for( int k=0; k<int(sizeof(long))*8-1; ++k ) {
         TestOperations<T>(T(1L<<k),T(~(1L<<k)),T(1-(1L<<k)));
@@ -329,13 +634,16 @@ void TestAtomicInteger( const char* name ) {
     TestParallel<T>( name );
 }
 
-template<typename T>
-struct Foo {
-    T x, y, z;
-};
+namespace test_indirection_helpers {
+    template<typename T>
+    struct Foo {
+        T x, y, z;
+    };
+}
 
 template<typename T>
 void TestIndirection() {
+    using test_indirection_helpers::Foo;
     Foo<T> item;
     tbb::atomic<Foo<T>*> pointer;
     pointer = &item;
@@ -343,8 +651,8 @@ void TestIndirection() {
         // Test various syntaxes for indirection to fields with non-zero offset.
         T value1=T(), value2=T();
         for( size_t j=0; j<sizeof(T); ++j ) {
-            *(char*)&value1 = char(k^j);
-            *(char*)&value2 = char(k^j*j);
+            ((char*)&value1)[j] = char(k^j);
+            ((char*)&value2)[j] = char(k^j*j);
         }
         pointer->y = value1;
         (*pointer).z = value2;
@@ -353,6 +661,10 @@ void TestIndirection() {
         ASSERT( memcmp(&value1,&result1,sizeof(T))==0, NULL );
         ASSERT( memcmp(&value2,&result2,sizeof(T))==0, NULL );
     }
+    #if __TBB_ICC_BUILTIN_ATOMICS_POINTER_ALIASING_BROKEN
+        //prevent ICC compiler from assuming 'item' is unused and reusing it's storage
+        item.x = item.y=item.z;
+    #endif
 }
 
 //! Test atomic<T*>
@@ -364,6 +676,7 @@ void TestAtomicPointer() {
     TestFetchAndAdd<T*>(&array[500]);
     TestIndirection<T>();
     TestParallel<T*>( "pointer" );
+
 }
 
 //! Test atomic<Ptr> where Ptr is a pointer to a type of unknown size
@@ -393,16 +706,42 @@ void TestAtomicEnum() {
 template<typename T>
 void TestAtomicFloat( const char* name ) {
     REMARK("testing atomic<%s>\n", name );
+    TestAlignment<T>(name);
     TestOperations<T>(0.5,3.25,10.75);
     TestParallel<T>( name );
 }
 
-#if __TBB_BIG_ENDIAN!=-1
+#define __TBB_TEST_GENERIC_PART_WORD_CAS (__TBB_ENDIANNESS!=__TBB_ENDIAN_UNSUPPORTED)
+#if __TBB_TEST_GENERIC_PART_WORD_CAS
+void TestEndianness() {
+    // Test for pure endianness (assumed by simpler probe in __TBB_MaskedCompareAndSwap()).
+    bool is_big_endian = true, is_little_endian = true;
+    const tbb::internal::uint32_t probe = 0x03020100;
+    ASSERT (tbb::internal::is_aligned(&probe,4), NULL);
+    for( const char *pc_begin = reinterpret_cast<const char*>(&probe)
+         , *pc = pc_begin, *pc_end = pc_begin + sizeof(probe)
+         ; pc != pc_end; ++pc) {
+        if (*pc != pc_end-1-pc) is_big_endian = false;
+        if (*pc != pc-pc_begin) is_little_endian = false;
+    }
+    ASSERT (!is_big_endian || !is_little_endian, NULL);
+    #if __TBB_ENDIANNESS==__TBB_ENDIAN_DETECT
+        ASSERT (is_big_endian || is_little_endian, "__TBB_ENDIANNESS should be set to __TBB_ENDIAN_UNSUPPORTED");
+    #elif __TBB_ENDIANNESS==__TBB_ENDIAN_BIG
+        ASSERT (is_big_endian, "__TBB_ENDIANNESS should NOT be set to __TBB_ENDIAN_BIG");
+    #elif __TBB_ENDIANNESS==__TBB_ENDIAN_LITTLE
+        ASSERT (is_little_endian, "__TBB_ENDIANNESS should NOT be set to __TBB_ENDIAN_LITTLE");
+    #elif __TBB_ENDIANNESS==__TBB_ENDIAN_UNSUPPORTED
+        #error Generic implementation of part-word CAS may not be used: unsupported endianness
+    #else
+        #error Unexpected value of __TBB_ENDIANNESS
+    #endif
+}
+
 namespace masked_cas_helpers {
     const int numMaskedOperations = 100000;
     const int testSpaceSize = 8;
     int prime[testSpaceSize] = {3,5,7,11,13,17,19,23};
-
 
     template<typename T>
     class TestMaskedCAS_Body: NoAssign {
@@ -412,7 +751,7 @@ namespace masked_cas_helpers {
         TestMaskedCAS_Body( T* _space1, T* _space2 ) : test_space_uncontended(_space1), test_space_contended(_space2) {}
         void operator()( int my_idx ) const {
             using tbb::internal::__TBB_MaskedCompareAndSwap;
-            const T my_prime = T(prime[my_idx]);
+            const volatile T my_prime = T(prime[my_idx]); // 'volatile' prevents erroneous optimizations by SunCC
             T* const my_ptr = test_space_uncontended+my_idx;
             T old_value=0;
             for( int i=0; i<numMaskedOperations; ++i, old_value+=my_prime ){
@@ -476,6 +815,7 @@ namespace masked_cas_helpers {
         return slot.result;
     }
 } // namespace masked_cas_helpers
+
 template<typename T>
 void TestMaskedCAS() {
     using namespace masked_cas_helpers;
@@ -498,7 +838,8 @@ void TestMaskedCAS() {
         ASSERT( arr2[i+1]==correctContendedValue, "unexpected value in a contended slot" );
     }
 }
-#endif
+#endif // __TBB_TEST_GENERIC_PART_WORD_CAS
+
 template <typename T>
 class TestRelaxedLoadStorePlainBody {
     static T s_turn,
@@ -583,7 +924,7 @@ namespace bit_operation_test_suite{
         const uintptr_t random_value ;
         const uintptr_t inverted_random_value ;
         fixture():
-            random_value (tbb::internal::size_t_select(0x9E3779B9,0x9E3779B97F4A7C15ULL)),
+            random_value (tbb::internal::select_size_t_constant<0x9E3779B9,0x9E3779B97F4A7C15ULL>::value),
             inverted_random_value ( ~random_value)
         {}
     };
@@ -655,13 +996,18 @@ void TestBitOperations(){
 }
 
 int TestMain () {
-    #if __TBB_64BIT_ATOMICS
-    TestAtomicInteger<unsigned long long>("unsigned long long");
-    TestAtomicInteger<long long>("long long");
-    #else
-    REPORT("64-bit atomics not supported\n");
-    ASSERT(sizeof(long long)==8, "type long long is not 64 bits");
-    #endif
+#   if __TBB_ATOMIC_CTORS
+         TestConstExprInitializationOfGlobalObjects();
+#   endif //__TBB_ATOMIC_CTORS
+#   if __TBB_64BIT_ATOMICS && !__TBB_CAS_8_CODEGEN_BROKEN
+         TestAtomicInteger<unsigned long long>("unsigned long long");
+         TestAtomicInteger<long long>("long long");
+#   elif __TBB_CAS_8_CODEGEN_BROKEN
+         REPORT("Known issue: compiler generates incorrect code for 64-bit atomics on this configuration\n");
+#   else
+         REPORT("64-bit atomics not supported\n");
+         ASSERT(sizeof(long long)==8, "type long long is not 64 bits");
+#   endif
     TestAtomicInteger<unsigned long>("unsigned long");
     TestAtomicInteger<long>("long");
     TestAtomicInteger<unsigned int>("unsigned int");
@@ -687,21 +1033,28 @@ int TestMain () {
     TestAtomicBool();
     TestAtomicEnum();
     TestAtomicFloat<float>("float");
-    #if __TBB_64BIT_ATOMICS
-    TestAtomicFloat<double>("double");
-    #else
-    ASSERT(sizeof(double)==8, "type double is not 64 bits");
-    #endif
+#   if __TBB_64BIT_ATOMICS && !__TBB_CAS_8_CODEGEN_BROKEN
+        TestAtomicFloat<double>("double");
+#   else
+        ASSERT(sizeof(double)==8, "type double is not 64 bits");
+#   endif
     ASSERT( !ParallelError, NULL );
-    #if __TBB_BIG_ENDIAN!=-1
-        TestMaskedCAS<unsigned char>();
+#   if __TBB_TEST_GENERIC_PART_WORD_CAS
+        TestEndianness();
+        ASSERT (sizeof(short)==2, NULL);
         TestMaskedCAS<unsigned short>();
-    #else
-        REPORT("Generic part-word CAS is not available\n");
-    #endif
-#if __TBB_64BIT_ATOMICS
-    TestRegisterPromotionSuppression<tbb::internal::int64_t>();
-#endif
+        TestMaskedCAS<short>();
+        TestMaskedCAS<unsigned char>();
+        TestMaskedCAS<signed char>();
+        TestMaskedCAS<char>();
+#   elif __TBB_USE_GENERIC_PART_WORD_CAS
+#       error Generic part-word CAS is enabled, but not covered by the test
+#   else
+        REPORT("Skipping test for generic part-word CAS\n");
+#   endif
+#   if __TBB_64BIT_ATOMICS && !__TBB_CAS_8_CODEGEN_BROKEN
+        TestRegisterPromotionSuppression<tbb::internal::int64_t>();
+#   endif
     TestRegisterPromotionSuppression<tbb::internal::int32_t>();
     TestRegisterPromotionSuppression<tbb::internal::int16_t>();
     TestRegisterPromotionSuppression<tbb::internal::int8_t>();
@@ -710,14 +1063,38 @@ int TestMain () {
     return Harness::Done;
 }
 
-template<typename T>
-struct FlagAndMessage {
+template<typename T, bool aligned>
+class AlignedAtomic: NoAssign {
+    //tbb::aligned_space can not be used here, because internally it utilize align pragma/attribute,
+    //which has bugs on 8byte alignment on ia32 on some compilers( see according ****_BROKEN macro)
+    // Allocate space big enough to always contain sizeof(T)-byte locations that are aligned and misaligned.
+    char raw_space[2*sizeof(T) -1];
+public:
+    tbb::atomic<T>& construct_atomic(){
+        std::memset(&raw_space[0],0, sizeof(raw_space));
+        uintptr_t delta = aligned ? 0 : sizeof(T)/2;
+        size_t index=sizeof(T)-1;
+        tbb::atomic<T>* y = reinterpret_cast<tbb::atomic<T>*>((reinterpret_cast<uintptr_t>(&raw_space[index+delta])&~index) - delta);
+        // Assertion checks that y really did end up somewhere inside "raw_space".
+        ASSERT( raw_space<=reinterpret_cast<char*>(y), "y starts before raw_space" );
+        ASSERT( reinterpret_cast<char*>(y+1) <= raw_space+sizeof(raw_space), "y starts after raw_space" );
+        ASSERT( !(aligned ^ tbb::internal::is_aligned(y,sizeof(T))), "y is not aligned as it required" );
+        new (y) tbb::atomic<T> ();
+        return *y;
+    }
+};
+
+template<typename T, bool aligned>
+struct FlagAndMessage: AlignedAtomic<T,aligned> {
     //! 0 if message not set yet, 1 if message is set.
-    tbb::atomic<T> flag;
+    tbb::atomic<T>& flag;
     /** Force flag and message to be on distinct cache lines for machines with cache line size <= 4096 bytes */
     char pad[4096/sizeof(T)];
     //! Non-zero if message is ready
     T message;
+    FlagAndMessage(): flag(FlagAndMessage::construct_atomic()) {
+        std::memset(pad,0,sizeof(pad));
+    }
 };
 
 // A special template function used for summation.
@@ -805,21 +1182,23 @@ struct LoadStoreTraits<T, UseGlobalHelperRelaxed> {
     static void store ( tbb::atomic<T>& dst, const T& src ) { tbb::store<tbb::relaxed>(dst, src); }
 };
 
-template<typename T, LoadStoreExpression E>
-class HammerLoadAndStoreFence: NoAssign {
+template<typename T, bool aligned, LoadStoreExpression E>
+struct HammerLoadAndStoreFence: NoAssign {
+    typedef FlagAndMessage<T,aligned> fam_type;
+private:
     typedef LoadStoreTraits<T, E> trait;
-    FlagAndMessage<T>* fam;
+    fam_type* fam;
     const int n;
     const int p;
     const int trial;
     const char* name;
     mutable T accum;
 public:
-    HammerLoadAndStoreFence( FlagAndMessage<T>* fam_, int n_, int p_, const char* name_, int trial_ ) : fam(fam_), n(n_), p(p_), trial(trial_), name(name_) {}
+    HammerLoadAndStoreFence( fam_type* fam_, int n_, int p_, const char* name_, int trial_ ) : fam(fam_), n(n_), p(p_), trial(trial_), name(name_) {}
     void operator()( int k ) const {
         int one = One;
-        FlagAndMessage<T>* s = fam+k;
-        FlagAndMessage<T>* s_next = fam + (k+1)%p;
+        fam_type* s = fam+k;
+        fam_type* s_next = fam + (k+1)%p;
         for( int i=0; i<n; ++i ) {
             // The inner for loop is a spin-wait loop, which is normally considered very bad style.
             // But we must use it here because we are interested in examining subtle hardware effects.
@@ -881,17 +1260,18 @@ public:
 //! Test that atomic<T> has acquire semantics for loads and release semantics for stores.
 /** Test performs round-robin passing of message among p processors,
     where p goes from MinThread to MaxThread. */
-template<typename T, LoadStoreExpression E>
+template<typename T, bool aligned, LoadStoreExpression E>
 void TestLoadAndStoreFences( const char* name ) {
+    typedef HammerLoadAndStoreFence<T, aligned, E> hammer_load_store_type;
+    typedef typename hammer_load_store_type::fam_type fam_type;
     for( int p=MinThread<2 ? 2 : MinThread; p<=MaxThread; ++p ) {
-        FlagAndMessage<T>* fam = new FlagAndMessage<T>[p];
+        fam_type * fam = new fam_type[p];
         // Each of four trials exercise slightly different expression pattern within the test.
         // See occurrences of COMPLICATED_ZERO for details.
         for( int trial=0; trial<4; ++trial ) {
-            memset( fam, 0, p*sizeof(FlagAndMessage<T>) );
             fam->message = (T)-1;
             fam->flag = (T)-1;
-            NativeParallelFor( p, HammerLoadAndStoreFence<T, E>( fam, 100, p, name, trial ) );
+            NativeParallelFor( p, hammer_load_store_type( fam, 100, p, name, trial ) );
             if ( !IsRelaxed(E) ) {
                 for( int k=0; k<p; ++k ) {
                     ASSERT( fam[k].message==(k==0 ? (T)-1 : 0), "incomplete round-robin?" );
@@ -996,13 +1376,13 @@ class SparseValueSet<float>: public SparseFloatSet<float> {};
 template<>
 class SparseValueSet<double>: public SparseFloatSet<double> {};
 
-template<typename T>
-class HammerAssignment: NoAssign {
+template<typename T, bool aligned>
+class HammerAssignment: AlignedAtomic<T,aligned> {
     tbb::atomic<T>& x;
     const char* name;
     SparseValueSet<T> set;
 public:
-    HammerAssignment( tbb::atomic<T>& x_, const char* name_ ) : x(x_), name(name_) {}
+    HammerAssignment(const char* name_ ) : x(HammerAssignment::construct_atomic()), name(name_) {}
     void operator()( int k ) const {
         const int n = 1000000;
         if( k ) {
@@ -1037,34 +1417,10 @@ template<typename T> void TestAssignmentSignature( T& (T::*)(const T&) ) {}
     #pragma warning( disable: 4355 4800 )
 #endif
 
-template<typename T>
+template<typename T, bool aligned>
 void TestAssignment( const char* name ) {
     TestAssignmentSignature( &tbb::atomic<T>::operator= );
-    tbb::atomic<T> x;
-    x = T(0);
-    NativeParallelFor( 2, HammerAssignment<T>( x, name ) );
-#if __TBB_x86_32 && (__linux__ || __FreeBSD__ || _WIN32)
-    if( sizeof(T)==8 ) {
-        // Some compilers for IA-32 fail to provide 8-byte alignment of objects on the stack,
-        // even if the object specifies 8-byte alignment.  On such platforms, the IA-32 implementation
-        // of atomic<long long> and atomic<unsigned long long> use different tactics depending upon
-        // whether the object is properly aligned or not.  The following abusive test ensures that we
-        // cover both the proper and improper alignment cases, one with the x above and the other with
-        // the y below, perhaps not respectively.
-
-        // Allocate space big enough to always contain 8-byte locations that are aligned and misaligned.
-        char raw_space[15];
-        // Set delta to 0 if x is aligned, 4 otherwise.
-        uintptr_t delta = ((reinterpret_cast<uintptr_t>(&x)&7) ? 0 : 4);
-        // y crosses 8-byte boundary if and only if x does not cross.
-        tbb::atomic<T>& y = *reinterpret_cast<tbb::atomic<T>*>((reinterpret_cast<uintptr_t>(&raw_space[7+delta])&~7u) - delta);
-        // Assertion checks that y really did end up somewhere inside "raw_space".
-        ASSERT( raw_space<=reinterpret_cast<char*>(&y), "y starts before raw_space" );
-        ASSERT( reinterpret_cast<char*>(&y+1) <= raw_space+sizeof(raw_space), "y starts after raw_space" );
-        y = T(0);
-        NativeParallelFor( 2, HammerAssignment<T>( y, name ) );
-    }
-#endif /* __TBB_x86_32 && (__linux__ || __FreeBSD__ || _WIN32) */
+    NativeParallelFor( 2, HammerAssignment<T,aligned>(name ) );
 }
 
 static const unsigned Primes[] = {
@@ -1092,16 +1448,17 @@ public:
     }
 };
 
-template <typename T, LoadStoreExpression E>
-class ArbitrationBody : NoAssign, Harness::NoAfterlife {
+template <typename T, bool aligned, LoadStoreExpression E>
+class DekkerArbitrationBody : NoAssign, Harness::NoAfterlife {
     typedef LoadStoreTraits<T, E> trait;
 
     mutable FastRandom my_rand;
     static const unsigned short c_rand_ceil = 10;
-
-    static tbb::atomic<T> s_ready[2];
-    static tbb::atomic<T> s_turn;
-    static volatile bool s_inside;
+    mutable AlignedAtomic<T,aligned> s_ready_storage[2];
+    mutable AlignedAtomic<T,aligned> s_turn_storage;
+    mutable tbb::atomic<T>* s_ready[2];
+    tbb::atomic<T>& s_turn;
+    mutable volatile bool s_inside;
 
 public:
     void operator() ( int id ) const {
@@ -1110,11 +1467,11 @@ public:
                 cleared = T(0),
                 signaled = T(1);
         for ( int i = 0; i < 100000; ++i ) {
-            trait::store( s_ready[me], signaled );
+            trait::store( *s_ready[me], signaled );
             trait::store( s_turn, other );
             T r, t;
             for ( int j = 0; ; ++j ) {
-                trait::load(r, s_ready[(uintptr_t)other]);
+                trait::load(r, *s_ready[(uintptr_t)other]);
                 trait::load(t, s_turn);
                 if ( r != signaled || t != other )
                     break;
@@ -1133,38 +1490,60 @@ public:
             s_inside = false;
             ASSERT( !s_inside, "Peterson lock is broken - some fences are missing" );
             // leaving critical section
-            trait::store( s_ready[me], cleared );
+            trait::store( *s_ready[me], cleared );
             spin = my_rand.get() % c_rand_ceil;
             for ( volatile int j = 0; j < spin; ++j )
                 continue;
         }
     }
 
-    ArbitrationBody () : my_rand((unsigned)(uintptr_t)this) {}
+    DekkerArbitrationBody ()
+        : my_rand((unsigned)(uintptr_t)this)
+        , s_turn(s_turn_storage.construct_atomic())
+        , s_inside (false)
+    {
+        //atomics pointed to by s_ready and s_turn will be zeroed by the
+        //according construct_atomic() calls
+         s_ready[0] = &s_ready_storage[0].construct_atomic();
+         s_ready[1] = &s_ready_storage[1].construct_atomic();
+    }
 };
 
-template<typename T, LoadStoreExpression E> tbb::atomic<T> ArbitrationBody<T, E>::s_ready[2];
-template<typename T, LoadStoreExpression E> tbb::atomic<T> ArbitrationBody<T, E>::s_turn;
-template<typename T, LoadStoreExpression E> volatile bool ArbitrationBody<T, E>::s_inside = false;
-
-template <typename T, LoadStoreExpression E>
+template <typename T, bool aligned, LoadStoreExpression E>
 void TestDekkerArbitration () {
-    NativeParallelFor( 2, ArbitrationBody<T, E>() );
+    NativeParallelFor( 2, DekkerArbitrationBody<T,aligned, E>() );
 }
 
 template<typename T>
 void TestParallel( const char* name ) {
-    TestLoadAndStoreFences<T, UseOperators>(name);
-    TestLoadAndStoreFences<T, UseImplicitAcqRel>(name);
-    TestLoadAndStoreFences<T, UseExplicitFullyFenced>(name);
-    TestLoadAndStoreFences<T, UseExplicitAcqRel>(name);
-    TestLoadAndStoreFences<T, UseExplicitRelaxed>(name);
-    TestLoadAndStoreFences<T, UseGlobalHelperFullyFenced>(name);
-    TestLoadAndStoreFences<T, UseGlobalHelperAcqRel>(name);
-    TestLoadAndStoreFences<T, UseGlobalHelperRelaxed>(name);
-    TestAssignment<T>(name);
-    TestDekkerArbitration<T, UseExplicitFullyFenced>();
-    TestDekkerArbitration<T, UseGlobalHelperFullyFenced>();
+    //TODO: looks like there are no tests for operations other than load/store ?
+#if __TBB_FORCE_64BIT_ALIGNMENT_BROKEN
+    if (sizeof(T)==8){
+        TestLoadAndStoreFences<T, false, UseOperators>(name);
+        TestLoadAndStoreFences<T, false, UseImplicitAcqRel>(name);
+        TestLoadAndStoreFences<T, false, UseExplicitFullyFenced>(name);
+        TestLoadAndStoreFences<T, false, UseExplicitAcqRel>(name);
+        TestLoadAndStoreFences<T, false, UseExplicitRelaxed>(name);
+        TestLoadAndStoreFences<T, false, UseGlobalHelperFullyFenced>(name);
+        TestLoadAndStoreFences<T, false, UseGlobalHelperAcqRel>(name);
+        TestLoadAndStoreFences<T, false, UseGlobalHelperRelaxed>(name);
+        TestAssignment<T,false>(name);
+        TestDekkerArbitration<T, false, UseExplicitFullyFenced>();
+        TestDekkerArbitration<T, false, UseGlobalHelperFullyFenced>();
+    }
+#endif
+
+    TestLoadAndStoreFences<T, true, UseOperators>(name);
+    TestLoadAndStoreFences<T, true, UseImplicitAcqRel>(name);
+    TestLoadAndStoreFences<T, true, UseExplicitFullyFenced>(name);
+    TestLoadAndStoreFences<T, true, UseExplicitAcqRel>(name);
+    TestLoadAndStoreFences<T, true, UseExplicitRelaxed>(name);
+    TestLoadAndStoreFences<T, true, UseGlobalHelperFullyFenced>(name);
+    TestLoadAndStoreFences<T, true, UseGlobalHelperAcqRel>(name);
+    TestLoadAndStoreFences<T, true, UseGlobalHelperRelaxed>(name);
+    TestAssignment<T,true>(name);
+    TestDekkerArbitration<T, true, UseExplicitFullyFenced>();
+    TestDekkerArbitration<T, true, UseGlobalHelperFullyFenced>();
 }
 
 #endif // __TBB_TEST_SKIP_PIC_MODE || __TBB_TEST_SKIP_BUILTINS_MODE

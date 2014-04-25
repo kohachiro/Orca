@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,12 +27,44 @@
 */
 
 #include "tbb/atomic.h"
+#include "tbb/tick_count.h"
 
 #ifndef harness_barrier_H
 #define harness_barrier_H
 
 namespace Harness {
 
+//! Spin WHILE the value of the variable is equal to a given value
+/** T and U should be comparable types. */
+class TimedWaitWhileEq {
+    //! Assignment not allowed
+    void operator=( const TimedWaitWhileEq& );
+    double &my_limit;
+public:
+    TimedWaitWhileEq(double &n_seconds) : my_limit(n_seconds) {}
+    TimedWaitWhileEq(const TimedWaitWhileEq &src) : my_limit(src.my_limit) {}
+    template<typename T, typename U>
+    void operator()( const volatile T& location, U value ) const {
+        tbb::tick_count start = tbb::tick_count::now();
+        double time_passed;
+        do {
+            time_passed = (tbb::tick_count::now()-start).seconds();
+            if( time_passed < 0.0001 ) __TBB_Pause(10); else __TBB_Yield();
+        } while( time_passed < my_limit && location == value);
+        my_limit -= time_passed;
+    }
+};
+//! Spin WHILE the value of the variable is equal to a given value
+/** T and U should be comparable types. */
+class WaitWhileEq {
+    //! Assignment not allowed
+    void operator=( const WaitWhileEq& );
+public:
+    template<typename T, typename U>
+    void operator()( const volatile T& location, U value ) const {
+        tbb::internal::spin_wait_while_eq(location, value);
+    }
+};
 class SpinBarrier
 {
     unsigned numThreads;
@@ -41,6 +73,8 @@ class SpinBarrier
 
     struct DummyCallback {
         void operator() () const {}
+        template<typename T, typename U>
+        void operator()( const T&, U) const {}
     };
 
     SpinBarrier( const SpinBarrier& );    // no copy ctor
@@ -55,15 +89,15 @@ public:
     };
 
     // onOpenBarrierCallback is called by last thread arrived on a barrier
-    template<typename Callback>
-    bool wait(const Callback &onOpenBarrierCallback)
+    template<typename WaitEq, typename Callback>
+    bool custom_wait(const WaitEq &onWaitCallback, const Callback &onOpenBarrierCallback)
     { // return true if last thread
         unsigned myEpoch = epoch;
         int threadsLeft = numThreads - numThreadsFinished.fetch_and_increment() - 1;
         ASSERT(threadsLeft>=0, "Broken barrier");
         if (threadsLeft > 0) {
             /* not the last threading reaching barrier, wait until epoch changes & return 0 */
-            tbb::internal::spin_wait_while_eq(epoch, myEpoch);
+            onWaitCallback(epoch, myEpoch);
             return false;
         }
         /* No more threads left to enter, so I'm the last one reaching this epoch;
@@ -73,9 +107,22 @@ public:
         epoch = myEpoch+1; /* wakes up threads waiting to exit this epoch */
         return true;
     }
-    bool wait()
-    {
+    bool timed_wait(double n_seconds, const char *msg="Time is out while waiting on a barrier") {
+        bool is_last = custom_wait(TimedWaitWhileEq(n_seconds), DummyCallback());
+        ASSERT( n_seconds >= 0, msg); // TODO: refactor to avoid passing msg here and rising assertion
+        return is_last;
+    }
+    //! onOpenBarrierCallback is called by last thread arrived on a barrier
+    template<typename Callback>
+    bool wait(const Callback &onOpenBarrierCallback) {
+        return custom_wait(WaitWhileEq(), onOpenBarrierCallback);
+    }
+    bool wait(){
         return wait(DummyCallback());
+    }
+    //! signal to the barrier, rather a semaphore functionality
+    bool signal_nowait() {
+        return custom_wait(DummyCallback(),DummyCallback());
     }
 };
 

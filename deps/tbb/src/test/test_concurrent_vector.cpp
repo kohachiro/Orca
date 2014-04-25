@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -639,6 +639,42 @@ void TestConcurrentGrowBy( int nthread ) {
     ASSERT( items_allocated == items_freed, NULL);
     ASSERT( allocations == frees, NULL);
 }
+//TODO: move this to more appropriate place, smth like test_harness.cpp
+void TestArrayLength(){
+    int five_elementh_array[5] = {0};
+    ASSERT(Harness::array_length(five_elementh_array)==5,"array_length failed to determine length of non empty non dynamic array");
+}
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+#include "test_initializer_list.h"
+
+void TestInitList(){
+    REMARK("testing initializer_list methods \n");
+    using namespace initializer_list_support_tests;
+    TestInitListSupport<tbb::concurrent_vector<char> >({1,2,3,4,5});
+    TestInitListSupport<tbb::concurrent_vector<int> >({});
+}
+#endif //if __TBB_INITIALIZER_LISTS_PRESENT
+
+#if __TBB_RANGE_BASED_FOR_PRESENT
+#include "test_range_based_for.h"
+#include <functional>
+
+void TestRangeBasedFor(){
+    using namespace range_based_for_support_tests;
+
+    REMARK("testing range based for loop compatibility \n");
+    typedef tbb::concurrent_vector<int> c_vector;
+    c_vector a_c_vector;
+
+    const int sequence_length = 100;
+    for (int i =1; i<= sequence_length; ++i){
+        a_c_vector.push_back(i);
+    }
+
+    ASSERT( range_based_for_accumulate(a_c_vector, std::plus<int>(), 0) == gauss_summ_of_int_sequence(sequence_length), "incorrect accumulated value generated via range based for ?");
+}
+#endif //if __TBB_RANGE_BASED_FOR_PRESENT
 
 //! Test the assignment operator and swap
 void TestAssign() {
@@ -960,11 +996,11 @@ void TestExceptions() {
 #endif /* TBB_USE_EXCEPTIONS */
 
 //------------------------------------------------------------------------
-// Test SSE / AVX
+// Test support for SIMD instructions
 //------------------------------------------------------------------------
 #include "harness_m128.h"
 
-#if HAVE_m128 | HAVE_m256
+#if HAVE_m128 || HAVE_m256
 
 template<typename ClassWithVectorType>
 void TestVectorTypes() {
@@ -990,6 +1026,10 @@ int TestMain () {
 #if !TBB_DEPRECATED
     TestIteratorTraits<tbb::concurrent_vector<Foo>::iterator,Foo>();
     TestIteratorTraits<tbb::concurrent_vector<Foo>::const_iterator,const Foo>();
+    TestArrayLength();
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    TestInitList();
+#endif
     TestSequentialFor<FooWithAssign> ();
     TestResizeAndCopy();
     TestAssign();
@@ -1013,6 +1053,9 @@ int TestMain () {
     TestComparison();
     TestFindPrimes();
     TestSort();
+#if __TBB_RANGE_BASED_FOR_PRESENT
+    TestRangeBasedFor();
+#endif //if __TBB_RANGE_BASED_FOR_PRESENT
 #if __TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN
     REPORT("Known issue: exception safety test is skipped.\n");
 #elif TBB_USE_EXCEPTIONS

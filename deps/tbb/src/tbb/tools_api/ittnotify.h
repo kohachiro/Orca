@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -37,7 +37,8 @@
 The ITT API is used to annotate a user's program with additional information
 that can be used by correctness and performance tools. The user inserts
 calls in their program. Those calls generate information that is collected
-at runtime, and used by tools such as Amplifier and Inspector.
+at runtime, and used by tools such as Intel(R) Parallel Amplifier and
+Intel(R) Parallel Inspector.
 
 @section API Concepts
 The following general concepts are used throughout the API.

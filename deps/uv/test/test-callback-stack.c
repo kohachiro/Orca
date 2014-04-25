@@ -45,12 +45,10 @@ static int bytes_received = 0;
 static int shutdown_cb_called = 0;
 
 
-static uv_buf_t alloc_cb(uv_handle_t* handle, size_t size) {
-  uv_buf_t buf;
-  buf.len = size;
-  buf.base = (char*) malloc(size);
-  ASSERT(buf.base);
-  return buf;
+static void alloc_cb(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
+  buf->len = size;
+  buf->base = malloc(size);
+  ASSERT(buf->base != NULL);
 }
 
 
@@ -69,18 +67,17 @@ static void shutdown_cb(uv_shutdown_t* req, int status) {
 }
 
 
-static void read_cb(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
+static void read_cb(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf) {
   ASSERT(nested == 0 && "read_cb must be called from a fresh stack");
 
   printf("Read. nread == %d\n", (int)nread);
-  free(buf.base);
+  free(buf->base);
 
   if (nread == 0) {
-    ASSERT(uv_last_error(uv_default_loop()).code == UV_EAGAIN);
     return;
 
-  } else if (nread == -1) {
-    ASSERT(uv_last_error(uv_default_loop()).code == UV_EOF);
+  } else if (nread < 0) {
+    ASSERT(nread == UV_EOF);
 
     nested++;
     uv_close((uv_handle_t*)tcp, close_cb);
@@ -108,9 +105,8 @@ static void read_cb(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
 }
 
 
-static void timer_cb(uv_timer_t* handle, int status) {
+static void timer_cb(uv_timer_t* handle) {
   ASSERT(handle == &timer);
-  ASSERT(status == 0);
   ASSERT(nested == 0 && "timer_cb must be called from a fresh stack");
 
   puts("Timeout complete. Now read data...");
@@ -174,7 +170,9 @@ static void connect_cb(uv_connect_t* req, int status) {
 
 
 TEST_IMPL(callback_stack) {
-  struct sockaddr_in addr = uv_ip4_addr("127.0.0.1", TEST_PORT);
+  struct sockaddr_in addr;
+
+  ASSERT(0 == uv_ip4_addr("127.0.0.1", TEST_PORT, &addr));
 
   if (uv_tcp_init(uv_default_loop(), &client)) {
     FATAL("uv_tcp_init failed");
@@ -184,12 +182,15 @@ TEST_IMPL(callback_stack) {
 
   nested++;
 
-  if (uv_tcp_connect(&connect_req, &client, addr, connect_cb)) {
+  if (uv_tcp_connect(&connect_req,
+                     &client,
+                     (const struct sockaddr*) &addr,
+                     connect_cb)) {
     FATAL("uv_tcp_connect failed");
   }
   nested--;
 
-  uv_run(uv_default_loop());
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 
   ASSERT(nested == 0);
   ASSERT(connect_cb_called == 1 && "connect_cb must be called exactly once");
@@ -199,5 +200,6 @@ TEST_IMPL(callback_stack) {
   ASSERT(shutdown_cb_called == 1 && "shutdown_cb must be called exactly once");
   ASSERT(close_cb_called == 2 && "close_cb must be called exactly twice");
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

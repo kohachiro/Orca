@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -84,12 +84,12 @@ tbb::atomic<int> EnqueuedTask::nOrderedPairs;
 
 const int nTracks = 10;
 static int TaskTracks[nTracks];
-const int stall_threshold = 100000;
+const int stall_threshold = 1000000; // 1 sec
 
 void TimedYield( double pause_time ) {
     tbb::tick_count start = tbb::tick_count::now();
     while( (tbb::tick_count::now()-start).seconds() < pause_time )
-        __TBB_Yield();
+        tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(pause_time));
 }
 
 class ProgressMonitor {
@@ -119,8 +119,8 @@ public:
                 stall_count=0;
             else {
                 ++stall_count;
-                // no progress for at least 0.1 s; consider it dead.
-                ASSERT(stall_count < stall_threshold, "no progress on enqueued tasks; deadlock, or the machine is oversubsribed?");
+                // no progress; consider it dead.
+                ASSERT(stall_count < stall_threshold, "no progress on enqueued tasks; deadlock, or the machine is heavily oversubscribed?");
             }
             if( progress_mask==all_progressed || progress_mask^last_progress_mask ) {
                 uneven_progress_count = 0;
@@ -128,7 +128,8 @@ public:
             }
             else if ( overall_progress > 2 ) {
                 ++uneven_progress_count;
-                ASSERT(uneven_progress_count < 5, "some enqueued tasks seem stalling; no simultaneous progress?");
+                // The threshold of 16 is twice bigger than what was observed on a 8-core machine with oversubscription.
+                ASSERT(uneven_progress_count < 16, "some enqueued tasks seem stalling; no simultaneous progress, or the machine is oversubscribed?");
             }
         } while( !completed );
     }
@@ -318,7 +319,46 @@ void TestDequeueByMaster () {
     tbb::task::destroy(r);
 }
 
+////////////////////// Missed wake-ups ///////
+#include "tbb/blocked_range.h"
+#include "tbb/parallel_for.h"
+
+static const int NUM_TASKS    = 4;
+static const size_t NUM_REPEATS = TBB_USE_DEBUG ? 50000 : 100000;
+
+struct Functor : NoAssign
+{
+    Harness::SpinBarrier &my_barrier;
+    Functor(Harness::SpinBarrier &a_barrier) : my_barrier(a_barrier) { }
+    void operator()(const tbb::blocked_range<int>& r) const 
+    {
+        ASSERT(r.size() == 1, NULL);
+        tbb::task *t = new(tbb::task::allocate_root()) tbb::empty_task();
+        tbb::task::enqueue(*t); // ensure no missing wake-ups
+        my_barrier.timed_wait(10, "Attention: poorly reproducible event, if seen stress testing required" );
+    }
+};
+
+void TestWakeups()
+{
+    tbb::task_scheduler_init my(tbb::task_scheduler_init::deferred);
+    if( tbb::task_scheduler_init::default_num_threads() <= NUM_TASKS )
+        my.initialize(NUM_TASKS*2);
+    Harness::SpinBarrier barrier(NUM_TASKS);
+    REMARK("Missing wake-up: affinity_partitioner\n");
+    tbb::affinity_partitioner aff;
+    for (size_t i = 0; i < NUM_REPEATS; ++i)
+        tbb::parallel_for(tbb::blocked_range<int>(0, NUM_TASKS), Functor(barrier), aff);
+    REMARK("Missing wake-up: simple_partitioner\n");
+    for (size_t i = 0; i < NUM_REPEATS; ++i)
+        tbb::parallel_for(tbb::blocked_range<int>(0, NUM_TASKS), Functor(barrier), tbb::simple_partitioner());
+    REMARK("Missing wake-up: auto_partitioner\n");
+    for (size_t i = 0; i < NUM_REPEATS; ++i)
+        tbb::parallel_for(tbb::blocked_range<int>(0, NUM_TASKS), Functor(barrier)); // auto
+}
+
 int TestMain () {
+    TestWakeups();
     TestDequeueByMaster();
     TestCascadedEnqueue();
     for( int p=MinThread; p<=MaxThread; ++p ) {

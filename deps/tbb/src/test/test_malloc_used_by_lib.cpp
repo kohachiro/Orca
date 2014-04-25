@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -29,6 +29,7 @@
 #if _USRDLL
 
 #include <stdlib.h>
+#include "harness_defs.h"
 #include "tbb/scalable_allocator.h"
 #if __TBB_SOURCE_DIRECTLY_INCLUDED
 #include "../tbbmalloc/tbbmalloc_internal_api.h"
@@ -78,6 +79,13 @@ static RegisterProcessShutdownNotification reg;
 #define __TBB_NO_IMPLICIT_LINKAGE 1
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
 #include "harness.h"
+#if __TBB_WIN8UI_SUPPORT	
+// FIXME: fix the test to support New Windows *8 Store Apps mode.
+int TestMain() {
+    return Harness::Skipped;
+}
+#else /* __TBB_WIN8UI_SUPPORT	 */
+
 #include "harness_memory.h"
 #include "harness_tbb_independence.h"
 #include "harness_barrier.h"
@@ -95,8 +103,8 @@ public:
 void LoadThreadsUnload()
 {
     Harness::LIBRARY_HANDLE lib =
-        Harness::OpenLibrary(TEST_LIBRARY_NAME("test_malloc_used_by_lib"));
-    ASSERT(lib, "Can't load " TEST_LIBRARY_NAME("test_malloc_used_by_lib"));
+        Harness::OpenLibrary(TEST_LIBRARY_NAME("test_malloc_used_by_lib_dll"));
+    ASSERT(lib, "Can't load " TEST_LIBRARY_NAME("test_malloc_used_by_lib_dll"));
     NativeParallelFor( 4, UseDll( Harness::GetAddress(lib, "callDll") ) );
     Harness::CloseLibrary(lib);
 }
@@ -117,8 +125,8 @@ struct RunWithLoad : NoAssign {
     void operator()(int id) const {
         if (!id) {
             Harness::LIBRARY_HANDLE lib =
-                Harness::OpenLibrary(TEST_LIBRARY_NAME("test_malloc_used_by_lib"));
-            ASSERT(lib, "Can't load "TEST_LIBRARY_NAME("test_malloc_used_by_lib"));
+                Harness::OpenLibrary(TEST_LIBRARY_NAME("test_malloc_used_by_lib_dll"));
+            ASSERT(lib, "Can't load " TEST_LIBRARY_NAME("test_malloc_used_by_lib_dll"));
             runPtr = Harness::GetAddress(lib, "callDll");
             unloadCallback.lib = lib;
         }
@@ -171,3 +179,4 @@ int TestMain () {
 }
 
 #endif // _USRDLL
+#endif /* __TBB_WIN8UI_SUPPORT	 */

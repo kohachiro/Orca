@@ -1,6 +1,6 @@
 @echo off
 REM
-REM Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+REM Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 REM
 REM This file is part of Threading Building Blocks.
 REM
@@ -69,6 +69,9 @@ echo setenv %_LIB% "%bin_dir%;$%_LIB%">>tbbvars.csh
 echo setenv PATH "%bin_dir%;$PATH">>tbbvars.csh
 if not x%UNIXMODE%==x echo setenv LD_LIBRARY_PATH "%bin_dir%;$LD_LIBRARY_PATH">>tbbvars.csh
 :skipcsh
+
+REM Workaround for copying Android* specific libgnustl_shared.so library to work folder
+if not x%LIB_GNU_STL_ANDROID%==x copy /Y "%LIB_GNU_STL_ANDROID%"\libgnustl_shared.so
 
 endlocal
 exit

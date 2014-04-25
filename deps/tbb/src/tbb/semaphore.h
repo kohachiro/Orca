@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -62,12 +62,14 @@ public:
     //! dtor
     ~semaphore() {CloseHandle( sem );}
     //! wait/acquire
-    void P() {WaitForSingleObject( sem, INFINITE );}
+    void P() {WaitForSingleObjectEx( sem, INFINITE, FALSE );}
     //! post/release 
     void V() {ReleaseSemaphore( sem, 1, NULL );}
 private:
     HANDLE sem;
-    void init_semaphore(size_t start_cnt_) {sem = CreateSemaphore( NULL, LONG(start_cnt_), max_semaphore_cnt, NULL );}
+    void init_semaphore(size_t start_cnt_) {
+        sem = CreateSemaphoreEx( NULL, LONG(start_cnt_), max_semaphore_cnt, NULL, 0, SEMAPHORE_ALL_ACCESS );
+    }
 };
 #elif __APPLE__
 //! Edsger Dijkstra's counting semaphore
@@ -129,22 +131,22 @@ private:
 
 //! for performance reasons, we want specialied binary_semaphore
 #if _WIN32||_WIN64
-#if !defined(RTL_SRWLOCK_INIT)
+#if !__TBB_USE_SRWLOCK
 //! binary_semaphore for concurrent_monitor
 class binary_semaphore : no_copy {
 public:
     //! ctor
-    binary_semaphore() { my_sem = CreateEvent( NULL, FALSE/*manual reset*/, FALSE/*not signalled initially*/, NULL);  }
+    binary_semaphore() { my_sem = CreateEventEx( NULL, NULL, 0, EVENT_ALL_ACCESS );  }
     //! dtor
     ~binary_semaphore() { CloseHandle( my_sem ); }
     //! wait/acquire
-    void P() {WaitForSingleObject( my_sem, INFINITE ); }
+    void P() { WaitForSingleObjectEx( my_sem, INFINITE, FALSE ); }
     //! post/release 
-    void V() {SetEvent( my_sem );}
+    void V() { SetEvent( my_sem ); }
 private:
     HANDLE my_sem;
 };
-#else /* defined(RTL_SRWLOCK_INIT) */
+#else /* __TBB_USE_SRWLOCK */
 
 union srwl_or_handle {
     SRWLOCK lock;
@@ -165,7 +167,7 @@ public:
 private:
     srwl_or_handle my_sem;
 };
-#endif /* !defined(RTL_SRWLOCK_INIT) */
+#endif /* !__TBB_USE_SRWLOCK */
 #elif __APPLE__
 //! binary_semaphore for concurrent monitor
 class binary_semaphore : no_copy {

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -38,6 +38,16 @@ namespace rml {
 #define SERVER omp_server 
 #define CLIENT omp_client
 #define FACTORY omp_factory
+
+#if __TBB_WEAK_SYMBOLS_PRESENT
+    #pragma weak __KMP_make_rml_server
+    #pragma weak __KMP_call_with_my_server_info
+    extern "C" {
+        omp_factory::status_type __KMP_make_rml_server( omp_factory& f, omp_server*& server, omp_client& client );
+        void __KMP_call_with_my_server_info( ::rml::server_info_callback_t cb, void* arg );
+    }
+#endif /* __TBB_WEAK_SYMBOLS_PRESENT */
+
 #include "rml_factory.h"
 
 } // rml

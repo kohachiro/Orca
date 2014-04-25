@@ -30,6 +30,9 @@
 # include <unistd.h>
 #endif
 
+#include <string.h>
+#include <errno.h>
+
 
 TEST_IMPL(tty) {
   int r, width, height;
@@ -62,7 +65,16 @@ TEST_IMPL(tty) {
 
 #else /* unix */
   ttyin_fd = open("/dev/tty", O_RDONLY, 0);
+  if (ttyin_fd < 0) {
+    LOGF("Cannot open /dev/tty as read-only: %s\n", strerror(errno));
+    return TEST_SKIP;
+  }
+
   ttyout_fd = open("/dev/tty", O_WRONLY, 0);
+  if (ttyout_fd < 0) {
+    LOGF("Cannot open /dev/tty as write-only: %s\n", strerror(errno));
+    return TEST_SKIP;
+  }
 #endif
 
   ASSERT(ttyin_fd >= 0);
@@ -73,10 +85,10 @@ TEST_IMPL(tty) {
   ASSERT(UV_TTY == uv_guess_handle(ttyin_fd));
   ASSERT(UV_TTY == uv_guess_handle(ttyout_fd));
 
-  r = uv_tty_init(uv_default_loop(), &tty_in, ttyin_fd, 1);
+  r = uv_tty_init(uv_default_loop(), &tty_in, ttyin_fd, 1);  /* Readable. */
   ASSERT(r == 0);
 
-  r = uv_tty_init(uv_default_loop(), &tty_out, ttyout_fd, 2);
+  r = uv_tty_init(uv_default_loop(), &tty_out, ttyout_fd, 0);  /* Writable. */
   ASSERT(r == 0);
 
   r = uv_tty_get_winsize(&tty_out, &width, &height);
@@ -104,7 +116,8 @@ TEST_IMPL(tty) {
   uv_close((uv_handle_t*) &tty_in, NULL);
   uv_close((uv_handle_t*) &tty_out, NULL);
 
-  uv_run(loop);
+  uv_run(loop, UV_RUN_DEFAULT);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

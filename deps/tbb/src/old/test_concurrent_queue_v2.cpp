@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -36,11 +36,12 @@
 static tbb::atomic<long> FooConstructed;
 static tbb::atomic<long> FooDestroyed;
 
+enum state_t{
+    LIVE=0x1234,
+    DEAD=0xDEAD
+};
+
 class Foo {
-    enum state_t{
-        LIVE=0x1234,
-        DEAD=0xDEAD
-    };
     state_t state;
 public:
     int thread_id;
@@ -58,8 +59,8 @@ public:
         ASSERT( state==LIVE, NULL );
         ++FooDestroyed;
         state=DEAD;
-        thread_id=0xDEAD;
-        serial=0xDEAD;
+        thread_id=DEAD;
+        serial=DEAD;
     }
     void operator=( Foo& item ) {
         ASSERT( item.state==LIVE, NULL );
@@ -96,8 +97,8 @@ struct Body: NoAssign {
         long sum = 0;
         for( long j=0; j<M; ++j ) {
             Foo f;
-            f.thread_id = 0xDEAD;
-            f.serial = 0xDEAD;
+            f.thread_id = DEAD;
+            f.serial = DEAD;
             bool prepopped = false;
             if( j&1 ) {
                 prepopped = queue->pop_if_present(f);

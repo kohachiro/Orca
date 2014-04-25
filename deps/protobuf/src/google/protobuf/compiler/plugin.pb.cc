@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/once.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/wire_format_lite_inl.h>
@@ -138,7 +139,9 @@ void protobuf_AddDesc_google_2fprotobuf_2fcompiler_2fplugin_2eproto() {
     "atorResponse\022\r\n\005error\030\001 \001(\t\022B\n\004file\030\017 \003("
     "\01324.google.protobuf.compiler.CodeGenerat"
     "orResponse.File\032>\n\004File\022\014\n\004name\030\001 \001(\t\022\027\n"
-    "\017insertion_point\030\002 \001(\t\022\017\n\007content\030\017 \001(\t", 399);
+    "\017insertion_point\030\002 \001(\t\022\017\n\007content\030\017 \001(\tB"
+    ",\n\034com.google.protobuf.compilerB\014PluginP"
+    "rotos", 445);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "google/protobuf/compiler/plugin.proto", &protobuf_RegisterTypes);
   CodeGeneratorRequest::default_instance_ = new CodeGeneratorRequest();
@@ -181,7 +184,7 @@ CodeGeneratorRequest::CodeGeneratorRequest(const CodeGeneratorRequest& from)
 
 void CodeGeneratorRequest::SharedCtor() {
   _cached_size_ = 0;
-  parameter_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  parameter_ = const_cast< ::std::string*>(&::google::protobuf::internal::GetEmptyString());
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -190,7 +193,7 @@ CodeGeneratorRequest::~CodeGeneratorRequest() {
 }
 
 void CodeGeneratorRequest::SharedDtor() {
-  if (parameter_ != &::google::protobuf::internal::kEmptyString) {
+  if (parameter_ != &::google::protobuf::internal::GetEmptyString()) {
     delete parameter_;
   }
   if (this != default_instance_) {
@@ -221,7 +224,7 @@ CodeGeneratorRequest* CodeGeneratorRequest::New() const {
 void CodeGeneratorRequest::Clear() {
   if (_has_bits_[1 / 32] & (0xffu << (1 % 32))) {
     if (has_parameter()) {
-      if (parameter_ != &::google::protobuf::internal::kEmptyString) {
+      if (parameter_ != &::google::protobuf::internal::GetEmptyString()) {
         parameter_->clear();
       }
     }
@@ -498,9 +501,9 @@ CodeGeneratorResponse_File::CodeGeneratorResponse_File(const CodeGeneratorRespon
 
 void CodeGeneratorResponse_File::SharedCtor() {
   _cached_size_ = 0;
-  name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  insertion_point_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  content_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  name_ = const_cast< ::std::string*>(&::google::protobuf::internal::GetEmptyString());
+  insertion_point_ = const_cast< ::std::string*>(&::google::protobuf::internal::GetEmptyString());
+  content_ = const_cast< ::std::string*>(&::google::protobuf::internal::GetEmptyString());
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -509,13 +512,13 @@ CodeGeneratorResponse_File::~CodeGeneratorResponse_File() {
 }
 
 void CodeGeneratorResponse_File::SharedDtor() {
-  if (name_ != &::google::protobuf::internal::kEmptyString) {
+  if (name_ != &::google::protobuf::internal::GetEmptyString()) {
     delete name_;
   }
-  if (insertion_point_ != &::google::protobuf::internal::kEmptyString) {
+  if (insertion_point_ != &::google::protobuf::internal::GetEmptyString()) {
     delete insertion_point_;
   }
-  if (content_ != &::google::protobuf::internal::kEmptyString) {
+  if (content_ != &::google::protobuf::internal::GetEmptyString()) {
     delete content_;
   }
   if (this != default_instance_) {
@@ -546,17 +549,17 @@ CodeGeneratorResponse_File* CodeGeneratorResponse_File::New() const {
 void CodeGeneratorResponse_File::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
     if (has_name()) {
-      if (name_ != &::google::protobuf::internal::kEmptyString) {
+      if (name_ != &::google::protobuf::internal::GetEmptyString()) {
         name_->clear();
       }
     }
     if (has_insertion_point()) {
-      if (insertion_point_ != &::google::protobuf::internal::kEmptyString) {
+      if (insertion_point_ != &::google::protobuf::internal::GetEmptyString()) {
         insertion_point_->clear();
       }
     }
     if (has_content()) {
-      if (content_ != &::google::protobuf::internal::kEmptyString) {
+      if (content_ != &::google::protobuf::internal::GetEmptyString()) {
         content_->clear();
       }
     }
@@ -836,7 +839,7 @@ CodeGeneratorResponse::CodeGeneratorResponse(const CodeGeneratorResponse& from)
 
 void CodeGeneratorResponse::SharedCtor() {
   _cached_size_ = 0;
-  error_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  error_ = const_cast< ::std::string*>(&::google::protobuf::internal::GetEmptyString());
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -845,7 +848,7 @@ CodeGeneratorResponse::~CodeGeneratorResponse() {
 }
 
 void CodeGeneratorResponse::SharedDtor() {
-  if (error_ != &::google::protobuf::internal::kEmptyString) {
+  if (error_ != &::google::protobuf::internal::GetEmptyString()) {
     delete error_;
   }
   if (this != default_instance_) {
@@ -876,7 +879,7 @@ CodeGeneratorResponse* CodeGeneratorResponse::New() const {
 void CodeGeneratorResponse::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
     if (has_error()) {
-      if (error_ != &::google::protobuf::internal::kEmptyString) {
+      if (error_ != &::google::protobuf::internal::GetEmptyString()) {
         error_->clear();
       }
     }

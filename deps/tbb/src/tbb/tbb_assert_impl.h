@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -38,7 +38,6 @@
 #include <stdarg.h>
 #if _MSC_VER
 #include <crtdbg.h>
-#define __TBB_USE_DBGBREAK_DLG TBB_USE_DEBUG
 #endif
 
 #if _MSC_VER >= 1400
@@ -76,7 +75,7 @@ namespace tbb {
                          expression, line, filename );
                 if( comment )
                     fprintf( stderr, "Detailed description: %s\n", comment );
-#if __TBB_USE_DBGBREAK_DLG
+#if _MSC_VER && _DEBUG
                 if(1 == _CrtDbgReport(_CRT_ASSERT, filename, line, "tbb_debug.dll", "%s\r\n%s", expression, comment?comment:""))
                         _CrtDbgBreak();
 #else

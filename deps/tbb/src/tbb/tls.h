@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -56,6 +56,7 @@ public:
 #else /* USE_WINTHREAD */
     typedef DWORD tls_key_t;
 public:
+#if !__TBB_WIN8UI_SUPPORT
     int create() {
         tls_key_t tmp = TlsAlloc();
         if( tmp==TLS_OUT_OF_INDEXES )
@@ -66,7 +67,19 @@ public:
     int  destroy()      { TlsFree(my_key); my_key=0; return 0; }
     void set( T value ) { TlsSetValue(my_key, (LPVOID)value); }
     T    get()          { return (T)TlsGetValue(my_key); }
-#endif
+#else /*!__TBB_WIN8UI_SUPPORT*/
+    int create() {
+        tls_key_t tmp = FlsAlloc(NULL);
+        if( tmp== (DWORD)0xFFFFFFFF )
+            return (DWORD)0xFFFFFFFF;
+        my_key = tmp;
+        return 0;
+    }
+    int  destroy()      { FlsFree(my_key); my_key=0; return 0; }
+    void set( T value ) { FlsSetValue(my_key, (LPVOID)value); }
+    T    get()          { return (T)FlsGetValue(my_key); }
+#endif /* !__TBB_WIN8UI_SUPPORT */
+#endif /* USE_WINTHREAD */
 private:
     tls_key_t my_key;
 };

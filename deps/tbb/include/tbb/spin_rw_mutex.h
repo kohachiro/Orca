@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -32,7 +32,7 @@
 #include "tbb_stddef.h"
 #include "tbb_machine.h"
 #include "tbb_profiling.h"
-
+#include "internal/_mutex_padding.h"
 namespace tbb {
 
 class spin_rw_mutex_v3;
@@ -161,7 +161,23 @@ public:
             return result;
         }
 
+#if TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+        // helper methods for speculation-based spin_rw_mutex
+        spin_rw_mutex *__internal_get_mutex() {
+            return mutex;
+        }
+
+        // have to be able to "NULL"-ify the mutex
+        void __internal_set_mutex(spin_rw_mutex* m) {
+            mutex = m;
+        }
+
+        void __internal_set_writer(bool flag=true) {
+            is_writer = flag;
+        }
+#endif /* TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX */
     protected:
+
         //! The pointer to the current mutex that is held, or NULL if no mutex is held.
         spin_rw_mutex* mutex;
 
@@ -204,7 +220,7 @@ public:
     /** Return true if reader lock acquired; false otherwise. */
     bool try_lock_read() {return internal_try_acquire_reader();}
 
-private:
+protected:
     typedef intptr_t state_t;
     static const state_t WRITER = 1;
     static const state_t WRITER_PENDING = 2;
@@ -217,11 +233,38 @@ private:
         Bit 2..N = number of readers holding lock */
     state_t state;
 
+private:
     void __TBB_EXPORTED_METHOD internal_construct();
 };
 
 __TBB_DEFINE_PROFILING_SET_NAME(spin_rw_mutex)
 
 } // namespace tbb
+#if TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+#if __TBB_TSX_AVAILABLE
+#include "internal/_x86_rtm_rw_mutex_impl.h"
+#endif
 
+namespace tbb {
+namespace interface7 {
+//! A cross-platform spin reader/writer mutex with speculative lock acquisition.
+/** On platforms with proper HW support, this lock may speculatively execute
+    its critical sections, using HW mechanisms to detect real data races and
+    ensure atomicity of the critical sections. In particular, it uses
+    Intel(R) Transactional Synchronization Extensions (Intel(R) TSX).
+    Without such HW support, it behaves like a spin_rw_mutex.
+    It should be used for locking short critical sections where the lock is 
+    contended but the data it protects are not.
+    @ingroup synchronization */
+#if __TBB_TSX_AVAILABLE
+typedef interface7::internal::padded_mutex<tbb::interface7::internal::x86_rtm_rw_mutex,true> speculative_spin_rw_mutex;
+#else
+typedef interface7::internal::padded_mutex<tbb::spin_rw_mutex,true> speculative_spin_rw_mutex;
+#endif
+}  // namespace interface7
+
+using interface7::speculative_spin_rw_mutex;
+__TBB_DEFINE_PROFILING_SET_NAME(speculative_spin_rw_mutex)
+} // namespace tbb
+#endif /* TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX */
 #endif /* __TBB_spin_rw_mutex_H */

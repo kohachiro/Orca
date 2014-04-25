@@ -139,8 +139,6 @@ const int FieldDescriptor::kLastReservedNumber;
 
 namespace {
 
-const string kEmptyString;
-
 string ToCamelCase(const string& input) {
   bool capitalize_next = false;
   string result;
@@ -2673,7 +2671,7 @@ Symbol DescriptorBuilder::LookupSymbolNoPlaceholder(
   //   }
   // So, we look for just "Foo" first, then look for "Bar.baz" within it if
   // found.
-  int name_dot_pos = name.find_first_of('.');
+  string::size_type name_dot_pos = name.find_first_of('.');
   string first_part_of_name;
   if (name_dot_pos == string::npos) {
     first_part_of_name = name;
@@ -2757,7 +2755,7 @@ Symbol DescriptorBuilder::NewPlaceholder(const string& name,
     placeholder_name = tables_->AllocateString(
       placeholder_full_name->substr(dotpos + 1));
   } else {
-    placeholder_package = &kEmptyString;
+    placeholder_package = &::google::protobuf::internal::GetEmptyString();
     placeholder_name = placeholder_full_name;
   }
 
@@ -2843,7 +2841,7 @@ const FileDescriptor* DescriptorBuilder::NewPlaceholderFile(
   memset(placeholder, 0, sizeof(*placeholder));
 
   placeholder->name_ = tables_->AllocateString(name);
-  placeholder->package_ = &kEmptyString;
+  placeholder->package_ = &::google::protobuf::internal::GetEmptyString();
   placeholder->pool_ = pool_;
   placeholder->options_ = &FileOptions::default_instance();
   placeholder->tables_ = &FileDescriptorTables::kEmpty;
@@ -2987,7 +2985,11 @@ template<class DescriptorT> void DescriptorBuilder::AllocateOptionsImpl(
   //       tables_->AllocateMessage<typename DescriptorT::OptionsType>();
   typename DescriptorT::OptionsType* const dummy = NULL;
   typename DescriptorT::OptionsType* options = tables_->AllocateMessage(dummy);
-  options->CopyFrom(orig_options);
+  // Avoid using MergeFrom()/CopyFrom() in this class to make it -fno-rtti
+  // friendly. Without RTTI, MergeFrom() and CopyFrom() will fallback to the
+  // reflection based method, which requires the Descriptor. However, we are in
+  // the middle of building the descriptors, thus the deadlock.
+  options->ParseFromString(orig_options.SerializeAsString());
   descriptor->options_ = options;
 
   // Don't add to options_to_interpret_ unless there were uninterpreted
@@ -3481,7 +3483,7 @@ void DescriptorBuilder::BuildFieldOrExtension(const FieldDescriptorProto& proto,
           result->default_value_enum_ = NULL;
           break;
         case FieldDescriptor::CPPTYPE_STRING:
-          result->default_value_string_ = &kEmptyString;
+          result->default_value_string_ = &::google::protobuf::internal::GetEmptyString();
           break;
         case FieldDescriptor::CPPTYPE_MESSAGE:
           break;
@@ -4128,16 +4130,26 @@ void DescriptorBuilder::ValidateFieldOptions(FieldDescriptor* field,
 void DescriptorBuilder::ValidateEnumOptions(EnumDescriptor* enm,
                                             const EnumDescriptorProto& proto) {
   VALIDATE_OPTIONS_FROM_ARRAY(enm, value, EnumValue);
-  if (!enm->options().allow_alias()) {
+  if (!enm->options().has_allow_alias() || !enm->options().allow_alias()) {
     map<int, string> used_values;
     for (int i = 0; i < enm->value_count(); ++i) {
       const EnumValueDescriptor* enum_value = enm->value(i);
       if (used_values.find(enum_value->number()) != used_values.end()) {
-        AddError(enm->full_name(), proto,
-                 DescriptorPool::ErrorCollector::NUMBER,
-                 "\"" + enum_value->full_name() +
-                 "\" uses the same enum value as \"" +
-                 used_values[enum_value->number()] + "\"");
+        string error =
+            "\"" + enum_value->full_name() +
+            "\" uses the same enum value as \"" +
+            used_values[enum_value->number()] + "\". If this is intended, set "
+            "'option allow_alias = true;' to the enum definition.";
+        if (!enm->options().allow_alias()) {
+          // Generate error if duplicated enum values are explicitly disallowed.
+          AddError(enm->full_name(), proto,
+                   DescriptorPool::ErrorCollector::NUMBER,
+                   error);
+        } else {
+          // Generate warning if duplicated values are found but the option
+          // isn't set.
+          GOOGLE_LOG(ERROR) << error;
+        }
       } else {
         used_values[enum_value->number()] = enum_value->full_name();
       }

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -115,7 +115,7 @@ enum statistics_groups {
 };
 
 //! Groups of counters to output
-const uintptr_t __TBB_ActiveStatisticsGroups = sg_task_execution | sg_stealing | sg_arena | sg_market;
+const uintptr_t __TBB_ActiveStatisticsGroups = sg_task_execution | sg_stealing | sg_affinity | sg_arena | sg_market;
 
 //! A set of various statistics counters that are updated by the library on per thread basis.
 /** All the fields must be of the same type (statistics_counters::counter_type).

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -71,7 +71,7 @@ private:
     //! Currently active global market
     static market* theMarket;
 
-    typedef spin_mutex global_market_mutex_type;
+    typedef scheduler_mutex_type global_market_mutex_type;
 
     //! Mutex guarding creation/destruction of theMarket, insertions/deletions in my_arenas, and cancellation propagation
     static global_market_mutex_type  theMarketMutex;
@@ -80,7 +80,8 @@ private:
     intptr_t my_ref_count;
 
     //! Lightweight mutex guarding accounting operations with arenas list
-    spin_mutex  my_arenas_list_mutex;
+    typedef scheduler_mutex_type arenas_list_mutex_type;
+    arenas_list_mutex_type my_arenas_list_mutex;
 
     //! Pointer to the RML server object that services this TBB instance.
     rml::tbb_server* my_server;
@@ -280,6 +281,13 @@ public:
     /** Concurrent invocations are possible only on behalf of different arenas. **/
     void adjust_demand ( arena&, int delta );
 
+    //! Guarantee that request_close_connection() is called by master, not some worker
+    /** Must be called before arena::on_thread_leaving() **/
+    void prepare_wait_workers() { ++my_ref_count; }
+
+    //! Wait workers termiantion
+    void wait_workers ();
+
     //! Returns the requested stack size of worker threads.
     size_t worker_stack_size () const { return my_stack_size; }
 
@@ -306,7 +314,7 @@ public:
 #if __TBB_TASK_PRIORITY
     //! Lowers arena's priority is not higher than newPriority 
     /** Returns true if arena priority was actually elevated. **/ 
-    bool lower_arena_priority ( arena& a, intptr_t new_priority, intptr_t old_priority );
+    bool lower_arena_priority ( arena& a, intptr_t new_priority, uintptr_t old_reload_epoch );
 
     //! Makes sure arena's priority is not lower than newPriority 
     /** Returns true if arena priority was elevated. Also updates arena's bottom
@@ -338,9 +346,9 @@ public:
 
 #if __TBB_TASK_PRIORITY
     #define BeginForEachArena(a)    \
-        spin_mutex::scoped_lock arena_list_lock(my_arenas_list_mutex);  \
+        arenas_list_mutex_type::scoped_lock arena_list_lock(my_arenas_list_mutex);  \
         for ( intptr_t i = my_global_top_priority; i >= my_global_bottom_priority; --i ) {  \
-            /*spin_mutex::scoped_lock arena_list_lock(my_priority_levels[i].my_arenas_list_mutex);*/ \
+            /*arenas_list_mutex_type::scoped_lock arena_list_lock(my_priority_levels[i].my_arenas_list_mutex);*/ \
             arena_list_type &arenas = my_priority_levels[i].arenas;
 #else /* !__TBB_TASK_PRIORITY */
     #define BeginForEachArena(a)    \

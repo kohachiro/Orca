@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,12 +26,19 @@
     the GNU General Public License.
 */
 
-//! task_handle<T> cannot be instantiated with a function ptr without explicit cast
-#define __TBB_FUNC_PTR_AS_TEMPL_PARAM_BROKEN ((__linux__ || __APPLE__) && __INTEL_COMPILER && __INTEL_COMPILER < 1100) || __SUNPRO_CC
-#define __TBB_UNQUALIFIED_CALL_OF_DTOR_BROKEN (__GNUC__==3 && __GNUC_MINOR__<=3)
+#include "harness_defs.h"
 
+//Concurrency scheduler is not supported by Windows* new UI apps
+//TODO: check whether we can test anything here
+#include "tbb/tbb_config.h"
+#if !__TBB_WIN8UI_SUPPORT
 #ifndef TBBTEST_USE_TBB
     #define TBBTEST_USE_TBB 1
+#endif
+#else
+    #define TBBTEST_USE_TBB 0
+    #undef __TBB_TASK_GROUP_CONTEXT
+    #define __TBB_TASK_GROUP_CONTEXT 0
 #endif
 
 #if !TBBTEST_USE_TBB
@@ -71,6 +78,7 @@
 #if __TBB_TASK_GROUP_CONTEXT
 
 #include "tbb/atomic.h"
+#include "tbb/aligned_space.h"
 #include "harness_concurrency_tracker.h"
 
 unsigned g_MaxConcurrency = 0;
@@ -170,7 +178,7 @@ public:
 
     void Run ( uint_t idx ) {
 #if TBBTEST_USE_TBB
-        tbb::task_scheduler_init init;
+        tbb::task_scheduler_init init(g_MaxConcurrency);
 #endif
         AssertLive();
         if ( idx == 0 ) {
@@ -256,8 +264,8 @@ atomic_t g_Sum;
 //------------------------------------------------------------------------
 // Test for a complex tree of task groups
 //
-// The test executes a tree of task groups of the same sort with asymmetric 
-// descendant nodes distribution at each level at each level. 
+// The test executes a tree of task groups of the same sort with asymmetric
+// descendant nodes distribution at each level at each level.
 //
 // The chores are specified as functor objects. Each task group contains only one chore.
 //------------------------------------------------------------------------
@@ -269,7 +277,7 @@ struct FibTask : NoAssign, Harness::NoAfterlife {
     FibTask( uint_t* y, uint_t n ) : m_pRes(y), m_Num(n) {}
     void operator() () const {
         *m_pRes = Func(m_Num);
-    } 
+    }
 };
 
 uint_t Fib_SpawnRightChildOnly ( uint_t n ) {
@@ -288,7 +296,7 @@ uint_t Fib_SpawnRightChildOnly ( uint_t n ) {
 
 void TestFib1 () {
     FIB_TEST_PROLOGUE();
-    uint_t sum = 0; 
+    uint_t sum = 0;
     for( unsigned i = 0; i < numRepeats; ++i )
         sum += Fib_SpawnRightChildOnly(N);
     FIB_TEST_EPILOGUE(sum);
@@ -298,7 +306,7 @@ void TestFib1 () {
 //------------------------------------------------------------------------
 // Test for a mixed tree of task groups.
 //
-// The test executes a tree with multiple task of one sort at the first level, 
+// The test executes a tree with multiple task of one sort at the first level,
 // each of which originates in its turn a binary tree of descendant task groups.
 //
 // The chores are specified both as functor objects and as function pointers
@@ -325,7 +333,7 @@ void RunFib2 () {
 
 void TestFib2 () {
     FIB_TEST_PROLOGUE();
-    g_Sum = 0; 
+    g_Sum = 0;
     Concurrency::task_group rg;
     for( unsigned i = 0; i < numRepeats - 1; ++i )
         rg.run( &RunFib2 );
@@ -373,7 +381,7 @@ uint_t RunFib3 ( uint_t n ) {
 
 void TestTaskHandle () {
     FIB_TEST_PROLOGUE();
-    uint_t sum = 0; 
+    uint_t sum = 0;
     for( unsigned i = 0; i < numRepeats; ++i )
         sum += RunFib3(N);
     FIB_TEST_EPILOGUE(sum);
@@ -396,7 +404,7 @@ public:
         if( m_Num < 2 ) {
             *m_pRes = m_Num;
         } else {
-            uint_t  x = ~0u, // initialized only to suppress warning 
+            uint_t  x = ~0u, // initialized only to suppress warning
                     y = ~0u;
             task_group_type tg;
             Concurrency::task_handle<FibTask_SpawnBothChildren> h1 = FibTask_SpawnBothChildren(&y, m_Num-1),
@@ -420,13 +428,17 @@ void RunFib4 () {
 template<class task_group_type>
 void TestTaskHandle2 () {
     FIB_TEST_PROLOGUE();
-    g_Sum = 0; 
+    g_Sum = 0;
     task_group_type rg;
-    const unsigned hSize = sizeof(handle_type);
-    char *handles = new char [numRepeats * hSize];
+    typedef tbb::aligned_space<handle_type,1> handle_space_t;
+    handle_space_t *handles = new handle_space_t[numRepeats];
     handle_type *h = NULL;
-    for( unsigned i = 0; ; ++i ) {
-        h = (handle_type*)(handles + i * hSize);
+#if __TBB_ipf && __TBB_GCC_VERSION==40601
+    volatile // Workaround for unexpected exit from the loop below after the exception was caught
+#endif
+    unsigned i = 0;
+    for( ;; ++i ) {
+        h = handles[i].begin();
 #if __TBB_FUNC_PTR_AS_TEMPL_PARAM_BROKEN
         new ( h ) handle_type((void(*)())RunFib4<task_group_type>);
 #else
@@ -438,7 +450,8 @@ void TestTaskHandle2 () {
 #if TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN
         bool caught = false;
         try {
-            rg.run( *h );
+            if( i&1 ) rg.run( *h );
+            else rg.run_and_wait( *h );
         }
         catch ( Concurrency::invalid_multiple_scheduling& e ) {
             ASSERT( e.what(), "Error message is absent" );
@@ -450,12 +463,14 @@ void TestTaskHandle2 () {
         ASSERT ( caught, "Expected invalid_multiple_scheduling exception is missing" );
 #endif /* TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN */
     }
+    ASSERT( i == numRepeats - 1, "unexpected exit from the loop" );
     rg.run_and_wait( *h );
-    for( unsigned i = 0; i < numRepeats; ++i )
+
+    for( i = 0; i < numRepeats; ++i )
 #if __TBB_UNQUALIFIED_CALL_OF_DTOR_BROKEN
-        ((handle_type*)(handles + i * hSize))->Concurrency::task_handle<void(*)()>::~task_handle();
+        handles[i].begin()->Concurrency::task_handle<void(*)()>::~task_handle();
 #else
-        ((handle_type*)(handles + i * hSize))->~handle_type();
+        handles[i].begin()->~handle_type();
 #endif
     delete []handles;
     FIB_TEST_EPILOGUE(g_Sum);
@@ -568,7 +583,7 @@ public:
         Harness::ConcurrencyTracker ct;
         AssertLive();
         if ( g_Throw ) {
-            if ( ++m_TaskCount == SKIP_CHORES ) 
+            if ( ++m_TaskCount == SKIP_CHORES )
                 __TBB_THROW( test_exception(EXCEPTION_DESCR1) );
             __TBB_Yield();
         }
@@ -612,7 +627,7 @@ void TestEh1 () {
     ResetGlobals( true, false );
     Concurrency::task_group rg;
     for( unsigned i = 0; i < NUM_GROUPS; ++i )
-        // TBB version does not require taking function address 
+        // TBB version does not require taking function address
         rg.run( &LaunchChildren );
     try {
         rg.wait();
@@ -628,7 +643,7 @@ void TestEh2 () {
     Concurrency::task_group rg;
     bool exceptionCaught = false;
     for( unsigned i = 0; i < NUM_GROUPS; ++i )
-        // TBB version does not require taking function address 
+        // TBB version does not require taking function address
         rg.run( &LaunchChildren );
     try {
         rg.wait();
@@ -653,7 +668,7 @@ void TestCancellation1 () {
     ResetGlobals( false, false );
     Concurrency::task_group rg;
     for( unsigned i = 0; i < NUM_GROUPS; ++i )
-        // TBB version does not require taking function address 
+        // TBB version does not require taking function address
         rg.run( &LaunchChildren );
     ASSERT ( !Concurrency::is_current_task_group_canceling(), "Unexpected cancellation" );
     ASSERT ( !rg.is_canceling(), "Unexpected cancellation" );
@@ -681,10 +696,9 @@ void StructuredLaunchChildren () {
     Concurrency::structured_task_group g;
     bool exceptionCaught = false;
     typedef Concurrency::task_handle<ThrowingTask> throwing_handle_type;
-    static const unsigned hSize = sizeof(throwing_handle_type);
-    char handles[NUM_CHORES * hSize];
+    tbb::aligned_space<throwing_handle_type,NUM_CHORES> handles;
     for( unsigned i = 0; i < NUM_CHORES; ++i ) {
-        throwing_handle_type *h = (throwing_handle_type*)(handles + i * hSize);
+        throwing_handle_type *h = handles.begin()+i;
         new ( h ) throwing_handle_type( ThrowingTask(count) );
         g.run( *h );
     }
@@ -705,7 +719,7 @@ void StructuredLaunchChildren () {
     } CATCH_ANY();
     ASSERT( !g_Throw || exceptionCaught, "No exception in the child task group" );
     for( unsigned i = 0; i < NUM_CHORES; ++i )
-        ((throwing_handle_type*)(handles + i * hSize))->~throwing_handle_type();
+        (handles.begin()+i)->~throwing_handle_type();
     if ( g_Rethrow && g_ExceptionCount > SKIP_GROUPS ) {
 #if __TBB_SILENT_CANCELLATION_BROKEN
         g_CancellationPropagationInProgress = true;
@@ -715,14 +729,13 @@ void StructuredLaunchChildren () {
 }
 
 class StructuredCancellationTestDriver {
-    static const unsigned hSize = sizeof(handle_type);
-    char m_handles[NUM_CHORES * hSize];
+    tbb::aligned_space<handle_type,NUM_CHORES> m_handles;
 
 public:
     void Launch ( Concurrency::structured_task_group& rg ) {
         ResetGlobals( false, false );
         for( unsigned i = 0; i < NUM_GROUPS; ++i ) {
-            handle_type *h = (handle_type*)(m_handles + i * hSize);
+            handle_type *h = m_handles.begin()+i;
             new ( h ) handle_type( StructuredLaunchChildren );
             rg.run( *h );
         }
@@ -737,7 +750,7 @@ public:
 
     void Finish () {
         for( unsigned i = 0; i < NUM_GROUPS; ++i )
-            ((handle_type*)(m_handles + i * hSize))->~handle_type();
+            (m_handles.begin()+i)->~handle_type();
         ASSERT( g_TaskCount <= NUM_GROUPS * NUM_CHORES, "Too many tasks reported. The test is broken" );
         ASSERT( g_TaskCount < NUM_GROUPS * NUM_CHORES, "No tasks were cancelled. Cancellation model changed?" );
         ASSERT( g_TaskCount <= g_ExecutedAtCancellation + g_MaxConcurrency, "Too many tasks survived cancellation" );
@@ -836,7 +849,16 @@ int TestMain () {
         TestEh2();
         TestStructuredWait();
         TestStructuredCancellation2<true>();
+        //TODO: recheck the condition with newer versions of clang/libc++
+#if (__clang__ && (__cplusplus >= 201103L || _LIBCPP_VERSION ))
+        //TODO:it seems that clang in C++11 mode does not expect exception
+        //coming from destructor in the following test as it does not generate correct code for stack unwinding.
+        //TODO:it seems that libc++ implementation of std::uncaught_exception return incorrect value clang and
+        //icc14 in the following test
+        REPORT("Known issue: TestStructuredCancellation2<false> test is skipped.\n");
+#else
         TestStructuredCancellation2<false>();
+#endif
 #endif /* TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN */
 #if !TBBTEST_USE_TBB
         s->Release();

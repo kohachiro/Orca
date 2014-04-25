@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,6 +26,13 @@
     the GNU General Public License.
 */
 
+#include <tbb/tbb_config.h>
+#if __TBB_WIN8UI_SUPPORT || __TBB_MIC_OFFLOAD
+#include "harness.h"
+int TestMain () {
+    return Harness::Skipped;
+}
+#else
 #include "rml_tbb.h"
 #include "rml_omp.h"
 #include "tbb/atomic.h"
@@ -34,8 +41,15 @@
 #define HARNESS_DEFAULT_MIN_THREADS 4
 #include "harness.h"
 
+// dynamic_link initializes its data structures in a static constructor. But
+// the initialization order of static constructors in different modules is
+// non-deterministic. Thus dynamic_link fails on some systems when the
+// applicaton changes its current directory after the library (TBB/OpenMP/...)
+// is loaded but before the static constructors in the library are executed.
+#define CHDIR_SUPPORT_BROKEN ( __GNUC__ == 4 && __GNUC_MINOR__ >= 6 && __GNUC_MINOR__ <= 8 )
+
 const int OMP_ParallelRegionSize = 16;
-int TBB_MaxThread = 4;           // Includes master 
+int TBB_MaxThread = 4;           // Includes master
 int OMP_MaxThread = int(~0u>>1); // Includes master
 
 template<typename Client>
@@ -62,6 +76,9 @@ private:
         delete this;
     }
     /*override*/void cleanup( job& j ) {delete &j;}
+
+public:
+    virtual ~ClientBase() {}
 };
 
 #if _WIN32
@@ -83,6 +100,7 @@ private:
 #define _chdir  chdir
 #endif
 
+#if !CHDIR_SUPPORT_BROKEN
 class ChangeCurrentDir {
     char dir[PATH_LEN+1];
     char *last_slash;
@@ -109,6 +127,7 @@ public:
         }
     }
 };
+#endif
 
 //! Represents a TBB or OpenMP run-time that uses RML.
 template<typename Factory, typename Client>
@@ -193,9 +212,11 @@ class OMP_Client: public ClientBase<__kmp::rml::omp_client> {
     }
 };
 
+#if !CHDIR_SUPPORT_BROKEN
 // A global instance of ChangeCurrentDir should be declared before TBB_RunTime and OMP_RunTime
 // since we want to change current directory before opening factory
 ChangeCurrentDir Changer;
+#endif
 RunTime<tbb::internal::rml::tbb_factory, TBB_Client> TBB_RunTime;
 RunTime<__kmp::rml::omp_factory, OMP_Client> OMP_RunTime;
 
@@ -289,6 +310,9 @@ void TBBOutSideOpenMPInside() {
 }
 
 int TestMain () {
+#if CHDIR_SUPPORT_BROKEN
+    REPORT("Known issue: dynamic_link does not support current directory changing before its initialization.\n");
+#endif
     for( int TBB_MaxThread=MinThread; TBB_MaxThread<=MaxThread; ++TBB_MaxThread ) {
         REMARK("Testing with TBB_MaxThread=%d\n", TBB_MaxThread);
         TBB_RunTime.create_connection();
@@ -300,3 +324,4 @@ int TestMain () {
     TotalThreadLevel.dump();
     return Harness::Done;
 }
+#endif /* __TBB_WIN8UI_SUPPORT || __TBB_MIC_OFFLOAD */

@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -43,15 +43,20 @@ cfg ?= release
 #------------------------------------------------------------------------------
 CPLUS = icl /nologo $(VCCOMPAT_FLAG)
 LINK_FLAGS = /link /nologo
-LIB_LINK_FLAGS= /link /nologo /DLL /MAP /DEBUG /fixed:no /INCREMENTAL:NO
+LIB_LINK_FLAGS= /link /nologo /DLL /MAP /DEBUG /fixed:no /INCREMENTAL:NO /DYNAMICBASE /NXCOMPAT
+
+ifeq ($(arch), ia32)
+	LIB_LINK_FLAGS += /SAFESEH
+endif
+
 
 # ICC 11.0 and higher support -std=c++0x
-ifeq (ok,$(shell cmd /C "cscript /nologo /E:jscript $(tbb_root)/build/detect.js /minversion icl 11"))
+ifeq (ok,$(call detect_js,/minversion icl 11))
     CPP11_FLAGS = /Qstd=c++0x /D_TBB_CPP0X
 endif
 
-# ICC 12.0 and higher provide Intel(R) Cilk Plus
-ifeq (ok,$(shell cmd /C "cscript /nologo /E:jscript $(tbb_root)/build/detect.js /minversion icl 12"))
+# ICC 12.0 and higher provide Intel(R) Cilk(TM) Plus
+ifeq (ok,$(call detect_js,/minversion icl 12))
     CILK_AVAILABLE = yes
 endif
 
@@ -70,7 +75,7 @@ ifeq ($(cfg), debug)
     CPLUS_FLAGS = $(MS_CRT_KEY) /Od /Ob0 /Zi $(EH_FLAGS) /Zc:forScope /Zc:wchar_t /DTBB_USE_DEBUG /D__TBB_LIB_NAME=$(TBB.LIB)
     ASM_FLAGS = /DUSE_FRAME_POINTER
 endif
-
+CPLUS_FLAGS += /GS
 
 COMPILE_ONLY = /c /QMMD
 # PREPROC_ONLY should really use /TP which applies to all files in the command line.
@@ -87,9 +92,6 @@ EXPORT_KEY = /DEF:
 NODEFAULTLIB_KEY = /Zl
 NOINTRINSIC_KEY = /Oi-
 
-ifeq (intel64,$(arch))
-    CPLUS_FLAGS += /GS-
-endif
 
 ifneq (,$(codecov))
     CPLUS_FLAGS += /Qprof-genx
@@ -109,7 +111,7 @@ endif
 C_FLAGS = $(CPLUS_FLAGS)
 
 ifneq (00,$(lambdas)$(cpp0x))
-    CPLUS_FLAGS += $(CPP11_FLAGS)
+    CXX_ONLY_FLAGS += $(CPP11_FLAGS)
 endif
 
 VCVERSION:=$(runtime)
@@ -127,9 +129,16 @@ ifeq ($(VCCOMPAT_FLAG),)
         VCCOMPAT_FLAG := $(if $(findstring vc10, $(VCVERSION)),/Qvc10)
 endif
 ifeq ($(VCCOMPAT_FLAG),)
+        VCCOMPAT_FLAG := $(if $(findstring vc11, $(VCVERSION)),/Qvc11)
+endif
+ifeq ($(VCCOMPAT_FLAG),)
+        VCCOMPAT_FLAG := $(if $(findstring vc12, $(VCVERSION)),/Qvc12)
+endif
+ifeq ($(VCCOMPAT_FLAG),)
         $(error VC version not detected correctly: $(VCVERSION) )
 endif
 export VCCOMPAT_FLAG
+
 #------------------------------------------------------------------------------
 # End of setting compiler flags.
 #------------------------------------------------------------------------------
@@ -142,12 +151,12 @@ ASSEMBLY_SOURCE=$(arch)-masm
 ifeq (intel64,$(arch))
     ASM=ml64 /nologo
     ASM_FLAGS += /DEM64T=1 /c /Zi
-    TBB_ASM.OBJ = atomic_support.obj intel64_misc.obj
+    TBB_ASM.OBJ = atomic_support.obj intel64_misc.obj itsx.obj
     MALLOC_ASM.OBJ = atomic_support.obj
 else
     ASM=ml /nologo
-    ASM_FLAGS += /c /coff /Zi
-    TBB_ASM.OBJ = atomic_support.obj lock_byte.obj
+    ASM_FLAGS += /c /coff /Zi /safeseh
+    TBB_ASM.OBJ = atomic_support.obj lock_byte.obj itsx.obj
 endif
 #------------------------------------------------------------------------------
 # End of setting assembler data.

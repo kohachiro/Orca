@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -34,7 +34,8 @@
 #define LIBRARY_ASSERT(x,y) KMP_ASSERT2((x),(y))
 #else
 #include <assert.h>
-#define LIBRARY_ASSERT(x,y) assert(x)
+#define LIBRARY_ASSERT(x,y)         assert(x)
+#define __TBB_DYNAMIC_LOAD_ENABLED  1
 #endif
 #endif /* LIBRARY_ASSERT */
 

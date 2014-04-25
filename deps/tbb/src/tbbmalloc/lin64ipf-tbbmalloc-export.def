@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -43,6 +43,9 @@ __TBB_internal_malloc;
 __TBB_internal_realloc;
 __TBB_internal_posix_memalign;
 scalable_msize;
+scalable_allocation_mode;
+scalable_allocation_command;
+
 /* memory pool stuff */
 _ZN3rml11pool_createElPKNS_13MemPoolPolicyE;
 _ZN3rml14pool_create_v1ElPKNS_13MemPoolPolicyEPPNS_10MemoryPoolE;

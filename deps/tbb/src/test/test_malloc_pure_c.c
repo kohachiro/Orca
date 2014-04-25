@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -33,15 +33,52 @@
 #include "tbb/scalable_allocator.h"
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h> /* for atexit */
 
 /*
  *  The test is to check if the scalable_allocator.h and its functions
  *  can be used from pure C programs; also some regression checks are done
  */
 
+#if __linux__
+/* huge pages supported only under Linux so far */
+const int ExpectedResultHugePages = TBBMALLOC_OK;
+#else
+const int ExpectedResultHugePages = TBBMALLOC_NO_EFFECT;
+#endif
+
+#if __TBB_SOURCE_DIRECTLY_INCLUDED
+/* test that it's possible to call allocation function from atexit
+   after mallocProcessShutdownNotification() called */
+void __TBB_mallocProcessShutdownNotification();
+#else
+#define __TBB_mallocProcessShutdownNotification()
+#endif
+
+static void MyExit(void) {
+    void *p = scalable_malloc(32);
+    assert(p);
+    scalable_free(p);
+    __TBB_mallocProcessShutdownNotification();
+}
+
 int main(void) {
     size_t i, j;
+    int curr_mode, res;
     void *p1, *p2;
+
+    atexit( MyExit );
+    for ( curr_mode = 0; curr_mode<=1; curr_mode++) {
+        assert(ExpectedResultHugePages ==
+               scalable_allocation_mode(TBBMALLOC_USE_HUGE_PAGES, !curr_mode));
+        p1 = scalable_malloc(10*1024*1024);
+        assert(p1);
+        assert(ExpectedResultHugePages ==
+               scalable_allocation_mode(TBBMALLOC_USE_HUGE_PAGES, curr_mode));
+        scalable_free(p1);
+    }
+    /* note that huge pages (if supported) are still enabled at this point */
+
     for( i=0; i<=1<<16; ++i) {
         p1 = scalable_malloc(i);
         if( !p1 )
@@ -75,6 +112,16 @@ int main(void) {
     }
     scalable_free(p1);
     scalable_free(p2);
+    res = scalable_allocation_command(TBBMALLOC_CLEAN_ALL_BUFFERS, NULL);
+    assert(res == TBBMALLOC_OK);
+    res = scalable_allocation_command(TBBMALLOC_CLEAN_THREAD_BUFFERS, NULL);
+    /* expect all caches cleaned before, so got nothing from CLEAN_THREAD_BUFFERS */
+    assert(res == TBBMALLOC_NO_EFFECT);
+    /* check that invalid param argument give expected result*/
+    res = scalable_allocation_command(TBBMALLOC_CLEAN_THREAD_BUFFERS,
+                                      (void*)(intptr_t)1);
+    assert(res == TBBMALLOC_INVALID_PARAM);
+    __TBB_mallocProcessShutdownNotification();
     printf("done\n");
     return 0;
 }

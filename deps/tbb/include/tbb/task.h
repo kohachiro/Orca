@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -52,7 +52,7 @@ class task_group_context;
 #define __TBB_TASK_BASE_ACCESS private
 #endif
 
-namespace internal {
+namespace internal { //< @cond INTERNAL
 
     class allocate_additional_child_of_proxy: no_assign {
         //! No longer used, but retained for binary layout compatibility.  Always NULL.
@@ -64,7 +64,7 @@ namespace internal {
         void __TBB_EXPORTED_METHOD free( task& ) const;
     };
 
-}
+} //< namespace internal @endcond
 
 namespace interface5 {
     namespace internal {
@@ -348,7 +348,8 @@ private:
 
     union {
         //! Flavor of this context: bound or isolated.
-        kind_type my_kind;
+        // TODO: describe asynchronous use, and whether any memory semantics are needed
+        __TBB_atomic kind_type my_kind;
         uintptr_t _my_kind_aligner;
     };
 
@@ -371,14 +372,14 @@ private:
                           - 2 * sizeof(uintptr_t)- sizeof(void*) - sizeof(internal::context_list_node_t)
                           - sizeof(__itt_caller)];
 
-    //! Specifies whether cancellation was request for this task group.
+    //! Specifies whether cancellation was requested for this task group.
     uintptr_t my_cancellation_requested;
 
     //! Version for run-time checks and behavioral traits of the context.
     /** Version occupies low 16 bits, and traits (zero or more ORed enumerators
         from the traits_type enumerations) take the next 16 bits.
         Original (zeroth) version of the context did not support any traits. **/
-    uintptr_t  my_version_and_traits;
+    uintptr_t my_version_and_traits;
 
     //! Pointer to the container storing exception being propagated across this task group.
     exception_container_type *my_exception;
@@ -386,7 +387,7 @@ private:
     //! Scheduler instance that registered this context in its thread specific list.
     internal::generic_scheduler *my_owner;
 
-    //! Internal state (combination of state flags).
+    //! Internal state (combination of state flags, currently only may_have_children).
     uintptr_t my_state;
 
 #if __TBB_TASK_PRIORITY
@@ -440,6 +441,7 @@ public:
         init();
     }
 
+    // Do not introduce standalone unbind method since it will break state propagation assumptions
     __TBB_EXPORTED_METHOD ~task_group_context ();
 
     //! Forcefully reinitializes the context after the task tree it was associated with is completed.
@@ -496,11 +498,9 @@ private:
     static const kind_type detached = kind_type(binding_completed+1);
     static const kind_type dying = kind_type(detached+1);
 
-    //! Propagates state change (if any) from an ancestor
-    /** Checks if one of this object's ancestors is in a new state, and propagates
-        the new state to all its descendants in this object's heritage line. **/
+    //! Propagates any state change detected to *this, and as an optimisation possibly also upward along the heritage line.
     template <typename T>
-    void propagate_state_from_ancestors ( T task_group_context::*mptr_state, T new_state );
+    void propagate_task_group_state ( T task_group_context::*mptr_state, task_group_context& src, T new_state );
 
     //! Makes sure that the context is registered with a scheduler instance.
     inline void finish_initialization ( internal::generic_scheduler *local_sched );
@@ -550,6 +550,10 @@ public:
         freed,
         //! task to be recycled as continuation
         recycle
+#if __TBB_RECYCLE_TO_ENQUEUE
+        //! task to be scheduled for starvation-resistant execution
+        ,to_enqueue
+#endif
     };
 
     //------------------------------------------------------------------------
@@ -640,6 +644,15 @@ public:
         __TBB_ASSERT( prefix().ref_count==0, "no child tasks allowed when recycled for reexecution" );
         prefix().state = reexecute;
     }
+
+#if __TBB_RECYCLE_TO_ENQUEUE
+    //! Schedule this to enqueue after descendant tasks complete.
+    /** Save enqueue/spawn difference, it has the semantics of recycle_as_safe_continuation. */
+    void recycle_to_enqueue() {
+        __TBB_ASSERT( prefix().state==executing, "execute not running, or already recycled" );
+        prefix().state = to_enqueue;
+    }
+#endif /* __TBB_RECYCLE_TO_ENQUEUE */
 
     // All depth-related methods are obsolete, and are retained for the sake
     // of backward source compatibility only
@@ -817,6 +830,8 @@ public:
 
     //! Returns true if the context has received cancellation request.
     bool is_cancelled () const { return prefix().context->is_group_execution_cancelled(); }
+#else
+    bool is_cancelled () const { return false; }
 #endif /* __TBB_TASK_GROUP_CONTEXT */
 
 #if __TBB_TASK_PRIORITY
@@ -854,6 +869,21 @@ class empty_task: public task {
         return NULL;
     }
 };
+
+//! @cond INTERNAL
+namespace internal {
+    template<typename F>
+    class function_task : public task {
+        F my_func;
+        /*override*/ task* execute() {
+            my_func();
+            return NULL;
+        }
+    public:
+        function_task( const F& f ) : my_func(f) {}
+    };
+} // namespace internal
+//! @endcond
 
 //! A list of children.
 /** Used for method task::spawn_children

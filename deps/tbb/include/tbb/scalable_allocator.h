@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -88,12 +88,51 @@ void __TBB_EXPORTED_FUNC scalable_aligned_free (void* ptr);
     @ingroup memory_allocation */
 size_t __TBB_EXPORTED_FUNC scalable_msize (void* ptr);
 
+/* Results for scalable_allocation_* functions */
+typedef enum {
+    TBBMALLOC_OK,
+    TBBMALLOC_INVALID_PARAM,
+    TBBMALLOC_UNSUPPORTED,
+    TBBMALLOC_NO_MEMORY,
+    TBBMALLOC_NO_EFFECT
+} ScalableAllocationResult;
+
+/* Setting TBB_MALLOC_USE_HUGE_PAGES environment variable to 1 enables huge pages.
+   scalable_allocation_mode call has priority over environment variable. */
+typedef enum {
+    TBBMALLOC_USE_HUGE_PAGES,  /* value turns using huge pages on and off */
+    /* deprecated, kept for backward compatibility only */
+    USE_HUGE_PAGES = TBBMALLOC_USE_HUGE_PAGES,
+    /* try to limit memory consumption value Bytes, clean internal buffers
+       if limit is exceeded, but not prevents from requesting memory from OS */
+    TBBMALLOC_SET_SOFT_HEAP_LIMIT
+} AllocationModeParam;
+
+/** Set TBB allocator-specific allocation modes.
+    @ingroup memory_allocation */
+int __TBB_EXPORTED_FUNC scalable_allocation_mode(int param, intptr_t value);
+
+typedef enum {
+    /* Clean internal allocator buffers for all threads.
+       Returns TBBMALLOC_NO_EFFECT if no buffers cleaned,
+       TBBMALLOC_OK if some memory released from buffers. */
+    TBBMALLOC_CLEAN_ALL_BUFFERS,
+    /* Clean internal allocator buffer for current thread only.
+       Return values same as for TBBMALLOC_CLEAN_ALL_BUFFERS. */
+    TBBMALLOC_CLEAN_THREAD_BUFFERS
+} ScalableAllocationCmd;
+
+/** Call TBB allocator-specific commands.
+    @ingroup memory_allocation */
+int __TBB_EXPORTED_FUNC scalable_allocation_command(int cmd, void *param);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif /* __cplusplus */
 
 #ifdef __cplusplus
 
+//! The namespace rml contains components of low-level memory pool interface.
 namespace rml {
 class MemoryPool;
 
@@ -112,7 +151,7 @@ struct MemPoolPolicy {
 
 struct MemPoolPolicy {
     enum {
-        VERSION = 1
+        TBBMALLOC_POOL_VERSION = 1
     };
 
     rawAllocType pAlloc;
@@ -130,16 +169,24 @@ struct MemPoolPolicy {
     MemPoolPolicy(rawAllocType pAlloc_, rawFreeType pFree_,
                   size_t granularity_ = 0, bool fixedPool_ = false,
                   bool keepAllMemory_ = false) :
-        pAlloc(pAlloc_), pFree(pFree_), granularity(granularity_), version(VERSION),
+        pAlloc(pAlloc_), pFree(pFree_), granularity(granularity_), version(TBBMALLOC_POOL_VERSION),
         fixedPool(fixedPool_), keepAllMemory(keepAllMemory_),
         reserved(0) {}
 };
 
+// enums have same values as appropriate enums from ScalableAllocationResult
+// TODO: use ScalableAllocationResult in pool_create directly
 enum MemPoolError {
-    POOL_OK,            // pool created successfully
-    INVALID_POLICY,     // invalid policy parameters found
-    UNSUPPORTED_POLICY, // requested pool policy is not supported by allocator library
-    NO_MEMORY           // lack of memory during pool creation
+    // pool created successfully
+    POOL_OK = TBBMALLOC_OK,
+    // invalid policy parameters found
+    INVALID_POLICY = TBBMALLOC_INVALID_PARAM,
+     // requested pool policy is not supported by allocator library
+    UNSUPPORTED_POLICY = TBBMALLOC_UNSUPPORTED,
+    // lack of memory during pool creation
+    NO_MEMORY = TBBMALLOC_NO_MEMORY,
+    // action takes no effect
+    NO_EFFECT = TBBMALLOC_NO_EFFECT
 };
 
 MemPoolError pool_create_v1(intptr_t pool_id, const MemPoolPolicy *policy,
@@ -217,17 +264,17 @@ public:
         size_type absolutemax = static_cast<size_type>(-1) / sizeof (value_type);
         return (absolutemax > 0 ? absolutemax : 1);
     }
-#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
-    template<typename... Args>
-    void construct(pointer p, Args&&... args)
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    template<typename U, typename... Args>
+    void construct(U *p, Args&&... args)
  #if __TBB_CPP11_STD_FORWARD_BROKEN
-        { ::new((void *)p) T((args)...); }
+        { ::new((void *)p) U((args)...); }
  #else
-        { ::new((void *)p) T(std::forward<Args>(args)...); }
+        { ::new((void *)p) U(std::forward<Args>(args)...); }
  #endif
-#else // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#else // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
     void construct( pointer p, const value_type& value ) {::new((void*)(p)) value_type(value);}
-#endif // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#endif // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
     void destroy( pointer p ) {p->~value_type();}
 };
 

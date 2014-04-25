@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,7 +27,7 @@
 */
 
 // Declarations for simple estimate of the memory being used by a program.
-// Not yet implemented for Mac.
+// Not yet implemented for OS X*.
 // This header is an optional part of the test harness.
 // It assumes that "harness_assert.h" has already been included.
 
@@ -36,6 +36,7 @@
 #elif _WIN32 
 #include "tbb/machine/windows_api.h"
 #endif /* OS specific */
+#include <memory>
 #include <new>
 
 #if !TBB_USE_EXCEPTIONS && _MSC_VER

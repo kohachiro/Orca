@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -50,7 +50,7 @@ extern "C" void _MemoryBarrier();
 #define __TBB_full_memory_fence() __sync()
 
 #define __TBB_WORDSIZE 4
-#define __TBB_BIG_ENDIAN 1
+#define __TBB_ENDIANNESS __TBB_ENDIAN_BIG
 
 //todo: define __TBB_USE_FENCED_ATOMICS and define acquire/release primitives to maximize performance
 

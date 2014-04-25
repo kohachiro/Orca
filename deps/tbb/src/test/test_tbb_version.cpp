@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,6 +27,15 @@
 */
 
 #include "tbb/tbb_stddef.h"
+
+#if __TBB_WIN8UI_SUPPORT
+// TODO: figure out how the test can be enabled for win8ui
+#define HARNESS_NO_PARSE_COMMAND_LINE 1
+#include "harness.h"
+int TestMain() {
+    return Harness::Skipped;
+}
+#else
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,15 +83,15 @@ const char stdout_stream[] = "version_test.out";
 
 HARNESS_EXPORT
 int main(int argc, char *argv[] ) {
-    char psBuffer[512];
+    const size_t psBuffer_len = 2048;
+    char psBuffer[psBuffer_len];
 /* We first introduced runtime version identification in 3014 */
 #if TBB_INTERFACE_VERSION>=3014
     // For now, just test that run-time TBB version matches the compile-time version,
     // since otherwise the subsequent test of "TBB: INTERFACE VERSION" string will fail anyway.
     // We need something more clever in future.
     if ( tbb::TBB_runtime_interface_version()!=TBB_INTERFACE_VERSION ){
-        snprintf( psBuffer,
-                  512,
+        snprintf( psBuffer, psBuffer_len,
                   "%s %s %d %s %d.",
                   "Running with the library of different version than the test was compiled against.",
                   "Expected",
@@ -93,13 +102,14 @@ int main(int argc, char *argv[] ) {
         ASSERT( tbb::TBB_runtime_interface_version()==TBB_INTERFACE_VERSION, psBuffer );
     }
 #endif
-#if __TBB_MIC
+#if __TBB_MIC_OFFLOAD
     // Skip the test in offload mode.
     // Run the test in 'true' native mode (because 'system()' works in 'true' native mode).
     (argc, argv);
     REPORT("skip\n");
-#else //__TBB_MIC
-#if __TBB_MPI_INTEROP
+#elif __TBB_MPI_INTEROP || __bg__
+    (void) argc; // unused
+    (void) argv; // unused
     REPORT("skip\n");
 #else
     __TBB_TRY {
@@ -139,7 +149,7 @@ int main(int argc, char *argv[] ) {
                 exit( 1 );
             }
             while( !feof( stream_err ) ) {
-                if( fgets( psBuffer, 512, stream_err ) != NULL ){
+                if( fgets( psBuffer, psBuffer_len, stream_err ) != NULL ){
                     REPORT( "Error (step 1): stderr should be empty\n" );
                     exit( 1 );
                 }
@@ -151,7 +161,7 @@ int main(int argc, char *argv[] ) {
                 exit( 1 );
             }
             while( !feof( stream_out ) ) {
-                if( fgets( psBuffer, 512, stream_out ) != NULL ){
+                if( fgets( psBuffer, psBuffer_len, stream_out ) != NULL ){
                     REPORT( "Error (step 1): stdout should be empty\n" );
                     exit( 1 );
                 }
@@ -181,7 +191,7 @@ int main(int argc, char *argv[] ) {
             exit( 1 );
         }
         while( !feof( stream_out ) ) {
-            if( fgets( psBuffer, 512, stream_out ) != NULL ){
+            if( fgets( psBuffer, psBuffer_len, stream_out ) != NULL ){
                 REPORT( "Error (step 2): stdout should be empty\n" );
                 exit( 1 );
             }
@@ -195,7 +205,7 @@ int main(int argc, char *argv[] ) {
         }
         
         while( !feof( stream_err ) ) {
-            if( fgets( psBuffer, 512, stream_err ) != NULL ){
+            if( fgets( psBuffer, psBuffer_len, stream_err ) != NULL ){
                 if (strstr( psBuffer, "TBBmalloc: " )) {
                     // TBB allocator might or might not be here, ignore it
                     continue;
@@ -227,8 +237,7 @@ int main(int argc, char *argv[] ) {
         ASSERT( 0,"unexpected exception" );
     }
     REPORT("done\n");
-#endif //__TBB_MPI_INTEROP
-#endif //__TBB_MIC
+#endif //__TBB_MIC_OFFLOAD, __TBB_MPI_INTEROP etc
     return 0;
 }
 
@@ -236,8 +245,8 @@ int main(int argc, char *argv[] ) {
 // Fill dictionary with version strings for platforms 
 void initialize_strings_vector(std::vector <string_pair>* vector)
 {
-    vector->push_back(string_pair("TBB: VERSION\t\t4.0", required));          // check TBB_VERSION
-    vector->push_back(string_pair("TBB: INTERFACE VERSION\t6005", required)); // check TBB_INTERFACE_VERSION
+    vector->push_back(string_pair("TBB: VERSION\t\t4.2", required));          // check TBB_VERSION
+    vector->push_back(string_pair("TBB: INTERFACE VERSION\t7003", required)); // check TBB_INTERFACE_VERSION
     vector->push_back(string_pair("TBB: BUILD_DATE", required));
     vector->push_back(string_pair("TBB: BUILD_HOST", required));
     vector->push_back(string_pair("TBB: BUILD_OS", required));
@@ -254,13 +263,22 @@ void initialize_strings_vector(std::vector <string_pair>* vector)
     vector->push_back(string_pair("TBB: BUILD_KERNEL", required));
     vector->push_back(string_pair("TBB: BUILD_SUNCC", required));
     vector->push_back(string_pair("TBB: BUILD_COMPILER", optional)); //if( getenv("COMPILER_VERSION") )
-#else //We use version_info_linux.sh for unsupported OSes
+#else // We use version_info_linux.sh for unsupported OSes
+#if __ANDROID__
+    vector->push_back(string_pair("TBB: BUILD_TARGET_OS", required));
+    vector->push_back(string_pair("TBB: BUILD_TARGET_KERNEL", required));
+#else
     vector->push_back(string_pair("TBB: BUILD_KERNEL", required));
+#endif // !__ANDROID__
     vector->push_back(string_pair("TBB: BUILD_GCC", required));
     vector->push_back(string_pair("TBB: BUILD_COMPILER", optional)); //if( getenv("COMPILER_VERSION") )
-    vector->push_back(string_pair("TBB: BUILD_GLIBC", required));
+#if __ANDROID__
+    vector->push_back(string_pair("TBB: BUILD_NDK", optional));
+#else
+    vector->push_back(string_pair("TBB: BUILD_LIBC", required));
+#endif // !__ANDROID__
     vector->push_back(string_pair("TBB: BUILD_LD", required));
-#endif
+#endif // OS
     vector->push_back(string_pair("TBB: BUILD_TARGET", required));
     vector->push_back(string_pair("TBB: BUILD_COMMAND", required));
     vector->push_back(string_pair("TBB: TBB_USE_DEBUG", required));
@@ -281,3 +299,4 @@ void initialize_strings_vector(std::vector <string_pair>* vector)
     vector->push_back(string_pair("TBB: Tools support", required));
     return;
 }
+#endif /* __TBB_WIN8UI_SUPPORT */

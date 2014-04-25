@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -33,10 +33,10 @@
 #define __TBB_machine_linux_intel64_H
 
 #include <stdint.h>
-#include <unistd.h>
+#include "gcc_ia32_common.h"
 
 #define __TBB_WORDSIZE 8
-#define __TBB_BIG_ENDIAN 0
+#define __TBB_ENDIANNESS __TBB_ENDIAN_LITTLE
 
 #define __TBB_compiler_fence() __asm__ __volatile__("": : :"memory")
 #define __TBB_control_consistency_helper() __TBB_compiler_fence()
@@ -86,13 +86,6 @@ __TBB_MACHINE_DEFINE_ATOMICS(8,int64_t,"q")
 
 #undef __TBB_MACHINE_DEFINE_ATOMICS
 
-static inline int64_t __TBB_machine_lg( uint64_t x ) {
-    __TBB_ASSERT(x, "__TBB_Log2(0) undefined");
-    int64_t j;
-    __asm__ ("bsr %1,%0" : "=r"(j) : "r"(x));
-    return j;
-}
-
 static inline void __TBB_machine_or( volatile void *ptr, uint64_t value ) {
     __asm__ __volatile__("lock\norq %1,%0" : "=m"(*(volatile uint64_t*)ptr) : "r"(value), "m"(*(volatile uint64_t*)ptr) : "memory");
 }
@@ -104,55 +97,8 @@ static inline void __TBB_machine_and( volatile void *ptr, uint64_t value ) {
 #define __TBB_AtomicOR(P,V) __TBB_machine_or(P,V)
 #define __TBB_AtomicAND(P,V) __TBB_machine_and(P,V)
 
-// Definition of other functions
-#ifndef __TBB_Pause
-static inline void __TBB_machine_pause( int32_t delay ) {
-    for (int32_t i = 0; i < delay; i++) {
-       __asm__ __volatile__("pause;");
-    }
-    return;
-}
-#define __TBB_Pause(V) __TBB_machine_pause(V)
-#endif /* !__TBB_Pause */
-
-#define __TBB_Log2(V)  __TBB_machine_lg(V)
-
 #define __TBB_USE_FETCHSTORE_AS_FULL_FENCED_STORE           1
 #define __TBB_USE_GENERIC_HALF_FENCED_LOAD_STORE            1
 #define __TBB_USE_GENERIC_RELAXED_LOAD_STORE                1
 #define __TBB_USE_GENERIC_SEQUENTIAL_CONSISTENCY_LOAD_STORE 1
 
-// API to retrieve/update FPU control setting
-#ifndef __TBB_CPU_CTL_ENV_PRESENT
-#define __TBB_CPU_CTL_ENV_PRESENT 1
-
-struct __TBB_cpu_ctl_env_t {
-    int     mxcsr;
-    short   x87cw;
-};
-
-inline void __TBB_get_cpu_ctl_env ( __TBB_cpu_ctl_env_t* ctl ) {
-#if __TBB_ICC_12_0_INL_ASM_FSTCW_BROKEN
-    __TBB_cpu_ctl_env_t loc_ctl;
-    __asm__ __volatile__ (
-            "stmxcsr %0\n\t"
-            "fstcw %1"
-            : "=m"(loc_ctl.mxcsr), "=m"(loc_ctl.x87cw)
-    );
-    *ctl = loc_ctl;
-#else
-    __asm__ __volatile__ (
-            "stmxcsr %0\n\t"
-            "fstcw %1"
-            : "=m"(ctl->mxcsr), "=m"(ctl->x87cw)
-    );
-#endif
-}
-inline void __TBB_set_cpu_ctl_env ( const __TBB_cpu_ctl_env_t* ctl ) {
-    __asm__ __volatile__ (
-            "ldmxcsr %0\n\t"
-            "fldcw %1"
-            : : "m"(ctl->mxcsr), "m"(ctl->x87cw)
-    );
-}
-#endif /* !__TBB_CPU_CTL_ENV_PRESENT */

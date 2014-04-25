@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -38,6 +38,7 @@
 #include "tbb/null_rw_mutex.h"
 #include "tbb/atomic.h"
 #include "tbb/concurrent_unordered_map.h"
+#include "tbb/task.h"
 
 // Needed conversion to and from continue_msg, but didn't want to add
 // conversion operators to the class, since we don't want it in general,
@@ -68,7 +69,7 @@ template<size_t N>
 struct mof_helper {
     template<typename InputType, typename ports_type>
     static inline void output_converted_value(const InputType &i, ports_type &p) {
-        (void)std::get<N-1>(p).try_put(convertor<InputType,typename std::tuple_element<N-1,ports_type>::type::output_type>::convert_value(i));
+        (void)tbb::flow::get<N-1>(p).try_put(convertor<InputType,typename tbb::flow::tuple_element<N-1,ports_type>::type::output_type>::convert_value(i));
         output_converted_value<N-1>(i, p);
     }
 };
@@ -78,7 +79,7 @@ struct mof_helper<1> {
     template<typename InputType, typename ports_type>
     static inline void output_converted_value(const InputType &i, ports_type &p) {
         // just emit a default-constructed object
-        (void)std::get<0>(p).try_put(convertor<InputType,typename std::tuple_element<0,ports_type>::type::output_type>::convert_value(i));
+        (void)tbb::flow::get<0>(p).try_put(convertor<InputType,typename tbb::flow::tuple_element<0,ports_type>::type::output_type>::convert_value(i));
     }
 };
 
@@ -112,29 +113,30 @@ struct harness_graph_default_functor< tbb::flow::continue_msg, tbb::flow::contin
 
 template<typename InputType, typename OutputSet>
 struct harness_graph_default_multifunction_functor {
-    static const int N = std::tuple_size<OutputSet>::value;
+    static const int N = tbb::flow::tuple_size<OutputSet>::value;
     typedef typename tbb::flow::multifunction_node<InputType,OutputSet>::output_ports_type ports_type;
     static void construct(const InputType &i, ports_type &p) {
         mof_helper<N>::output_converted_value(i, p);
     }
 };
 
-static tbb::atomic<size_t> current_executors;
-
 //! An executor that accepts InputType and generates OutputType
-template< typename InputType, typename OutputType, typename M=tbb::null_rw_mutex >
+template< typename InputType, typename OutputType >
 struct harness_graph_executor {
 
     typedef OutputType (*function_ptr_type)( InputType v );
 
-    static M mutex;
+    template<typename RW>
+    struct mutex_holder { static RW mutex; };
+
     static function_ptr_type fptr;
     static tbb::atomic<size_t> execute_count;
+    static tbb::atomic<size_t> current_executors;
     static size_t max_executors;
 
     static inline OutputType func( InputType v ) {
-        typename M::scoped_lock l( mutex );
-        size_t c = current_executors.fetch_and_increment();
+        size_t c; // Declaration separate from initialization to avoid ICC internal error on IA-64 architecture
+        c = current_executors.fetch_and_increment();
         ASSERT( max_executors == 0 || c <= max_executors, NULL ); 
         ++execute_count;
         OutputType v2 = (*fptr)(v);
@@ -142,91 +144,113 @@ struct harness_graph_executor {
         return v2; 
     }
 
-    struct functor {
+    template< typename RW >
+    static inline OutputType tfunc( InputType v ) {
+        // Invocations allowed to be concurrent, the lock is acquired in shared ("read") mode.
+        // A test can take it exclusively, thus creating a barrier for invocations.
+        typename RW::scoped_lock l( mutex_holder<RW>::mutex, /*write=*/false );
+        return func(v);
+    }
+
+    template< typename RW >
+    struct tfunctor {
         tbb::atomic<size_t> my_execute_count;
-        functor() { my_execute_count = 0; }
-        functor( const functor &f ) { my_execute_count = f.my_execute_count; }
+        tfunctor() { my_execute_count = 0; }
+        tfunctor( const tfunctor &f ) { my_execute_count = f.my_execute_count; }
         OutputType operator()( InputType i ) {
-           typename M::scoped_lock l( harness_graph_executor::mutex );
-           size_t c = current_executors.fetch_and_increment();
-           ASSERT( harness_graph_executor::max_executors == 0 || c <= harness_graph_executor::max_executors, NULL ); 
-           ++execute_count;
+           typename RW::scoped_lock l( harness_graph_executor::mutex_holder<RW>::mutex, /*write=*/false );
            my_execute_count.fetch_and_increment();
-           OutputType v2 = (*harness_graph_executor::fptr)(i);
-           current_executors.fetch_and_decrement();
-           return v2; 
+           return harness_graph_executor::func(i); 
         }
     };
+    typedef tfunctor<tbb::null_rw_mutex> functor;
 
 };
 
 //! A multifunction executor that accepts InputType and has only one Output of OutputType.
-template< typename InputType, typename OutputTuple, typename M=tbb::null_rw_mutex >
+template< typename InputType, typename OutputTuple >
 struct harness_graph_multifunction_executor {
     typedef typename tbb::flow::multifunction_node<InputType,OutputTuple>::output_ports_type ports_type;
-    typedef typename std::tuple_element<0,OutputTuple>::type OutputType;
+    typedef typename tbb::flow::tuple_element<0,OutputTuple>::type OutputType;
 
     typedef void (*mfunction_ptr_type)( const InputType& v, ports_type &p );
 
-    static M mutex;
+    template<typename RW>
+    struct mutex_holder { static RW mutex; };
+
     static mfunction_ptr_type fptr;
     static tbb::atomic<size_t> execute_count;
+    static tbb::atomic<size_t> current_executors;
     static size_t max_executors;
 
 
     static inline void func( const InputType &v, ports_type &p ) {
-        typename M::scoped_lock l( mutex );
-        size_t c = current_executors.fetch_and_increment();
+        size_t c; // Declaration separate from initialization to avoid ICC internal error on IA-64 architecture
+        c = current_executors.fetch_and_increment();
         ASSERT( max_executors == 0 || c <= max_executors, NULL ); 
-        ASSERT(std::tuple_size<OutputTuple>::value == 1, NULL);
+        ASSERT(tbb::flow::tuple_size<OutputTuple>::value == 1, NULL);
         ++execute_count;
         (*fptr)(v,p);
         current_executors.fetch_and_decrement();
     }
 
-    struct functor {
+    template< typename RW >
+    static inline void tfunc( const InputType& v, ports_type &p ) {
+        // Shared lock in invocations, exclusive in a test; see a comment in harness_graph_executor.
+        typename RW::scoped_lock l( mutex_holder<RW>::mutex, /*write=*/false );
+        func(v,p);
+    }
+
+    template< typename RW >
+    struct tfunctor {
         tbb::atomic<size_t> my_execute_count;
-        functor() { my_execute_count = 0; }
-        functor( const functor &f ) { my_execute_count = f.my_execute_count; }
+        tfunctor() { my_execute_count = 0; }
+        tfunctor( const tfunctor &f ) { my_execute_count = f.my_execute_count; }
         void operator()( const InputType &i, ports_type &p ) {
-           typename M::scoped_lock l( harness_graph_multifunction_executor::mutex );
-           size_t c = current_executors.fetch_and_increment();
-           ASSERT( harness_graph_multifunction_executor::max_executors == 0 || c <= harness_graph_multifunction_executor::max_executors, NULL ); 
-           ++execute_count;
+           typename RW::scoped_lock l( harness_graph_multifunction_executor::mutex_holder<RW>::mutex, /*write=*/false );
            my_execute_count.fetch_and_increment();
-           (*harness_graph_multifunction_executor::fptr)(i,p);
-           current_executors.fetch_and_decrement();
+           harness_graph_multifunction_executor::func(i,p);
         }
     };
+    typedef tfunctor<tbb::null_rw_mutex> functor;
 
 };
 
-template< typename InputType, typename OutputType, typename M >
-M harness_graph_executor<InputType, OutputType, M>::mutex;
+// static vars for function_node tests
+template< typename InputType, typename OutputType >
+template< typename RW >
+RW harness_graph_executor<InputType, OutputType>::mutex_holder<RW>::mutex;
 
-template< typename InputType, typename OutputType, typename M >
-tbb::atomic<size_t> harness_graph_executor<InputType, OutputType, M>::execute_count;
+template< typename InputType, typename OutputType >
+tbb::atomic<size_t> harness_graph_executor<InputType, OutputType>::execute_count;
 
-template< typename InputType, typename OutputType, typename M >
-typename harness_graph_executor<InputType, OutputType, M>::function_ptr_type harness_graph_executor<InputType, OutputType, M>::fptr
+template< typename InputType, typename OutputType >
+typename harness_graph_executor<InputType, OutputType>::function_ptr_type harness_graph_executor<InputType, OutputType>::fptr
     = harness_graph_default_functor< InputType, OutputType >::construct;
 
-template< typename InputType, typename OutputType, typename M >
-size_t harness_graph_executor<InputType, OutputType, M>::max_executors = 0;
+template< typename InputType, typename OutputType >
+tbb::atomic<size_t> harness_graph_executor<InputType, OutputType>::current_executors;
+
+template< typename InputType, typename OutputType >
+size_t harness_graph_executor<InputType, OutputType>::max_executors = 0;
 
 // static vars for multifunction_node tests
-template< typename InputType, typename OutputTuple, typename M >
-M harness_graph_multifunction_executor<InputType, OutputTuple, M>::mutex;
+template< typename InputType, typename OutputTuple >
+template< typename RW >
+RW harness_graph_multifunction_executor<InputType, OutputTuple>::mutex_holder<RW>::mutex;
 
-template< typename InputType, typename OutputTuple, typename M >
-tbb::atomic<size_t> harness_graph_multifunction_executor<InputType, OutputTuple, M>::execute_count;
+template< typename InputType, typename OutputTuple >
+tbb::atomic<size_t> harness_graph_multifunction_executor<InputType, OutputTuple>::execute_count;
 
-template< typename InputType, typename OutputTuple, typename M >
-typename harness_graph_multifunction_executor<InputType, OutputTuple, M>::mfunction_ptr_type harness_graph_multifunction_executor<InputType, OutputTuple, M>::fptr
+template< typename InputType, typename OutputTuple >
+typename harness_graph_multifunction_executor<InputType, OutputTuple>::mfunction_ptr_type harness_graph_multifunction_executor<InputType, OutputTuple>::fptr
     = harness_graph_default_multifunction_functor< InputType, OutputTuple >::construct;
 
-template< typename InputType, typename OutputTuple, typename M >
-size_t harness_graph_multifunction_executor<InputType, OutputTuple, M>::max_executors = 0;
+template< typename InputType, typename OutputTuple >
+tbb::atomic<size_t> harness_graph_multifunction_executor<InputType, OutputTuple>::current_executors;
+
+template< typename InputType, typename OutputTuple >
+size_t harness_graph_multifunction_executor<InputType, OutputTuple>::max_executors = 0;
 
 //! Counts the number of puts received
 template< typename T >
@@ -246,15 +270,17 @@ struct harness_counting_receiver : public tbb::flow::receiver<T>, NoCopy {
        num_copies = c;
     }
 
-    /* override */ bool try_put( const T & ) {
+    /* override */ tbb::task *try_put_task( const T & ) {
       ++my_count;
-      return true;
+      return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
     }
 
     void validate() {
         size_t n = my_count;
         ASSERT( n == num_copies*max_value, NULL );
     }
+
+    /*override*/void reset_receiver() { my_count = 0; }
 
 };
 
@@ -284,7 +310,7 @@ struct harness_mapped_receiver : public tbb::flow::receiver<T>, NoCopy {
        my_map = new map_type;
     }
 
-    /* override */ bool try_put( const T &t ) {
+    /* override */ tbb::task * try_put_task( const T &t ) {
       if ( my_map ) {
           tbb::atomic<size_t> a;
           a = 1;
@@ -296,7 +322,7 @@ struct harness_mapped_receiver : public tbb::flow::receiver<T>, NoCopy {
       } else {
           ++my_count;
       }
-      return true;
+      return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
     }
 
     void validate() {
@@ -310,6 +336,8 @@ struct harness_mapped_receiver : public tbb::flow::receiver<T>, NoCopy {
             ASSERT( n == num_copies*max_value, NULL );
         }
     }
+
+    /*override*/void reset_receiver() { my_count = 0; if(my_map) delete my_map; my_map = new map_type; }
 
 };
 

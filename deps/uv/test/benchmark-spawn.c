@@ -30,7 +30,7 @@ static int N = 1000;
 static int done;
 
 static uv_process_t process;
-static uv_process_options_t options = { 0 };
+static uv_process_options_t options;
 static char exepath[1024];
 static size_t exepath_size = 1024;
 static char* args[3];
@@ -44,10 +44,10 @@ static int process_open;
 static int pipe_open;
 
 
-static void spawn();
+static void spawn(void);
 
 
-void maybe_spawn() {
+static void maybe_spawn(void) {
   if (process_open == 0 && pipe_open == 0) {
     done++;
     if (done < N) {
@@ -64,43 +64,43 @@ static void process_close_cb(uv_handle_t* handle) {
 }
 
 
-static void exit_cb(uv_process_t* process, int exit_status, int term_signal) {
+static void exit_cb(uv_process_t* process,
+                    int64_t exit_status,
+                    int term_signal) {
   ASSERT(exit_status == 42);
   ASSERT(term_signal == 0);
   uv_close((uv_handle_t*)process, process_close_cb);
 }
 
 
-uv_buf_t on_alloc(uv_handle_t* handle, size_t suggested_size) {
-  uv_buf_t buf;
-  buf.base = output + output_used;
-  buf.len = OUTPUT_SIZE - output_used;
-  return buf;
+static void on_alloc(uv_handle_t* handle,
+                     size_t suggested_size,
+                     uv_buf_t* buf) {
+  buf->base = output + output_used;
+  buf->len = OUTPUT_SIZE - output_used;
 }
 
 
-void pipe_close_cb(uv_handle_t* pipe) {
+static void pipe_close_cb(uv_handle_t* pipe) {
   ASSERT(pipe_open == 1);
   pipe_open = 0;
   maybe_spawn();
 }
 
 
-void on_read(uv_stream_t* pipe, ssize_t nread, uv_buf_t buf) {
-  uv_err_t err = uv_last_error(loop);
-
+static void on_read(uv_stream_t* pipe, ssize_t nread, const uv_buf_t* buf) {
   if (nread > 0) {
     ASSERT(pipe_open == 1);
     output_used += nread;
   } else if (nread < 0) {
-    if (err.code == UV_EOF) {
+    if (nread == UV_EOF) {
       uv_close((uv_handle_t*)pipe, pipe_close_cb);
     }
   }
 }
 
 
-static void spawn() {
+static void spawn(void) {
   uv_stdio_container_t stdio[2];
   int r;
 
@@ -122,7 +122,7 @@ static void spawn() {
   options.stdio[1].flags = UV_CREATE_PIPE | UV_WRITABLE_PIPE;
   options.stdio[1].data.stream = (uv_stream_t*)&out;
 
-  r = uv_spawn(loop, &process, options);
+  r = uv_spawn(loop, &process, &options);
   ASSERT(r == 0);
 
   process_open = 1;
@@ -149,7 +149,7 @@ BENCHMARK_IMPL(spawn) {
 
   spawn();
 
-  r = uv_run(loop);
+  r = uv_run(loop, UV_RUN_DEFAULT);
   ASSERT(r == 0);
 
   uv_update_time(loop);
@@ -158,5 +158,6 @@ BENCHMARK_IMPL(spawn) {
   LOGF("spawn: %.0f spawns/s\n",
        (double) N / (double) (end_time - start_time) * 1000.0);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -62,6 +62,10 @@
     #pragma warning( pop )
 #endif
 
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    #include <initializer_list>
+#endif
+
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER) && defined(_Wp64)
     // Workaround for overzealous compiler warnings in /Wp64 mode
     #pragma warning (push)
@@ -72,6 +76,9 @@ namespace tbb {
 
 template<typename T, class A = cache_aligned_allocator<T> >
 class concurrent_vector;
+
+template<typename Container, typename Value>
+class vector_iterator;
 
 //! @cond INTERNAL
 namespace internal {
@@ -135,6 +142,10 @@ namespace internal {
         }
         __TBB_EXPORTED_METHOD ~concurrent_vector_base_v3();
 
+        //these helpers methods use the fact that segments are allocated so
+        //that every segment size is a (increasing) power of 2.
+        //with one exception 0 segment has size of 2 as well segment 1;
+        //e.g. size of segment with index of 3 is 2^3=8;
         static segment_index_t segment_index_of( size_type index ) {
             return segment_index_t( __TBB_Log2( index|1 ) );
         }
@@ -151,6 +162,16 @@ namespace internal {
 
         static size_type segment_size( segment_index_t k ) {
             return segment_index_t(1)<<k; // fake value for k==0
+        }
+
+
+        static bool is_first_element_in_segment(size_type element_index){
+            //check if element_index is a power of 2 that is at least 2.
+            //The idea is to detect if the iterator crosses a segment boundary,
+            //and 2 is the minimal index for which it's true
+            __TBB_ASSERT(element_index, "there should be no need to call "
+                                        "is_first_element_in_segment for 0th element" );
+            return is_power_of_two_factor( element_index, 2 );
         }
 
         //! An operation on an n-element array starting at begin.
@@ -189,6 +210,10 @@ private:
         //! Private functionality
         class helper;
         friend class helper;
+
+        template<typename Container, typename Value>
+        friend class vector_iterator;
+
     };
 
     typedef concurrent_vector_base_v3 concurrent_vector_base;
@@ -278,11 +303,12 @@ public: // workaround for MSVC
 
         //! Pre increment
         vector_iterator& operator++() {
-            size_t k = ++my_index;
+            size_t element_index = ++my_index;
             if( my_item ) {
-                // Following test uses 2's-complement wizardry
-                if( (k& (k-2))==0 ) {
-                    // k is a power of two that is at least k-2
+                //TODO: consider using of knowledge about "first_block optimization" here as well?
+                if( concurrent_vector_base::is_first_element_in_segment(element_index)) {
+                    //if the iterator crosses a segment boundary, the pointer become invalid
+                    //as possibly next segment is in another memory location
                     my_item= NULL;
                 } else {
                     ++my_item;
@@ -294,11 +320,11 @@ public: // workaround for MSVC
         //! Pre decrement
         vector_iterator& operator--() {
             __TBB_ASSERT( my_index>0, "operator--() applied to iterator already at beginning of concurrent_vector" );
-            size_t k = my_index--;
+            size_t element_index = my_index--;
             if( my_item ) {
-                // Following test uses 2's-complement wizardry
-                if( (k& (k-2))==0 ) {
-                    // k is a power of two that is at least k-2  
+                if(concurrent_vector_base::is_first_element_in_segment(element_index)) {
+                    //if the iterator crosses a segment boundary, the pointer become invalid
+                    //as possibly next segment is in another memory location
                     my_item= NULL;
                 } else {
                     --my_item;
@@ -509,6 +535,23 @@ public:
         vector_allocator_ptr = &internal_allocator;
     }
 
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! Constructor from initializer_list
+    concurrent_vector(std::initializer_list<T> init_list, const allocator_type &a = allocator_type())
+        : internal::allocator_base<T, A>(a), internal::concurrent_vector_base()
+    {
+        vector_allocator_ptr = &internal_allocator;
+        __TBB_TRY {
+            internal_assign_iterators(init_list.begin(), init_list.end());
+        } __TBB_CATCH(...) {
+            segment_t *table = my_segment;
+            internal_free_segments( reinterpret_cast<void**>(table), internal_clear(&destroy_array), my_first_block );
+            __TBB_RETHROW();
+        }
+
+    }
+#endif //# __TBB_INITIALIZER_LISTS_PRESENT
+
     //! Copying constructor
     concurrent_vector( const concurrent_vector& vector, const allocator_type& a = allocator_type() )
         : internal::allocator_base<T, A>(a), internal::concurrent_vector_base()
@@ -587,6 +630,8 @@ public:
         return *this;
     }
 
+    //TODO: add an template assignment operator? (i.e. with different element type)
+
     //! Assignment for vector with different allocator type
     template<class M>
     concurrent_vector& operator=( const concurrent_vector<T, M>& vector ) {
@@ -596,19 +641,30 @@ public:
         return *this;
     }
 
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! Assignment for initializer_list
+    concurrent_vector& operator=( const std::initializer_list<T> & init_list) {
+        internal_clear(&destroy_array);
+        internal_assign_iterators(init_list.begin(), init_list.end());
+        return *this;
+    }
+#endif //#if __TBB_INITIALIZER_LISTS_PRESENT
+
     //------------------------------------------------------------------------
     // Concurrent operations
     //------------------------------------------------------------------------
+    //TODO: consider adding overload of grow_by accepting range of iterators:  grow_by(iterator,iterator)
+    //TODO: consider adding overload of grow_by accepting initializer_list:  grow_by(std::initializer_list<T>), as a analogy to std::vector::insert(initializer_list)
     //! Grow by "delta" elements.
 #if TBB_DEPRECATED
     /** Returns old size. */
     size_type grow_by( size_type delta ) {
-        return delta ? internal_grow_by( delta, sizeof(T), &initialize_array, NULL ) : my_early_size;
+        return delta ? internal_grow_by( delta, sizeof(T), &initialize_array, NULL ) : my_early_size.load();
     }
 #else
     /** Returns iterator pointing to the first new element. */
     iterator grow_by( size_type delta ) {
-        return iterator(*this, delta ? internal_grow_by( delta, sizeof(T), &initialize_array, NULL ) : my_early_size);
+        return iterator(*this, delta ? internal_grow_by( delta, sizeof(T), &initialize_array, NULL ) : my_early_size.load());
     }
 #endif
 
@@ -616,12 +672,12 @@ public:
 #if TBB_DEPRECATED
     /** Returns old size. */
     size_type grow_by( size_type delta, const_reference t ) {
-        return delta ? internal_grow_by( delta, sizeof(T), &initialize_array_by, static_cast<const void*>(&t) ) : my_early_size;
+        return delta ? internal_grow_by( delta, sizeof(T), &initialize_array_by, static_cast<const void*>(&t) ) : my_early_size.load();
     }
 #else
     /** Returns iterator pointing to the first new element. */
     iterator grow_by( size_type delta, const_reference t ) {
-        return iterator(*this, delta ? internal_grow_by( delta, sizeof(T), &initialize_array_by, static_cast<const void*>(&t) ) : my_early_size);
+        return iterator(*this, delta ? internal_grow_by( delta, sizeof(T), &initialize_array_by, static_cast<const void*>(&t) ) : my_early_size.load());
     }
 #endif
 
@@ -805,11 +861,19 @@ public:
         clear(); internal_assign_range( first, last, static_cast<is_integer_tag<std::numeric_limits<I>::is_integer> *>(0) );
     }
 
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! assigns an initializer list
+    void assign(std::initializer_list<T> init_list) {
+        clear(); internal_assign_iterators( init_list.begin(), init_list.end());
+    }
+#endif //# __TBB_INITIALIZER_LISTS_PRESENT
+
     //! swap two instances
     void swap(concurrent_vector &vector) {
+        using std::swap;
         if( this != &vector ) {
             concurrent_vector_base_v3::internal_swap(static_cast<concurrent_vector_base_v3&>(vector));
-            std::swap(this->my_allocator, vector.my_allocator);
+            swap(this->my_allocator, vector.my_allocator);
         }
     }
 
@@ -890,6 +954,7 @@ private:
         void init(const void *src) { for(; i < n; ++i) new( &array[i] ) T(*static_cast<const T*>(src)); }
         void copy(const void *src) { for(; i < n; ++i) new( &array[i] ) T(static_cast<const T*>(src)[i]); }
         void assign(const void *src) { for(; i < n; ++i) array[i] = static_cast<const T*>(src)[i]; }
+        //TODO: rename to construct_range
         template<class I> void iterate(I &src) { for(; i < n; ++i, ++src) new( &array[i] ) T( *src ); }
         ~internal_loop_guide() {
             if(i < n) // if exception raised, do zeroing on the rest of items

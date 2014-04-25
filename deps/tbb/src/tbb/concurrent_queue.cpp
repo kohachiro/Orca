@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -181,7 +181,7 @@ void micro_queue::push( const void* item, ticket k, concurrent_queue_base& base 
     k &= -concurrent_queue_rep::n_queue;
     page* p = NULL;
     // find index on page where we would put the data
-    size_t index = k/concurrent_queue_rep::n_queue & (base.items_per_page-1);
+    size_t index = modulo_power_of_two( k/concurrent_queue_rep::n_queue, base.items_per_page );
     if( !index ) {  // make a new page
         __TBB_TRY {
             p = base.allocate_page();
@@ -194,17 +194,16 @@ void micro_queue::push( const void* item, ticket k, concurrent_queue_base& base 
     }
 
     // wait for my turn
-    if( tail_counter!=k ) {
-        atomic_backoff backoff;
-        do {
-            backoff.pause();
-            // no memory. throws an exception; assumes concurrent_queue_rep::n_queue>1
-            if( tail_counter&0x1 ) {
+    if( tail_counter!=k ) // The developer insisted on keeping first check out of the backoff loop
+        for( atomic_backoff b(true);;b.pause() ) {
+            ticket tail = tail_counter;
+            if( tail==k ) break;
+            else if( tail&0x1 ) {
+                // no memory. throws an exception; assumes concurrent_queue_rep::n_queue>1
                 ++base.my_rep->n_invalid_entries;
                 throw_exception( eid_bad_last_alloc );
             }
-        } while( tail_counter!=k ) ;
-    }
+        }
 
     if( p ) { // page is newly allocated; insert in micro_queue
         spin_mutex::scoped_lock lock( page_mutex );
@@ -246,7 +245,7 @@ bool micro_queue::pop( void* dst, ticket k, concurrent_queue_base& base ) {
     spin_wait_while_eq( tail_counter, k );
     page& p = *head_page;
     __TBB_ASSERT( &p, NULL );
-    size_t index = k/concurrent_queue_rep::n_queue & (base.items_per_page-1);
+    size_t index = modulo_power_of_two( k/concurrent_queue_rep::n_queue, base.items_per_page );
     bool success = false;
     {
         micro_queue_pop_finalizer finalizer( *this, base, k+concurrent_queue_rep::n_queue, index==base.items_per_page-1 ? &p : NULL );
@@ -274,7 +273,7 @@ micro_queue& micro_queue::assign( const micro_queue& src, concurrent_queue_base&
         ticket g_index = head_counter;
         __TBB_TRY {
             size_t n_items  = (tail_counter-head_counter)/concurrent_queue_rep::n_queue;
-            size_t index = head_counter/concurrent_queue_rep::n_queue & (base.items_per_page-1);
+            size_t index = modulo_power_of_two( head_counter/concurrent_queue_rep::n_queue, base.items_per_page );
             size_t end_in_first_page = (index+n_items<base.items_per_page)?(index+n_items):base.items_per_page;
 
             head_page = make_copy( base, srcp, index, end_in_first_page, g_index );
@@ -288,7 +287,7 @@ micro_queue& micro_queue::assign( const micro_queue& src, concurrent_queue_base&
 
                 __TBB_ASSERT( srcp==src.tail_page, NULL );
 
-                size_t last_index = tail_counter/concurrent_queue_rep::n_queue & (base.items_per_page-1);
+                size_t last_index = modulo_power_of_two( tail_counter/concurrent_queue_rep::n_queue, base.items_per_page );
                 if( last_index==0 ) last_index = base.items_per_page;
 
                 cur_page->next = make_copy( base, srcp, 0, last_index, g_index );
@@ -569,7 +568,7 @@ public:
         } else {
             concurrent_queue_base::page* p = array[concurrent_queue_rep::index(k)];
             __TBB_ASSERT(p,NULL);
-            size_t i = k/concurrent_queue_rep::n_queue & (my_queue.items_per_page-1);
+            size_t i = modulo_power_of_two( k/concurrent_queue_rep::n_queue, my_queue.items_per_page );
             item = static_cast<unsigned char*>(static_cast<void*>(p)) + offset_of_last + my_queue.item_size*i;
             return (p->mask & uintptr_t(1)<<i)!=0;
         }
@@ -618,7 +617,7 @@ void concurrent_queue_iterator_base_v3::advance() {
     my_rep->get_item(tmp,k);
     __TBB_ASSERT( my_item==tmp, NULL );
 #endif /* TBB_USE_ASSERT */
-    size_t i = k/concurrent_queue_rep::n_queue & (queue.items_per_page-1);
+    size_t i = modulo_power_of_two( k/concurrent_queue_rep::n_queue, queue.items_per_page );
     if( i==queue.items_per_page-1 ) {
         concurrent_queue_base::page*& root = my_rep->array[concurrent_queue_rep::index(k)];
         root = root->next;

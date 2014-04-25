@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -49,7 +49,7 @@ ifneq (,$(shell icc -dumpversion | egrep  "^1[1-9]\."))
     CPP11_FLAGS = -std=c++0x -D_TBB_CPP0X
 endif
 
-# ICC 12.0 and higher provide Intel(R) Cilk Plus
+# ICC 12.0 and higher provide Intel(R) Cilk(TM) Plus
 ifneq (,$(shell icc -dumpversion | egrep  "^1[2-9]\."))
     CILK_AVAILABLE = yes
 endif
@@ -67,9 +67,16 @@ ifneq (,$(codecov))
 endif
 
 ifneq (00,$(lambdas)$(cpp0x))
-	CPLUS_FLAGS += $(CPP11_FLAGS)
+	CXX_ONLY_FLAGS += $(CPP11_FLAGS)
 endif
 
+# ICC 14.0 and higher support clang environment
+ifneq (,$(shell icc -dumpversion | egrep  "^1[4-9]\."))
+    ifeq (libc++,$(stdlib))
+        CPLUS_FLAGS    += -use-clang-env -stdlib=libc++
+        LIB_LINK_FLAGS += -use-clang-env -stdlib=libc++
+    endif
+endif
 #------------------------------------------------------------------------------
 # Setting assembler data.
 #------------------------------------------------------------------------------

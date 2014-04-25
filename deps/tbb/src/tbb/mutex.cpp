@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -115,7 +115,7 @@ bool mutex::scoped_lock::internal_try_acquire( mutex& m ) {
 
 void mutex::internal_construct() {
 #if _WIN32||_WIN64
-    InitializeCriticalSection(&impl);
+    InitializeCriticalSectionEx(&impl, 4000, 0);
     state = INITIALIZED;  
 #else
     int error_code = pthread_mutex_init(&impl,NULL);

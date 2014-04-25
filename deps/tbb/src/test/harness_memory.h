@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -27,7 +27,7 @@
 */
 
 // Declarations for simple estimate of the memory being used by a program.
-// Not yet implemented for Mac.
+// Not yet implemented for OS X*.
 // This header is an optional part of the test harness.
 // It assumes that "harness_assert.h" has already been included.
 
@@ -62,7 +62,7 @@ const size_t shared_size = 0;
 //! Return estimate of number of bytes of memory that this program is currently using.
 /* Returns 0 if not implemented on platform. */
 size_t GetMemoryUsage() { 
-#if _XBOX
+#if _XBOX || __TBB_WIN8UI_SUPPORT
     return 0;
 #elif _WIN32
     PROCESS_MEMORY_COUNTERS mem;

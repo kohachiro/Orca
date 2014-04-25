@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -31,6 +31,7 @@
 #ifndef __TBB_rml_tbb_H
 #define __TBB_rml_tbb_H
 
+#include "tbb/tbb_config.h"
 #include "rml_base.h"
 
 namespace tbb {

@@ -30,6 +30,12 @@
 
 #include "zone.h"
 
+#ifdef V8_USE_ADDRESS_SANITIZER
+  #include <sanitizer/asan_interface.h>
+#else
+  #define ASAN_UNPOISON_MEMORY_REGION(start, size) ((void) 0)
+#endif
+
 #include "counters.h"
 #include "isolate.h"
 #include "utils.h"
@@ -39,8 +45,10 @@ namespace v8 {
 namespace internal {
 
 
+static const int kASanRedzoneBytes = 24;  // Must be a multiple of 8.
+
+
 inline void* Zone::New(int size) {
-  ASSERT(scope_nesting_ > 0);
   // Round up the requested size to fit the alignment.
   size = RoundUp(size, kAlignment);
 
@@ -55,11 +63,24 @@ inline void* Zone::New(int size) {
   // Check if the requested size is available without expanding.
   Address result = position_;
 
-  if (size > limit_ - position_) {
-     result = NewExpand(size);
+  int size_with_redzone =
+#ifdef V8_USE_ADDRESS_SANITIZER
+      size + kASanRedzoneBytes;
+#else
+      size;
+#endif
+
+  if (size_with_redzone > limit_ - position_) {
+     result = NewExpand(size_with_redzone);
   } else {
-     position_ += size;
+     position_ += size_with_redzone;
   }
+
+#ifdef V8_USE_ADDRESS_SANITIZER
+  Address redzone_position = result + size;
+  ASSERT(redzone_position + kASanRedzoneBytes == position_);
+  ASAN_POISON_MEMORY_REGION(redzone_position, kASanRedzoneBytes);
+#endif
 
   // Check that the result has the proper alignment and return it.
   ASSERT(IsAddressAligned(result, kAlignment, 0));
@@ -70,12 +91,13 @@ inline void* Zone::New(int size) {
 
 template <typename T>
 T* Zone::NewArray(int length) {
+  CHECK(std::numeric_limits<int>::max() / static_cast<int>(sizeof(T)) > length);
   return static_cast<T*>(New(length * sizeof(T)));
 }
 
 
 bool Zone::excess_allocation() {
-  return segment_bytes_allocated_ > zone_excess_limit_;
+  return segment_bytes_allocated_ > kExcessLimit;
 }
 
 
@@ -110,14 +132,9 @@ void* ZoneList<T>::operator new(size_t size, Zone* zone) {
 }
 
 
-ZoneScope::ZoneScope(Zone* zone, ZoneScopeMode mode)
-    : zone_(zone), mode_(mode) {
-  zone_->scope_nesting_++;
-}
-
-
-bool ZoneScope::ShouldDeleteOnExit() {
-  return zone_->scope_nesting_ == 1 && mode_ == DELETE_ON_EXIT;
+template <typename T>
+void* ZoneSplayTree<T>::operator new(size_t size, Zone* zone) {
+  return zone->New(static_cast<int>(size));
 }
 
 

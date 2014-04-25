@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -65,24 +65,20 @@ class intrusive_list_base {
     class iterator_impl {
         Iterator& self () { return *static_cast<Iterator*>(this); }
 
-        //! Pointer to the head of the list being iterated
-        intrusive_list_node *my_list_head;
-
         //! Node the iterator points to at the moment
         intrusive_list_node *my_pos;
 
     protected:
-        iterator_impl ( intrusive_list_node* head, intrusive_list_node* pos )
-            : my_list_head(head), my_pos(pos)
+        iterator_impl (intrusive_list_node* pos )
+            :  my_pos(pos)
         {}
 
         T& item () const {
-            //return *reinterpret_cast<T*>((char*)my_pos - ((ptrdiff_t)&(reinterpret_cast<T*>(0x1000)->*NodePtr) - 0x1000));
             return intrusive_list_base::item(my_pos);
         }
 
     public:
-        iterator_impl () : my_list_head(NULL), my_pos(NULL) {}
+        iterator_impl () :  my_pos(NULL) {}
         
         bool operator == ( const Iterator& it ) const {
             return my_pos == it.my_pos;
@@ -130,8 +126,8 @@ public:
     class iterator : public iterator_impl<iterator> {
         template <class U, class V> friend class intrusive_list_base;
 
-        iterator ( intrusive_list_node* head, intrusive_list_node* pos )
-            : iterator_impl<iterator>( head, pos )
+        iterator (intrusive_list_node* pos )
+            : iterator_impl<iterator>(pos )
         {}
     public:
         iterator () {}
@@ -144,8 +140,8 @@ public:
     class const_iterator : public iterator_impl<const_iterator> {
         template <class U, class V> friend class intrusive_list_base;
 
-        const_iterator ( const intrusive_list_node* head, const intrusive_list_node* pos )
-            : iterator_impl<const_iterator>( const_cast<intrusive_list_node*>(head), const_cast<intrusive_list_node*>(pos) )
+        const_iterator (const intrusive_list_node* pos )
+            : iterator_impl<const_iterator>(const_cast<intrusive_list_node*>(pos) )
         {}
     public:
         const_iterator () {}
@@ -164,13 +160,13 @@ public:
 
     size_t size () const { return my_size; }
 
-    iterator begin () { return iterator(&my_head, my_head.my_next_node); }
+    iterator begin () { return iterator(my_head.my_next_node); }
 
-    iterator end () { return iterator(&my_head, &my_head); }
+    iterator end () { return iterator(&my_head); }
 
-    const_iterator begin () const { return const_iterator(&my_head, my_head.my_next_node); }
+    const_iterator begin () const { return const_iterator(my_head.my_next_node); }
 
-    const_iterator end () const { return const_iterator(&my_head, &my_head); }
+    const_iterator end () const { return const_iterator(&my_head); }
 
     void push_front ( T& val ) {
         __TBB_ASSERT( node(val).my_prev_node == &node(val) && node(val).my_next_node == &node(val), 

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -77,16 +77,11 @@ namespace tbb {
     };
 }
 
-#if HARNESS_USE_PROXY
-    #define TBB_PREVIEW_RUNTIME_LOADER 1
-    #include "tbb/runtime_loader.h"
-    static char const * test_path[] = { ".", NULL };
-    static tbb::runtime_loader test_runtime_loader( test_path );
-#endif // HARNESS_USE_PROXY
+#include "harness_runtime_loader.h"
 
 tbb::concurrent_hash_map<UserDefinedKeyType,int> TestInstantiationWithUserDefinedKeyType;
 
-// Test whether a sufficient set of headers were included to instantiate a concurernt_hash_map. OSS Bug #120 (& #130):
+// Test whether a sufficient set of headers were included to instantiate a concurrent_hash_map. OSS Bug #120 (& #130):
 // http://www.threadingbuildingblocks.org/bug_desc.php?id=120
 tbb::concurrent_hash_map<std::pair<std::pair<int,std::string>,const char*>,int> TestInstantiation;
 
@@ -917,6 +912,40 @@ void TestExceptions() {
 }
 #endif /* TBB_USE_EXCEPTIONS */
 
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+#include "test_initializer_list.h"
+
+void TestInitList(){
+    using namespace initializer_list_support_tests;
+    REMARK("testing initializer_list methods \n");
+
+    typedef tbb::concurrent_hash_map<int,int> ch_map_type;
+    std::initializer_list<ch_map_type::value_type > pairs_il = {{1,1},{2,2},{3,3},{4,4},{5,5}};
+
+    TestInitListSupportWithoutAssign<ch_map_type>(pairs_il);
+    TestInitListSupportWithoutAssign<ch_map_type>({});
+}
+#endif //if __TBB_INITIALIZER_LISTS_PRESENT
+
+#if __TBB_RANGE_BASED_FOR_PRESENT
+#include "test_range_based_for.h"
+
+void TestRangeBasedFor(){
+    using namespace range_based_for_support_tests;
+
+    REMARK("testing range based for loop compatibility \n");
+    typedef tbb::concurrent_hash_map<int,int> ch_map;
+    ch_map a_ch_map;
+
+    const int sequence_length = 100;
+    for (int i = 1; i <= sequence_length; ++i){
+        a_ch_map.insert(ch_map::value_type(i,i));
+    }
+
+    ASSERT( range_based_for_accumulate(a_ch_map, pair_second_summer(), 0) == gauss_summ_of_int_sequence(sequence_length), "incorrect accumulated value generated via range based for ?");
+}
+#endif //if __TBB_RANGE_BASED_FOR_PRESENT
 //------------------------------------------------------------------------
 // Test driver
 //------------------------------------------------------------------------
@@ -936,6 +965,14 @@ int TestMain () {
     TestRehash();
     TestAssignment();
     TestIteratorsAndRanges();
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    TestInitList();
+#endif //__TBB_INITIALIZER_LISTS_PRESENT
+
+#if __TBB_RANGE_BASED_FOR_PRESENT
+    TestRangeBasedFor();
+#endif //#if __TBB_RANGE_BASED_FOR_PRESENT
+
 #if TBB_USE_EXCEPTIONS
     TestExceptions();
 #endif /* TBB_USE_EXCEPTIONS */

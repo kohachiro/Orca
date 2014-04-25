@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -71,7 +71,7 @@ void* MapMemory (size_t bytes, bool hugePages)
     void* result = 0;
     int prevErrno = errno;
 #ifndef MAP_ANONYMOUS
-// Mac OS* X defines MAP_ANON, which is deprecated in Linux.
+// OS X* defines MAP_ANON, which is deprecated in Linux*.
 #define MAP_ANONYMOUS MAP_ANON
 #endif /* MAP_ANONYMOUS */
     int addFlags = hugePages? __TBB_MAP_HUGETLB : 0;
@@ -90,7 +90,7 @@ int UnmapMemory(void *area, size_t bytes)
     return ret;
 }
 
-#elif (_WIN32 || _WIN64) && !_XBOX
+#elif (_WIN32 || _WIN64) && !_XBOX && !__TBB_WIN8UI_SUPPORT
 #include <windows.h>
 
 #define MEMORY_MAPPING_USES_MALLOC 0
@@ -100,7 +100,7 @@ void* MapMemory (size_t bytes, bool)
     return VirtualAlloc(NULL, bytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 }
 
-int UnmapMemory(void *area, size_t bytes)
+int UnmapMemory(void *area, size_t /*bytes*/)
 {
     BOOL result = VirtualFree(area, 0, MEM_RELEASE);
     return !result;
@@ -114,7 +114,7 @@ void* MapMemory (size_t bytes, bool)
     return ErrnoPreservingMalloc( bytes );
 }
 
-int UnmapMemory(void *area, size_t bytes)
+int UnmapMemory(void *area, size_t /*bytes*/)
 {
     free( area );
     return 0;

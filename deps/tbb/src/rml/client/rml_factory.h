@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -47,22 +47,16 @@
 #error Unknown OS
 #endif
 
-#include "library_assert.h"
-
 const ::rml::versioned_object::version_type CLIENT_VERSION = 2;
 
-#if __TBB_WEAK_SYMBOLS
+#if __TBB_WEAK_SYMBOLS_PRESENT
     #pragma weak __RML_open_factory
-    #pragma weak __TBB_make_rml_server
     #pragma weak __RML_close_factory
-    #pragma weak __TBB_call_with_my_server_info
     extern "C" {
         ::rml::factory::status_type __RML_open_factory ( ::rml::factory&, ::rml::versioned_object::version_type&, ::rml::versioned_object::version_type );
-        ::rml::factory::status_type __TBB_make_rml_server( tbb::internal::rml::tbb_factory& f, tbb::internal::rml::tbb_server*& server, tbb::internal::rml::tbb_client& client );
-        void __TBB_call_with_my_server_info( ::rml::server_info_callback_t cb, void* arg );
         void __RML_close_factory( ::rml::factory& f );
     }
-#endif /* __TBB_WEAK_SYMBOLS */
+#endif /* __TBB_WEAK_SYMBOLS_PRESENT */
 
 ::rml::factory::status_type FACTORY::open() {
     // Failure of following assertion indicates that factory is already open, or not zero-inited.
@@ -75,10 +69,10 @@ const ::rml::versioned_object::version_type CLIENT_VERSION = 2;
         GET_INFO(my_call_with_server_info_routine),
     };
     status_type result;
-    if( dynamic_link( RML_SERVER_NAME, server_link_table, 4, 4, &library_handle ) ) {
+    if( dynamic_link( RML_SERVER_NAME, server_link_table, 4, &library_handle ) ) {
         version_type server_version;
         result = (*open_factory_routine)( *this, server_version, CLIENT_VERSION );
-        // server_version can be checked here for incompatibility here if necessary.
+        // server_version can be checked here for incompatibility if necessary.
     } else {
         library_handle = NULL;
         result = st_not_found;

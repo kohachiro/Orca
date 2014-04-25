@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -269,7 +269,7 @@ void Test4 () {
     TRY();
         tbb::task::spawn_root_and_wait(tl);
     CATCH_AND_ASSERT();
-    ASSERT (!exceptionCaught, "exception in this scope is unexpected");
+    ASSERT (!l_ExceptionCaughtAtCurrentLevel, "exception in this scope is unexpected");
     intptr_t  num_tasks_expected = NUM_ROOT_TASKS * (NUM_CHILD_TASKS + 2);
     ASSERT (g_CurStat.Existed() == num_tasks_expected, "Wrong total number of tasks");
     if ( g_SolitaryException )
@@ -286,7 +286,7 @@ void Test4_1 () {
     TRY();
         tbb::task::spawn_root_and_wait(tl);
     CATCH_AND_ASSERT();
-    ASSERT (!exceptionCaught, "exception in this scope is unexpected");
+    ASSERT (!l_ExceptionCaughtAtCurrentLevel, "exception in this scope is unexpected");
     intptr_t  num_tasks_expected = NUM_ROOT_TASKS * (NUM_CHILD_TASKS + 2);
     ASSERT (g_CurStat.Existed() == num_tasks_expected, "Wrong total number of tasks");
     if ( g_SolitaryException )
@@ -321,7 +321,7 @@ void Test5 () {
     TRY();
         tbb::task::spawn_root_and_wait(tl);
     CATCH_AND_ASSERT();
-    ASSERT (!exceptionCaught, "unexpected exception intercepted");
+    ASSERT (!l_ExceptionCaughtAtCurrentLevel, "unexpected exception intercepted");
     if ( g_SolitaryException )  {
         intptr_t  num_tasks_expected = NUM_ROOTS_IN_GROUP * (1 + NUM_ROOT_TASKS * (1 + NUM_CHILD_TASKS));
         intptr_t  min_num_tasks_executed = num_tasks_expected - NUM_ROOT_TASKS * (NUM_CHILD_TASKS + 1);
@@ -337,7 +337,7 @@ class ThrowingRootLauncherTask : public TaskBase {
         TRY();
             spawn_root_and_wait(r);
         CATCH();
-        ASSERT (!exceptionCaught, "unexpected exception intercepted");
+        ASSERT (!l_ExceptionCaughtAtCurrentLevel, "unexpected exception intercepted");
         ThrowTestException(NUM_CHILD_TASKS);
         g_TaskWasCancelled |= is_cancelled();
         return NULL;
@@ -359,14 +359,14 @@ class BoundHierarchyLauncherTask : public TaskBase {
         TRY();
             spawn_root_and_wait(tl);
         CATCH_AND_ASSERT();
-        ASSERT (exceptionCaught, "no exception occurred");
+        ASSERT (l_ExceptionCaughtAtCurrentLevel, "no exception occurred");
         ASSERT (!tl.empty(), "task list was cleared somehow");
         if ( g_SolitaryException )
             ASSERT (g_TaskWasCancelled, "No tasks were cancelled despite of exception");
         if ( m_Recover ) {
             // Test task_group_context::unbind and task_group_context::reset methods
             g_ThrowException = false;
-            exceptionCaught = false;
+            l_ExceptionCaughtAtCurrentLevel = false;
             tl.clear();
             alloc_roots(ctx, tl);
             ctx.reset();
@@ -374,9 +374,9 @@ class BoundHierarchyLauncherTask : public TaskBase {
                 spawn_root_and_wait(tl);
             }
             catch (...) {
-                exceptionCaught = true;
+                l_ExceptionCaughtAtCurrentLevel = true;
             }
-            ASSERT (!exceptionCaught, "unexpected exception occurred");
+            ASSERT (!l_ExceptionCaughtAtCurrentLevel, "unexpected exception occurred");
         }
         return NULL;
     }
@@ -397,7 +397,7 @@ void Test6 () {
     TRY();
         tbb::task::spawn_root_and_wait(r);
     CATCH_AND_ASSERT();
-    ASSERT (!exceptionCaught, "unexpected exception intercepted");
+    ASSERT (!l_ExceptionCaughtAtCurrentLevel, "unexpected exception intercepted");
     // After the first of the branches (ThrowingRootLauncherTask) completes, 
     // the rest of the task tree may be collapsed before having a chance to execute leaves.
     // A number of branches running concurrently with the first one will be able to spawn leaves though.
@@ -425,7 +425,7 @@ void Test7 () {
     TRY();
         tbb::task::spawn_root_and_wait(r);
     CATCH_AND_ASSERT();
-    ASSERT (!exceptionCaught, "unexpected exception intercepted");
+    ASSERT (!l_ExceptionCaughtAtCurrentLevel, "unexpected exception intercepted");
     ASSERT_TEST_POSTCOND();
 } // void Test6 ()
 
@@ -439,7 +439,7 @@ class BoundHierarchyLauncherTask2 : public TaskBase {
             spawn_root_and_wait(tl);
         CATCH_AND_ASSERT();
         // Exception must be intercepted by RootLauncherTask
-        ASSERT (!exceptionCaught, "no exception occurred");
+        ASSERT (!l_ExceptionCaughtAtCurrentLevel, "no exception occurred");
         return NULL;
     }
 }; // class BoundHierarchyLauncherTask2
@@ -455,7 +455,7 @@ void Test8 () {
     TRY();
         tbb::task::spawn_root_and_wait(r);
     CATCH_AND_ASSERT();
-    ASSERT (!exceptionCaught, "unexpected exception intercepted");
+    ASSERT (!l_ExceptionCaughtAtCurrentLevel, "unexpected exception intercepted");
     if ( g_SolitaryException )  {
         intptr_t  num_tasks_expected = 1 + NUM_ROOT_TASKS * (2 + NUM_CHILD_TASKS);
         intptr_t  min_num_tasks_created = 1 + g_NumThreads * (2 + NUM_CHILD_TASKS);
@@ -510,8 +510,6 @@ typedef tbb::movable_exception<int> SolitaryMovableException;
 typedef tbb::movable_exception<ExceptionData> MultipleMovableException;
 
 class LeafTaskWithMovableExceptions : public TaskBase {
-    bool m_IntAsData;
-
     tbb::task* do_execute () {
         Harness::ConcurrencyTracker ct;
         WaitUntilConcurrencyPeaks();
@@ -573,7 +571,7 @@ void TestMovableException () {
             throw;
         } catch ( tbb::tbb_exception& e ) {
             CheckException(e);
-            g_ExceptionCaught = exceptionCaught = true;
+            g_ExceptionCaught = l_ExceptionCaughtAtCurrentLevel = true;
         }
         catch ( ... ) {
             g_ExceptionCaught = true;
@@ -634,7 +632,7 @@ void TestCancelation () {
     TRY();
         tbb::task::spawn_root_and_wait(tl);
     CATCH_AND_FAIL();
-    ASSERT (g_CurStat.Executed() <= g_ExecutedAtCatch + g_NumThreads, "Too many tasks were executed after cancellation");
+    ASSERT (g_CurStat.Executed() <= g_ExecutedAtLastCatch + g_NumThreads, "Too many tasks were executed after cancellation");
     ASSERT_TEST_POSTCOND();
 } // void Test9 ()
 

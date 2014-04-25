@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,6 +26,13 @@
     the GNU General Public License.
 */
 
+#include <tbb/tbb_config.h>
+#if __TBB_WIN8UI_SUPPORT || __TBB_MIC_OFFLOAD
+#include "harness.h"
+int TestMain () {
+    return Harness::Skipped;
+}
+#else
 #include "rml_tbb.h"
 
 typedef tbb::internal::rml::tbb_server MyServer;
@@ -46,7 +53,7 @@ class MyClient: public ClientBase<tbb::internal::rml::tbb_client> {
         do_process(j);
         //wait until the gate is open.
         while( gate==0 )
-            MilliSleep(1);
+            Harness::Sleep(1);
 
         __TBB_ASSERT( nesting.limit<=2, NULL );
         if( nesting.level>=nesting.limit )
@@ -63,7 +70,7 @@ class MyClient: public ClientBase<tbb::internal::rml::tbb_client> {
         // at this point, ( nesting.level<nesting.limit ) && ( my_server->default_concurrency()-max_outstanding_connections>2 ) 
         for( ;; ) {
             while( n_available_hw_threads<=1 )
-                MilliSleep(1);
+                Harness::Sleep(1);
 
             int n = --n_available_hw_threads;
             if( n>0 ) break;
@@ -96,7 +103,7 @@ void FireUpJobs( MyServer& server, MyClient& client, int n_thread, int n_extra, 
     // while for the RML worker threads to do some work. 
     if( checker ) {
         // Give RML time to respond to change in number of threads.
-        MilliSleep(1);
+        Harness::Sleep(1);
         for( int k=0; k<n_thread; ++k )
             client.job_array[k].processing_count = 0;
     }
@@ -105,7 +112,7 @@ void FireUpJobs( MyServer& server, MyClient& client, int n_thread, int n_extra, 
     server.adjust_job_count_estimate( n_thread );
     int n_used = 0;
     if( checker ) {
-        MilliSleep(100);
+        Harness::Sleep(100);
         for( int k=0; k<n_thread; ++k )
             if( client.job_array[k].processing_count )
                 ++n_used;
@@ -140,7 +147,7 @@ void FireUpJobs( MyServer& server, MyClient& client, int n_thread, int n_extra, 
                     if( client.job_array[k].processing_count!=0 ) 
                         ++n;
                 if( n>=expected ) break;
-                MilliSleep(1);
+                Harness::Sleep(1);
             }
         }
     }
@@ -151,7 +158,7 @@ void FireUpJobs( MyServer& server, MyClient& client, int n_thread, int n_extra, 
 #endif
     // Give RML some time to respond
     if( checker ) {
-        MilliSleep(1);
+        Harness::Sleep(1);
         checker->check_number_of_threads_delivered( n_used, n_thread, n_extra );
     }
 }
@@ -195,7 +202,12 @@ void Initialize()
 
 int TestMain () {
     VerifyInitialization<MyFactory,MyClient>( MaxThread );
+    if ( default_concurrency<1 ) {
+         REPORT("The test is not intended to run on 1 thread\n");
+         return Harness::Skipped;
+    }
     Initialize();
     SimpleTest<MyFactory,MyClient>();
     return Harness::Done;
 }
+#endif /* __TBB_WIN8UI_SUPPORT || __TBB_MIC_OFFLOAD */

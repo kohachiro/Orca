@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,8 +26,6 @@
     the GNU General Public License.
 */
 
-#include <new>
-
 // Do not include task.h directly. Use scheduler_common.h instead
 #include "scheduler_common.h"
 #include "governor.h"
@@ -36,6 +34,8 @@
 
 #include "tbb/cache_aligned_allocator.h"
 #include "tbb/partitioner.h"
+
+#include <new>
 
 namespace tbb {
 
@@ -74,15 +74,15 @@ void allocate_root_proxy::free( task& task ) {
 task& allocate_root_with_context_proxy::allocate( size_t size ) const {
     internal::generic_scheduler* s = governor::local_scheduler();
     __TBB_ASSERT( s, "Scheduler auto-initialization failed?" );
-    task& t = s->allocate_task( size, __TBB_CONTEXT_ARG(NULL, &my_context) );
+    task& t = s->allocate_task( size, NULL, &my_context );
     // Supported usage model prohibits concurrent initial binding. Thus we do not
     // need interlocked operations or fences to manipulate with my_context.my_kind
-    if ( my_context.my_kind == task_group_context::binding_required ) {
+    if ( __TBB_load_relaxed(my_context.my_kind) == task_group_context::binding_required ) {
         // If we are in the outermost task dispatch loop of a master thread, then
         // there is nothing to bind this context to, and we skip the binding part
         // treating the context as isolated.
         if ( s->my_innermost_running_task == s->my_dummy_task )
-            my_context.my_kind = task_group_context::isolated;
+            __TBB_store_relaxed(my_context.my_kind, task_group_context::isolated);
         else
             my_context.bind_to( s );
     }
@@ -156,7 +156,7 @@ void allocate_additional_child_of_proxy::free( task& task ) const {
 //------------------------------------------------------------------------
 size_t get_initial_auto_partitioner_divisor() {
     const size_t X_FACTOR = 4;
-    return X_FACTOR * (governor::max_number_of_workers()+1);
+    return X_FACTOR * (1+governor::local_scheduler()->number_of_workers_in_my_arena());
 }
 
 //------------------------------------------------------------------------
@@ -164,7 +164,7 @@ size_t get_initial_auto_partitioner_divisor() {
 //------------------------------------------------------------------------
 void affinity_partitioner_base_v3::resize( unsigned factor ) {
     // Check factor to avoid asking for number of workers while there might be no arena.
-    size_t new_size = factor ? factor*(governor::max_number_of_workers()+1) : 0;
+    size_t new_size = factor ? factor*(1+governor::local_scheduler()->number_of_workers_in_my_arena()) : 0;
     if( new_size!=my_size ) {
         if( my_array ) {
             NFS_Free( my_array );
@@ -226,7 +226,10 @@ void interface5::internal::task_base::destroy( task& victim ) {
     task* parent = victim.parent();
     victim.~task();
     if( parent ) {
-        __TBB_ASSERT( parent->state()==task::allocated, "attempt to destroy child of running or corrupted parent?" );
+        __TBB_ASSERT( parent->state()!=task::freed && parent->state()!=task::ready,
+                      "attempt to destroy child of running or corrupted parent?" );
+        // 'reexecute' and 'executing' are also signs of a race condition, since most tasks
+        // set their ref_count upon entry but "es_ref_count_active" should detect this
         parent->internal_decrement_ref_count();
         // Even if the last reference to *parent is removed, it should not be spawned (documented behavior).
     }
@@ -253,13 +256,13 @@ void task::note_affinity( affinity_id ) {
 #if __TBB_TASK_GROUP_CONTEXT
 void task::change_group ( task_group_context& ctx ) {
     prefix().context = &ctx;
-    if ( ctx.my_kind == task_group_context::binding_required ) {
+    if ( __TBB_load_relaxed(ctx.my_kind) == task_group_context::binding_required ) {
         internal::generic_scheduler* s = governor::local_scheduler();
         // If we are in the outermost task dispatch loop of a master thread, then
         // there is nothing to bind this context to, and we skip the binding part
         // treating the context as isolated.
         if ( s->my_innermost_running_task == s->my_dummy_task )
-            ctx.my_kind = task_group_context::isolated;
+            __TBB_store_relaxed(ctx.my_kind, task_group_context::isolated);
         else
             ctx.bind_to( s );
     }

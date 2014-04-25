@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -146,7 +146,7 @@ namespace test_framework_unit_tests{
         }
 
         struct silent_switch_fixture{
-            test_helper::test_case<test_helper::tag<__LINE__> > do_nothing_tc;
+            test_helper::test_case<test_helper::tag<__LINE__> > empty_test_case;
         };
         struct run_all_and_print_results_should_respect_silent_mode: silent_switch_fixture{
             void operator()(){

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -33,11 +33,10 @@
 #define __TBB_machine_linux_ia64_H
 
 #include <stdint.h>
-#include <unistd.h>
 #include <ia64intrin.h>
 
 #define __TBB_WORDSIZE 8
-#define __TBB_BIG_ENDIAN 0
+#define __TBB_ENDIANNESS __TBB_ENDIAN_LITTLE
 
 #if __INTEL_COMPILER
     #define __TBB_compiler_fence()
@@ -56,6 +55,7 @@
 #endif /* !__INTEL_COMPILER */
 
 // Most of the functions will be in a .s file
+// TODO: revise dynamic_link, memory pools and etc. if the library dependency is removed.
 
 extern "C" {
     int8_t __TBB_machine_fetchadd1__TBB_full_fence (volatile void *ptr, int8_t addend);

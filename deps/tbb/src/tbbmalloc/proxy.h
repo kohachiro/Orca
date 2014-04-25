@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -30,11 +30,11 @@
 #define _TBB_malloc_proxy_H_
 
 #if __linux__
-#define MALLOC_LD_PRELOAD 1
+#define MALLOC_UNIXLIKE_OVERLOAD_ENABLED 1
 #endif
 
-// MALLOC_LD_PRELOAD depends on MALLOC_CHECK_RECURSION stuff
-#if __linux__ || __APPLE__ || __sun || __FreeBSD__ || MALLOC_LD_PRELOAD
+// MALLOC_UNIXLIKE_OVERLOAD_ENABLED depends on MALLOC_CHECK_RECURSION stuff
+#if __linux__ || __APPLE__ || __sun || __FreeBSD__ || MALLOC_UNIXLIKE_OVERLOAD_ENABLED
 #define MALLOC_CHECK_RECURSION 1
 #endif
 
@@ -53,6 +53,7 @@ extern "C" {
     void * safer_scalable_realloc( void *ptr, size_t, void* );
     void * safer_scalable_aligned_realloc( void *ptr, size_t, size_t, void* );
     size_t safer_scalable_msize( void *ptr, size_t (*orig_msize_crt80d)(void*));
+    size_t safer_scalable_aligned_msize( void *ptr, size_t, size_t, size_t (*orig_msize_crt80d)(void*,size_t,size_t));
 
     void * __TBB_internal_malloc(size_t size);
     void * __TBB_internal_calloc(size_t num, size_t size);

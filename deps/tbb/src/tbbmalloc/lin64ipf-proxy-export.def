@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -38,6 +38,13 @@ valloc;
 pvalloc;
 mallinfo;
 mallopt;
+__libc_malloc;
+__libc_realloc;
+__libc_calloc;
+__libc_free;
+__libc_memalign;
+__libc_pvalloc;
+__libc_valloc;
 __TBB_malloc_proxy;
 __TBB_internal_find_original_malloc;
 _ZdaPv;  /* next ones are new/delete */

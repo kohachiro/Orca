@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -36,6 +36,9 @@
 // are supposed to work in the abscense of STL.
 
 #include "harness.h"
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    #include <utility> //for std::pair
+#endif
 
 template<typename A>
 struct is_zero_filling {
@@ -137,6 +140,22 @@ void TestBasic( A& a ) {
     a.destroy( p );
     ASSERT( NumberOfFoo==n, "destructor for Foo not called?" );
     a.deallocate(p,1);
+
+    #if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    {
+        typedef typename A:: template rebind<std::pair<typename A::value_type, typename A::value_type> >::other pair_allocator_type;
+        pair_allocator_type pair_allocator(a);
+        int NumberOfFooBeforeConstruct= NumberOfFoo;
+        typename pair_allocator_type::pointer pair_pointer = pair_allocator.allocate(1);
+        pair_allocator.construct( pair_pointer, cx, cx);
+        ASSERT( NumberOfFoo==NumberOfFooBeforeConstruct+2, "constructor for Foo not called appropriate number of times?" );
+
+        pair_allocator.destroy( pair_pointer );
+        ASSERT( NumberOfFoo==NumberOfFooBeforeConstruct, "destructor for Foo not called appropriate number of times?" );
+        pair_allocator.deallocate(pair_pointer,1);
+    }
+    #endif
+
 }
 
 #include "tbb/blocked_range.h"
@@ -190,9 +209,6 @@ struct Body: NoAssign {
         for( size_t k=0; k<256; ++k )
             if(array[k])
                 check_deallocate(array, k, thread_id);
-#if __TBBMALLOC_CALL_THREAD_SHUTDOWN
-        __TBB_mallocThreadShutdownNotification();
-#endif
     }
 };
 

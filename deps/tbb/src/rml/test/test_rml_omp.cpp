@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,6 +26,13 @@
     the GNU General Public License.
 */
 
+#include <tbb/tbb_config.h>
+#if __TBB_WIN8UI_SUPPORT || __TBB_MIC_OFFLOAD
+#include "harness.h"
+int TestMain () {
+    return Harness::Skipped;
+}
+#else
 #include "rml_omp.h"
 
 typedef __kmp::rml::omp_server MyServer;
@@ -134,7 +141,7 @@ void FireUpJobs( MyServer& server, MyClient& client, int max_thread, int n_extra
         server.independent_thread_number_changed( n_extra );
         if( checker ) {
             // Give RML time to respond to change in number of threads.
-            MilliSleep(1);
+            Harness::Sleep(1);
         }
         int n_delivered = server.try_increase_load( n_thread, StrictTeam );
         ASSERT( !StrictTeam || n_delivered==int(n_thread), "server failed to satisfy strict request" );
@@ -184,6 +191,13 @@ void DoClientSpecificVerification( MyServer& server, int /*n_thread*/ )
 }
 
 int TestMain () {
+#if _MSC_VER == 1600 && RML_USE_WCRM
+    REPORT("Known issue: RML resets the process mask when Concurrency Runtime is used.\n");
+    // AvailableHwConcurrency reads process mask when the first call. That's why it should
+    // be called before RML initialization.
+    tbb::internal::AvailableHwConcurrency();
+#endif
+
     StrictTeam = true;
     VerifyInitialization<MyFactory,MyClient>( MaxThread );
     SimpleTest<MyFactory,MyClient>();
@@ -194,3 +208,4 @@ int TestMain () {
 
     return Harness::Done;
 }
+#endif /* __TBB_WIN8UI_SUPPORT || __TBB_MIC_OFFLOAD */

@@ -20,13 +20,11 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include "uv.h"
 #include "internal.h"
 
-
-/* Whether ipv6 is supported */
-int uv_allow_ipv6;
 
 /* Whether there are any non-IFS LSPs stacked on TCP */
 int uv_tcp_non_ifs_lsp_ipv4;
@@ -42,7 +40,8 @@ struct sockaddr_in6 uv_addr_ip6_any_;
  */
 static BOOL uv_get_extension_function(SOCKET socket, GUID guid,
     void **target) {
-  DWORD result, bytes;
+  int result;
+  DWORD bytes;
 
   result = WSAIoctl(socket,
                     SIO_GET_EXTENSION_FUNCTION_POINTER,
@@ -75,13 +74,13 @@ BOOL uv_get_connectex_function(SOCKET socket, LPFN_CONNECTEX* target) {
 }
 
 
-void uv_winsock_init() {
-  const GUID wsaid_connectex            = WSAID_CONNECTEX;
-  const GUID wsaid_acceptex             = WSAID_ACCEPTEX;
-  const GUID wsaid_getacceptexsockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
-  const GUID wsaid_disconnectex         = WSAID_DISCONNECTEX;
-  const GUID wsaid_transmitfile         = WSAID_TRANSMITFILE;
+static int error_means_no_support(DWORD error) {
+  return error == WSAEPROTONOSUPPORT || error == WSAESOCKTNOSUPPORT ||
+         error == WSAEPFNOSUPPORT || error == WSAEAFNOSUPPORT;
+}
 
+
+void uv_winsock_init() {
   WSADATA wsa_data;
   int errorno;
   SOCKET dummy;
@@ -95,53 +94,58 @@ void uv_winsock_init() {
   }
 
   /* Set implicit binding address used by connectEx */
-  uv_addr_ip4_any_ = uv_ip4_addr("0.0.0.0", 0);
-  uv_addr_ip6_any_ = uv_ip6_addr("::", 0);
+  if (uv_ip4_addr("0.0.0.0", 0, &uv_addr_ip4_any_)) {
+    abort();
+  }
+
+  if (uv_ip6_addr("::", 0, &uv_addr_ip6_any_)) {
+    abort();
+  }
 
   /* Detect non-IFS LSPs */
   dummy = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-  if (dummy == INVALID_SOCKET) {
+
+  if (dummy != INVALID_SOCKET) {
+    opt_len = (int) sizeof protocol_info;
+    if (getsockopt(dummy,
+                   SOL_SOCKET,
+                   SO_PROTOCOL_INFOW,
+                   (char*) &protocol_info,
+                   &opt_len) == SOCKET_ERROR)
+      uv_fatal_error(WSAGetLastError(), "getsockopt");
+
+    if (!(protocol_info.dwServiceFlags1 & XP1_IFS_HANDLES))
+      uv_tcp_non_ifs_lsp_ipv4 = 1;
+
+    if (closesocket(dummy) == SOCKET_ERROR)
+      uv_fatal_error(WSAGetLastError(), "closesocket");
+
+  } else if (!error_means_no_support(WSAGetLastError())) {
+    /* Any error other than "socket type not supported" is fatal. */
     uv_fatal_error(WSAGetLastError(), "socket");
-  }
-
-  opt_len = (int) sizeof protocol_info;
-  if (!getsockopt(dummy,
-                  SOL_SOCKET,
-                  SO_PROTOCOL_INFOW,
-                  (char*) &protocol_info,
-                  &opt_len) == SOCKET_ERROR) {
-    uv_fatal_error(WSAGetLastError(), "socket");
-  }
-
-  if (!(protocol_info.dwServiceFlags1 & XP1_IFS_HANDLES)) {
-    uv_tcp_non_ifs_lsp_ipv4 = 1;
-  }
-
-  if (closesocket(dummy) == SOCKET_ERROR) {
-    uv_fatal_error(WSAGetLastError(), "closesocket");
   }
 
   /* Detect IPV6 support and non-IFS LSPs */
   dummy = socket(AF_INET6, SOCK_STREAM, IPPROTO_IP);
+
   if (dummy != INVALID_SOCKET) {
-    uv_allow_ipv6 = TRUE;
-
     opt_len = (int) sizeof protocol_info;
-    if (!getsockopt(dummy,
-                    SOL_SOCKET,
-                    SO_PROTOCOL_INFOW,
-                    (char*) &protocol_info,
-                    &opt_len) == SOCKET_ERROR) {
-      uv_fatal_error(WSAGetLastError(), "socket");
-    }
+    if (getsockopt(dummy,
+                   SOL_SOCKET,
+                   SO_PROTOCOL_INFOW,
+                   (char*) &protocol_info,
+                   &opt_len) == SOCKET_ERROR)
+      uv_fatal_error(WSAGetLastError(), "getsockopt");
 
-    if (!(protocol_info.dwServiceFlags1 & XP1_IFS_HANDLES)) {
+    if (!(protocol_info.dwServiceFlags1 & XP1_IFS_HANDLES))
       uv_tcp_non_ifs_lsp_ipv6 = 1;
-    }
 
-    if (closesocket(dummy) == SOCKET_ERROR) {
+    if (closesocket(dummy) == SOCKET_ERROR)
       uv_fatal_error(WSAGetLastError(), "closesocket");
-    }
+
+  } else if (!error_means_no_support(WSAGetLastError())) {
+    /* Any error other than "socket type not supported" is fatal. */
+    uv_fatal_error(WSAGetLastError(), "socket");
   }
 }
 
@@ -163,13 +167,12 @@ int uv_ntstatus_to_winsock_error(NTSTATUS status) {
     case STATUS_COMMITMENT_LIMIT:
     case STATUS_WORKING_SET_QUOTA:
     case STATUS_NO_MEMORY:
-    case STATUS_CONFLICTING_ADDRESSES:
     case STATUS_QUOTA_EXCEEDED:
     case STATUS_TOO_MANY_PAGING_FILES:
     case STATUS_REMOTE_RESOURCES:
-    case STATUS_TOO_MANY_ADDRESSES:
       return WSAENOBUFS;
 
+    case STATUS_TOO_MANY_ADDRESSES:
     case STATUS_SHARING_VIOLATION:
     case STATUS_ADDRESS_ALREADY_EXISTS:
       return WSAEADDRINUSE;
@@ -238,6 +241,7 @@ int uv_ntstatus_to_winsock_error(NTSTATUS status) {
     case STATUS_PIPE_DISCONNECTED:
       return WSAESHUTDOWN;
 
+    case STATUS_CONFLICTING_ADDRESSES:
     case STATUS_INVALID_ADDRESS:
     case STATUS_INVALID_ADDRESS_COMPONENT:
       return WSAEADDRNOTAVAIL;

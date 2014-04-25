@@ -26,7 +26,9 @@ from distutils.spawn import find_executable
 maintainer_email = "protobuf@googlegroups.com"
 
 # Find the Protocol Compiler.
-if os.path.exists("../src/protoc"):
+if 'PROTOC' in os.environ and os.path.exists(os.environ['PROTOC']):
+  protoc = os.environ['PROTOC']
+elif os.path.exists("../src/protoc"):
   protoc = "../src/protoc"
 elif os.path.exists("../src/protoc.exe"):
   protoc = "../src/protoc.exe"
@@ -133,7 +135,6 @@ class build_py(_build_py):
     generate_proto("../src/google/protobuf/descriptor.proto")
     generate_proto("../src/google/protobuf/compiler/plugin.proto")
 
-    GenerateUnittestProtos()
     # Make sure google.protobuf.compiler is a valid package.
     open('google/protobuf/compiler/__init__.py', 'a').close()
     # _build_py is an old-style class, so super() doesn't work.
@@ -154,7 +155,7 @@ if __name__ == '__main__':
         libraries = [ "protobuf" ]))
 
   setup(name = 'protobuf',
-        version = '2.4.2-pre',
+        version = '2.5.1-pre',
         packages = [ 'google' ],
         namespace_packages = [ 'google' ],
         test_suite = 'setup.MakeTestSuite',
@@ -165,6 +166,7 @@ if __name__ == '__main__':
           'google.protobuf.internal.cpp_message',
           'google.protobuf.internal.decoder',
           'google.protobuf.internal.encoder',
+          'google.protobuf.internal.enum_type_wrapper',
           'google.protobuf.internal.message_listener',
           'google.protobuf.internal.python_message',
           'google.protobuf.internal.type_checkers',

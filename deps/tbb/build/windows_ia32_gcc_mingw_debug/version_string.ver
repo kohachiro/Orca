@@ -1,8 +1,0 @@
-#define __TBB_VERSION_STRINGS(N) \
-#N ": BUILD_HOST\t\tDAHOO-PC" ENDL \
-#N ": BUILD_OS\t\tMicrosoft Windows [°æ±¾ 6.1.7600]" ENDL \
-#N ": BUILD_COMPILER\tgcc (GCC) 4.6.2" ENDL \
-#N ": BUILD_TARGET\tia32" ENDL \
-#N ": BUILD_COMMAND\tg++ -g -O0 -DTBB_USE_DEBUG -DUSE_WINTHREAD -D_WIN32_WINNT=0x0501 -DMINGW_HAS_SECURE_API=1 -D__MSVCRT_VERSION__=0x0700 -msse -mthreads -m32 -march=i686  -D__TBB_BUILD=1 -Wall -Wno-parentheses -Wno-uninitialized " ENDL
-#define __TBB_DATETIME "Thu, 27 Sep 2012 19:43:17 UTC"
-#define __TBB_VERSION_YMD 2012, 0927

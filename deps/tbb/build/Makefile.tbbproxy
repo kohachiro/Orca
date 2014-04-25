@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -58,6 +58,7 @@ PROXY.OBJ := $(PROXY_CPLUS.OBJ) $(PROXY_ASM.OBJ)
 # Not using default libs prevents link issues caused by different CRT versions in tbbproxy and in an app.
 $(PROXY.OBJ): CPLUS_FLAGS += $(DEFINE_KEY)ARCH_$(arch) $(DEFINE_KEY)OS_$(tbb_os) $(NOINTRINSIC_KEY) $(NODEFAULTLIB_KEY)
 
+$(PROXY_CPLUS.OBJ): CPLUS_FLAGS+=$(if $(filter windows.%cl,$(tbb_os).$(compiler)),/Fdtbbproxy$(DEBUG_SUFFIX).pdb)
 $(PROXY_CPLUS.OBJ): %.$(OBJ): %.cpp
 	$(CPLUS) $(COMPILE_ONLY) $(CPLUS_FLAGS) $(INCLUDES) $<
 
@@ -66,7 +67,7 @@ $(PROXY.LIB): $(PROXY.OBJ)
 
 .PRECIOUS : %.$(ASMEXT)
 tbbproxy-asm.$(ASMEXT) : tbbproxy-$(tbb_os).$(ASMEXT) $(TBB.LST) $(TBB-OBJECTS.LST)
-	$(CPLUS) $(PREPROC_ONLY) $< $(INCLUDES) $(CPLUS_FLAGS) > $@
+	$(CPLUS) $(PREPROC_ONLY) $< $(INCLUDES) $(CPLUS_FLAGS) $(DEFINE_KEY)__TBB_BUILD=1 > $@
 
 .PHONY: tbbproxy
 ifeq (windows,$(tbb_os))

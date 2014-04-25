@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -133,6 +133,26 @@ void TestTickCountDifference( int n ) {
     }
 }
 
+void TestResolution() {
+    static double target_value = 0.314159265358979323846264338327950288419;
+    static double step_value = 0.00027182818284590452353602874713526624977572;
+    static int range_value = 100;
+    double avg_diff = 0.0;
+    double max_diff = 0.0;
+    for( int i = -range_value; i <= range_value; ++i ) {
+        double my_time = target_value + step_value * i;
+        tbb::tick_count::interval_t t0(my_time);
+        double interval_time = t0.seconds();
+        avg_diff += (my_time - interval_time);
+        if ( max_diff < my_time-interval_time) max_diff = my_time-interval_time;
+        // time always truncates
+        ASSERT(interval_time >= 0 && my_time - interval_time < tbb::tick_count::resolution(), "tick_count resolution out of range");
+    }
+    avg_diff = (avg_diff/(2*range_value+1))/tbb::tick_count::resolution();
+    max_diff /= tbb::tick_count::resolution();
+    REMARK("avg_diff = %g ticks, max_diff = %g ticks\n", avg_diff, max_diff);
+}
+
 int TestMain () {
     tbb::tick_count t0 = tbb::tick_count::now();
     TestSimpleDelay(/*ntrial=*/1000000,/*duration=*/0,    /*tolerance=*/2E-6);
@@ -140,6 +160,8 @@ int TestMain () {
     TestSimpleDelay(/*ntrial=*/10,     /*duration=*/0.125,/*tolerance=*/5E-6);
     tbb::tick_count t2 = tbb::tick_count::now();
     TestArithmetic(t0,t1,t2);
+
+    TestResolution();
 
     for( int n=MinThread; n<=MaxThread; ++n ) {
         TestTickCountDifference(n);

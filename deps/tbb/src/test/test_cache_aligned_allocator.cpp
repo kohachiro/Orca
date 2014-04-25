@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -45,7 +45,6 @@ void Test_NFS_Allocate_Throws() {
 #if TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN
     using namespace tbb::internal;
 
-    bool exception_caught = false;
     // First, allocate a reasonably big amount of memory, big enough
     // to not cause warp around in system allocator after adding object header
     // during address2 allocation.
@@ -55,14 +54,14 @@ void Test_NFS_Allocate_Throws() {
     try {
         address1 = NFS_Allocate( nitems, itemsize, NULL );
     } catch( ... ) {
-        address1 = NULL;
+        // intentionally empty
     }
-    ASSERT( address1, "NFS_Allocate unable to obtain 32*1024 bytes" );
+    ASSERT( address1, "NFS_Allocate unable to obtain 1024*1024 bytes" );
 
-    void *address2 = NULL;
+    bool exception_caught = false;
     try {
         // Try allocating more memory than left in the address space; should cause std::bad_alloc
-        address2 = NFS_Allocate( 1, ~size_t(0) - itemsize*nitems + NFS_GetLineSize(), NULL);
+        (void) NFS_Allocate( 1, ~size_t(0) - itemsize*nitems + NFS_GetLineSize(), NULL);
     } catch( std::bad_alloc ) {
         exception_caught = true;
     } catch( ... ) {
@@ -70,7 +69,6 @@ void Test_NFS_Allocate_Throws() {
         exception_caught = true;
     }
     ASSERT( exception_caught, "NFS_Allocate did not throw bad_alloc" );
-    ASSERT( !address2, "NFS_Allocate returned garbage?" );
 
     try {
         NFS_Free( address1 );

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -30,10 +30,11 @@
 
 // Enable testing of serial subset.
 #define TBB_PREVIEW_SERIAL_SUBSET 1
+#include "harness_defs.h"
 
 #if _MSC_VER
 #pragma warning (push)
-#if !defined(__INTEL_COMPILER)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Suppress pointless "unreachable code" warning.
     #pragma warning (disable: 4702)
 #endif
@@ -45,6 +46,7 @@
 #define _SCL_SECURE_NO_WARNINGS
 #endif //#if _MSC_VER
 
+#include "harness_defs.h"
 #include "tbb/parallel_for.h"
 #include "tbb/atomic.h"
 #include "harness_assert.h"
@@ -115,62 +117,79 @@ static tbb::atomic<int> Array[N];
 
 struct serial_tag {};
 struct parallel_tag {};
+struct empty_partitioner_tag {};
 
-template <typename Flavor, typename Range, typename Body>
+template <typename Flavor, typename Partitioner, typename Range, typename Body>
 struct Invoker;
 
 template <typename Range, typename Body>
-struct Invoker<serial_tag, Range, Body> {
-    void operator()( const Range& r, const Body& body, const tbb::simple_partitioner& p ) {
-        tbb::serial:: parallel_for( r, body, p );
+struct Invoker<serial_tag, empty_partitioner_tag, Range, Body> {
+    void operator()( const Range& r, const Body& body, empty_partitioner_tag& ) {
+        tbb::serial:: parallel_for( r, body );
     }
-    void operator()( const Range& r, const Body& body, const tbb::auto_partitioner& p ) {
+};
+
+template <typename Partitioner, typename Range, typename Body>
+struct Invoker<serial_tag, Partitioner, Range, Body> {
+    void operator()( const Range& r, const Body& body, Partitioner& p ) {
         tbb::serial:: parallel_for( r, body, p );
-    }
-    void operator()( const Range& r, const Body& body, tbb::affinity_partitioner& p ) {
-        tbb::serial:: parallel_for( r, body, p );
-    }
-    void operator()( const Range& r, const Body& body ) {
-        tbb::serial:: parallel_for( r, body, tbb::auto_partitioner() );
     }
 };
 
 template <typename Range, typename Body>
-struct Invoker<parallel_tag, Range, Body> {
-    void operator()( const Range& r, const Body& body, const tbb::simple_partitioner& p ) {
-        tbb:: parallel_for( r, body, p );
-    }
-    void operator()( const Range& r, const Body& body, const tbb::auto_partitioner& p ) {
-        tbb:: parallel_for( r, body, p );
-    }
-    void operator()( const Range& r, const Body& body, tbb::affinity_partitioner& p ) {
-        tbb:: parallel_for( r, body, p );
-    }
-    void operator()( const Range& r, const Body& body ) {
-        tbb:: parallel_for( r, body, tbb::auto_partitioner() );
+struct Invoker<parallel_tag, empty_partitioner_tag, Range, Body> {
+    void operator()( const Range& r, const Body& body, empty_partitioner_tag& ) {
+        tbb:: parallel_for( r, body );
     }
 };
 
-template <typename Flavor, typename T, typename Body>
+template <typename Partitioner, typename Range, typename Body>
+struct Invoker<parallel_tag, Partitioner, Range, Body> {
+    void operator()( const Range& r, const Body& body, Partitioner& p ) {
+        tbb:: parallel_for( r, body, p );
+    }
+};
+
+template <typename Flavor, typename Partitioner, typename T, typename Body>
 struct InvokerStep;
 
 template <typename T, typename Body>
-struct InvokerStep<serial_tag, T, Body> {
-    void operator()( const T& first, const T& last, const Body& f ) {
+struct InvokerStep<serial_tag, empty_partitioner_tag, T, Body> {
+    void operator()( const T& first, const T& last, const Body& f, empty_partitioner_tag& ) {
         tbb::serial:: parallel_for( first, last, f );
     }
-    void operator()( const T& first, const T& last, const T& step, const Body& f ) {
+    void operator()( const T& first, const T& last, const T& step, const Body& f, empty_partitioner_tag& ) {
         tbb::serial:: parallel_for( first, last, step, f );
     }
 };
 
+template <typename Partitioner, typename T, typename Body>
+struct InvokerStep<serial_tag, Partitioner, T, Body> {
+    void operator()( const T& first, const T& last, const Body& f, Partitioner& p ) {
+        tbb::serial:: parallel_for( first, last, f, p);
+    }
+    void operator()( const T& first, const T& last, const T& step, const Body& f, Partitioner& p ) {
+        tbb::serial:: parallel_for( first, last, step, f, p );
+    }
+};
+
 template <typename T, typename Body>
-struct InvokerStep<parallel_tag, T, Body> {
-    void operator()( const T& first, const T& last, const Body& f ) {
+struct InvokerStep<parallel_tag, empty_partitioner_tag, T, Body> {
+    void operator()( const T& first, const T& last, const Body& f, empty_partitioner_tag& ) {
         tbb:: parallel_for( first, last, f );
     }
-    void operator()( const T& first, const T& last, const T& step, const Body& f ) {
+    void operator()( const T& first, const T& last, const T& step, const Body& f, empty_partitioner_tag& ) {
         tbb:: parallel_for( first, last, step, f );
+    }
+};
+
+template <typename Partitioner, typename T, typename Body>
+struct InvokerStep<parallel_tag, Partitioner, T, Body> {
+    void operator()( const T& first, const T& last, const Body& f, Partitioner& p ) {
+        tbb:: parallel_for( first, last, f, p );
+    }
+    void operator()( const T& first, const T& last, const T& step, const Body& f, Partitioner& p ) {
+        tbb:: parallel_for( first, last, step, f, p );
     }
 };
 
@@ -185,21 +204,28 @@ void Flog( int nthread ) {
             const FooBody<Pad> fc = f;
             memset( Array, 0, sizeof(Array) );
             FooBodyCount = 1;
-            Invoker< Flavor, FooRange<Pad>, FooBody<Pad> > invoke_for;
             switch (mode) {
-                case 0:
-                    invoke_for( rc, fc );
+            case 0: {
+                empty_partitioner_tag p;
+                Invoker< Flavor, empty_partitioner_tag, FooRange<Pad>, FooBody<Pad> > invoke_for;
+                invoke_for( rc, fc, p );
+            }
                 break;
-                case 1:
-                    invoke_for( rc, fc, tbb::simple_partitioner() );
+            case 1: {
+                Invoker< Flavor, const tbb::simple_partitioner, FooRange<Pad>, FooBody<Pad> > invoke_for;
+                invoke_for( rc, fc, tbb::simple_partitioner() );
+            }
                 break;
-                case 2:
-                    invoke_for( rc, fc, tbb::auto_partitioner() );
+            case 2: {
+                Invoker< Flavor, const tbb::auto_partitioner, FooRange<Pad>, FooBody<Pad> > invoke_for;
+                invoke_for( rc, fc, tbb::auto_partitioner() );
+            }
                 break;
-                case 3: {
-                    static tbb::affinity_partitioner affinity;
-                    invoke_for( rc, fc, affinity );
-                }
+            case 3: {
+                static tbb::affinity_partitioner affinity;
+                Invoker< Flavor, tbb::affinity_partitioner, FooRange<Pad>, FooBody<Pad> > invoke_for;
+                invoke_for( rc, fc, affinity );
+            }
                 break;
             }
             for( int j=0; j<i; ++j )
@@ -239,21 +265,21 @@ public:
     #pragma warning (pop)
 #endif
 
-template <typename Flavor, typename T>
-void TestParallelForWithStepSupport()
+template <typename Flavor, typename T, typename Partitioner>
+void TestParallelForWithStepSupportHelper(Partitioner& p)
 {
     const T pfor_buffer_test_size = static_cast<T>(PFOR_BUFFER_TEST_SIZE);
     const T pfor_buffer_actual_size = static_cast<T>(PFOR_BUFFER_ACTUAL_SIZE);
     // Testing parallel_for with different step values
-    InvokerStep< Flavor, T, TestFunctor<T> > invoke_for;
+    InvokerStep< Flavor, Partitioner, T, TestFunctor<T> > invoke_for;
     for (T begin = 0; begin < pfor_buffer_test_size - 1; begin += pfor_buffer_test_size / 10 + 1) {
         T step;
         for (step = 1; step < pfor_buffer_test_size; step++) {
             memset(pfor_buffer, 0, pfor_buffer_actual_size * sizeof(size_t));
             if (step == 1){
-                invoke_for(begin, pfor_buffer_test_size, TestFunctor<T>());
+                invoke_for(begin, pfor_buffer_test_size, TestFunctor<T>(), p);
             } else {
-                invoke_for(begin, pfor_buffer_test_size, step, TestFunctor<T>());
+                invoke_for(begin, pfor_buffer_test_size, step, TestFunctor<T>(), p);
             }
             // Verifying that parallel_for processed all items it should
             for (T i = begin; i < pfor_buffer_test_size; i = i + step) {
@@ -266,6 +292,21 @@ void TestParallelForWithStepSupport()
             }
         }
     }
+}
+
+template <typename Flavor, typename T>
+void TestParallelForWithStepSupport()
+{
+    static tbb::affinity_partitioner affinity_p;
+    tbb::auto_partitioner auto_p;
+    tbb::simple_partitioner simple_p;
+    empty_partitioner_tag p;
+
+    // Try out all partitioner combinations
+    TestParallelForWithStepSupportHelper< Flavor,T,empty_partitioner_tag >(p);
+    TestParallelForWithStepSupportHelper< Flavor,T,const tbb::auto_partitioner >(auto_p);
+    TestParallelForWithStepSupportHelper< Flavor,T,const tbb::simple_partitioner >(simple_p);
+    TestParallelForWithStepSupportHelper< Flavor,T,tbb::affinity_partitioner >(affinity_p);
 
     // Testing some corner cases
     tbb::parallel_for(static_cast<T>(2), static_cast<T>(1), static_cast<T>(1), TestFunctor<T>());
@@ -477,7 +518,7 @@ int TestMain () {
     REPORT("Known issue: exception handling tests are skipped.\n");
 #endif
 #if (HAVE_m128 || HAVE_m256) && __TBB_SSE_STACK_ALIGNMENT_BROKEN
-    REPORT("Known issue: stack alignment for SSE/AVX not tested.\n");
+    REPORT("Known issue: stack alignment for SIMD instructions not tested.\n");
 #endif
     return Harness::Done;
 }

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,24 +26,24 @@
     the GNU General Public License.
 */
 
-// tbb::tuple
+// tbb::flow::tuple (implementation used in tbb::flow)
+// if <tuple> is available on the compiler/platform, that version should be the
+// one tested.
 
 #include "harness.h"
 // this test should match that in graph.h, so we test whatever tuple is
 // being used by the join_node.
-#if !__SUNPRO_CC
-#if TBB_IMPLEMENT_CPP0X && (!defined(_MSC_VER) || _MSC_VER < 1600)
-#define __TESTING_STD_TUPLE__ 0
-#define TBB_PREVIEW_TUPLE 1
-#include "tbb/compat/tuple"
-#else
+#if __TBB_CPP11_TUPLE_PRESENT
 #define __TESTING_STD_TUPLE__ 1
 #include <tuple>
-#endif
+using namespace std;
+#else
+#define __TESTING_STD_TUPLE__ 0
+#include "tbb/compat/tuple"
+using namespace tbb::flow;
+#endif /*!__TBB_CPP11_TUPLE_PRESENT*/
 #include <string>
 #include <iostream>
-
-using namespace std;
 
 class non_trivial {
 public:
@@ -58,6 +58,33 @@ private:
     int my_int;
     float my_float;
 };
+
+template<typename T1, typename T2, typename T3, typename U1, typename U2, typename U3>
+void RunOneComparisonTest() {
+    typedef tuple<T1,T2,T3> t_tuple;
+    typedef tuple<U1,U2,U3> u_tuple;
+
+    ASSERT(t_tuple((T1)1,(T2)1,(T3)1) == u_tuple((U1)1,(U2)1,(U3)1),NULL);
+    ASSERT(t_tuple((T1)1,(T2)0,(T3)1) <  u_tuple((U1)1,(U2)1,(U3)1),NULL);
+    ASSERT(t_tuple((T1)1,(T2)1,(T3)1) >  u_tuple((U1)1,(U2)1,(U3)0),NULL);
+    ASSERT(t_tuple((T1)1,(T2)0,(T3)1) != u_tuple((U1)1,(U2)1,(U3)1),NULL);
+    ASSERT(t_tuple((T1)1,(T2)0,(T3)1) <= u_tuple((U1)1,(U2)1,(U3)0),NULL);
+    ASSERT(t_tuple((T1)1,(T2)0,(T3)0) <= u_tuple((U1)1,(U2)0,(U3)0),NULL);
+    ASSERT(t_tuple((T1)1,(T2)1,(T3)1) >= u_tuple((U1)1,(U2)0,(U3)1),NULL);
+    ASSERT(t_tuple((T1)0,(T2)1,(T3)1) >= u_tuple((U1)0,(U2)1,(U3)1),NULL);
+
+    ASSERT(!(t_tuple((T1)2,(T2)1,(T3)1) == u_tuple((U1)1,(U2)1,(U3)1)),NULL);
+    ASSERT(!(t_tuple((T1)1,(T2)2,(T3)1) == u_tuple((U1)1,(U2)1,(U3)1)),NULL);
+    ASSERT(!(t_tuple((T1)1,(T2)1,(T3)2) == u_tuple((U1)1,(U2)1,(U3)1)),NULL);
+    
+    ASSERT(!(t_tuple((T1)1,(T2)1,(T3)1) <  u_tuple((U1)1,(U2)1,(U3)1)),NULL);
+    ASSERT(!(t_tuple((T1)1,(T2)1,(T3)1) >  u_tuple((U1)1,(U2)1,(U3)1)),NULL);
+    ASSERT(!(t_tuple((T1)1,(T2)1,(T3)1) !=  u_tuple((U1)1,(U2)1,(U3)1)),NULL);
+
+    ASSERT(t_tuple((T1)1,(T2)1,(T3)1) <= u_tuple((U1)1,(U2)1,(U3)1),NULL);
+    ASSERT(t_tuple((T1)1,(T2)1,(T3)1) >= u_tuple((U1)1,(U2)1,(U3)1),NULL);
+
+}
 
 void RunTests() {
 
@@ -138,8 +165,10 @@ void RunTests() {
     ASSERT(int_tuple_type(0,0,1) <= int_tuple_type(0,0,1),NULL);
     ASSERT(int_tuple_type(1,1,1) >= int_tuple_type(1,0,0),NULL);
     ASSERT(int_tuple_type(0,1,1) >= int_tuple_type(0,1,1),NULL);
+
     typedef tuple<int,float,double,char> mixed_tuple_left;
     typedef tuple<float,int,char,double> mixed_tuple_right;
+
     ASSERT(mixed_tuple_left(1,1.f,1,1) == mixed_tuple_right(1.f,1,1,1),NULL);
     ASSERT(mixed_tuple_left(1,0.f,1,1) <  mixed_tuple_right(1.f,1,1,1),NULL);
     ASSERT(mixed_tuple_left(1,1.f,1,1) >  mixed_tuple_right(1.f,1,0,1),NULL);
@@ -149,16 +178,31 @@ void RunTests() {
     ASSERT(mixed_tuple_left(1,1.f,1,0) >= mixed_tuple_right(1.f,0,1,1),NULL);
     ASSERT(mixed_tuple_left(0,1.f,1,0) >= mixed_tuple_right(0.f,1,1,0),NULL);
 
+    ASSERT(!(mixed_tuple_left(2,1.f,1,1) == mixed_tuple_right(1.f,1,1,1)),NULL);
+    ASSERT(!(mixed_tuple_left(1,2.f,1,1) == mixed_tuple_right(1.f,1,1,1)),NULL);
+    ASSERT(!(mixed_tuple_left(1,1.f,2,1) == mixed_tuple_right(1.f,1,1,1)),NULL);
+    ASSERT(!(mixed_tuple_left(1,1.f,1,2) == mixed_tuple_right(1.f,1,1,1)),NULL);
+    
+    ASSERT(!(mixed_tuple_left(1,1.f,1,1) <  mixed_tuple_right(1.f,1,1,1)),NULL);
+    ASSERT(!(mixed_tuple_left(1,1.f,1,1) >  mixed_tuple_right(1.f,1,1,1)),NULL);
+    ASSERT(!(mixed_tuple_left(1,1.f,1,1) !=  mixed_tuple_right(1.f,1,1,1)),NULL);
+
+    ASSERT(mixed_tuple_left(1,1.f,1,1) <= mixed_tuple_right(1.f,1,1,1),NULL);
+    ASSERT(mixed_tuple_left(1,1.f,1,1) >= mixed_tuple_right(1.f,1,1,1),NULL);
+
+    RunOneComparisonTest<int,float,char,float,char,int>();
+    RunOneComparisonTest<double,float,char,float,double,int>();
+    RunOneComparisonTest<int,float,char,short,char,short>();
+    RunOneComparisonTest<double,float,short,float,char,int>();
+
+
+    // the following should result in a syntax error
+    // typedef tuple<float,float> mixed_short_tuple;
+    // ASSERT(mixed_tuple_left(1,1.f,1,1) != mixed_short_tuple(1.f,1.f),NULL);
+
 }
 
 int TestMain() {
     RunTests();
     return Harness::Done;
 }
-#else  // __SUNPRO_CC
-
-int TestMain() {
-    return Harness::Skipped;
-}
-
-#endif  // __SUNPRO_CC

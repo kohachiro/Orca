@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -60,13 +60,25 @@ __TBB_SYMBOL( _ZN3tbb19task_scheduler_init19default_num_threadsEv )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEij )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEi )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init9terminateEv )
+#if __TBB_SCHEDULER_OBSERVER
 __TBB_SYMBOL( _ZN3tbb8internal26task_scheduler_observer_v37observeEb )
+#endif /* __TBB_SCHEDULER_OBSERVER */
 __TBB_SYMBOL( _ZN3tbb10empty_task7executeEv )
 __TBB_SYMBOL( _ZN3tbb10empty_taskD0Ev )
 __TBB_SYMBOL( _ZN3tbb10empty_taskD1Ev )
 __TBB_SYMBOL( _ZTIN3tbb10empty_taskE )
 __TBB_SYMBOL( _ZTSN3tbb10empty_taskE )
 __TBB_SYMBOL( _ZTVN3tbb10empty_taskE )
+
+#if __TBB_TASK_ARENA
+/* arena.cpp */
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base19internal_initializeEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base18internal_terminateEv )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base16internal_enqueueERNS_4taskEi )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base16internal_executeERNS1_13delegate_baseE )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base13internal_waitEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base21internal_current_slotEv )
+#endif /* __TBB_TASK_ARENA */
 
 #if !TBB_NO_LEGACY
 /* task_v2.cpp */
@@ -149,8 +161,10 @@ __TBB_SYMBOL( _ZN3tbb21set_assertion_handlerEPFvPKciS1_S1_E )
 __TBB_SYMBOL( _ZN3tbb8internal36get_initial_auto_partitioner_divisorEv )
 __TBB_SYMBOL( _ZN3tbb8internal13handle_perrorEiPKc )
 __TBB_SYMBOL( _ZN3tbb8internal15runtime_warningEPKcz )
+#if __TBB_x86_32
 __TBB_SYMBOL( __TBB_machine_store8_slow_perf_warning )
 __TBB_SYMBOL( __TBB_machine_store8_slow )
+#endif
 __TBB_SYMBOL( TBB_runtime_interface_version )
 
 /* tbb_main.cpp */
@@ -159,6 +173,13 @@ __TBB_SYMBOL( _ZN3tbb8internal33itt_store_pointer_with_release_v3EPvS1_ )
 __TBB_SYMBOL( _ZN3tbb8internal18call_itt_notify_v5EiPv )
 __TBB_SYMBOL( _ZN3tbb8internal20itt_set_sync_name_v3EPvPKc )
 __TBB_SYMBOL( _ZN3tbb8internal19itt_load_pointer_v3EPKv )
+#if __TBB_ITT_STRUCTURE_API
+__TBB_SYMBOL( _ZN3tbb8internal22itt_make_task_group_v7ENS0_15itt_domain_enumEPvyS2_yNS0_12string_indexE )
+__TBB_SYMBOL( _ZN3tbb8internal23itt_metadata_str_add_v7ENS0_15itt_domain_enumEPvyNS0_12string_indexEPKc )
+__TBB_SYMBOL( _ZN3tbb8internal19itt_relation_add_v7ENS0_15itt_domain_enumEPvyNS0_12itt_relationES2_y )
+__TBB_SYMBOL( _ZN3tbb8internal17itt_task_begin_v7ENS0_15itt_domain_enumEPvyS2_yNS0_12string_indexE )
+__TBB_SYMBOL( _ZN3tbb8internal15itt_task_end_v7ENS0_15itt_domain_enumE )
+#endif
 
 /* pipeline.cpp */
 __TBB_SYMBOL( _ZTIN3tbb6filterE )
@@ -229,6 +250,16 @@ __TBB_SYMBOL( _ZN3tbb16spin_rw_mutex_v323internal_release_readerEv )
 __TBB_SYMBOL( _ZN3tbb16spin_rw_mutex_v323internal_release_writerEv )
 __TBB_SYMBOL( _ZN3tbb16spin_rw_mutex_v327internal_try_acquire_readerEv )
 __TBB_SYMBOL( _ZN3tbb16spin_rw_mutex_v327internal_try_acquire_writerEv )
+
+#if TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex11scoped_lock7releaseEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex18internal_constructEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex23internal_acquire_readerERNS2_11scoped_lockEb )
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex23internal_acquire_writerERNS2_11scoped_lockEb )
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex16internal_upgradeERNS2_11scoped_lockE )
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex18internal_downgradeERNS2_11scoped_lockE )
+__TBB_SYMBOL( _ZN3tbb10interface78internal16x86_rtm_rw_mutex27internal_try_acquire_writerERNS2_11scoped_lockE )
+#endif
 
 /* spin_mutex.cpp */
 __TBB_SYMBOL( _ZN3tbb10spin_mutex18internal_constructEv )

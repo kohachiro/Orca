@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -121,17 +121,17 @@ public:
     }
     
     //! Copy-construct value at location pointed to by p.
-#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
-    template<typename... Args>
-    void construct(pointer p, Args&&... args)
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    template<typename U, typename... Args>
+    void construct(U *p, Args&&... args)
  #if __TBB_CPP11_STD_FORWARD_BROKEN
-        { ::new((void *)p) T((args)...); }
+        { ::new((void *)p) U((args)...); }
  #else
-        { ::new((void *)p) T(std::forward<Args>(args)...); }
+        { ::new((void *)p) U(std::forward<Args>(args)...); }
  #endif
-#else // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#else // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
     void construct( pointer p, const value_type& value ) {::new((void*)(p)) value_type(value);}
-#endif // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#endif // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
 
     //! Destroy value at location pointed to by p.
     void destroy( pointer p ) {p->~value_type();}

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,8 +26,10 @@
     the GNU General Public License.
 */
 
+#include "tbb/tbb_config.h"
 #include "tbb_main.h"
 #include "governor.h"
+#include "market.h"
 #include "tbb_misc.h"
 #include "itt_notify.h"
 
@@ -48,6 +50,13 @@ basic_tls<generic_scheduler*> governor::theTLS;
 unsigned governor::DefaultNumberOfThreads;
 rml::tbb_factory governor::theRMLServerFactory;
 bool governor::UsePrivateRML;
+const task_scheduler_init *governor::BlockingTSI;
+#if TBB_USE_ASSERT
+bool governor::IsBlockingTermiantionInProgress;
+#endif
+#if __TBB_CPF_BUILD || TBB_PREVIEW_SPECULATIVE_SPIN_RW_MUTEX
+bool governor::is_speculation_enabled;
+#endif
 
 //------------------------------------------------------------------------
 // market data
@@ -80,6 +89,7 @@ bool __TBB_InitOnce::InitializationDone;
 //! Pointer to the scheduler factory function
 generic_scheduler* (*AllocateSchedulerPtr)( arena*, size_t index );
 
+#if __TBB_OLD_PRIMES_RNG
 //! Table of primes used by fast random-number generator (FastRandom).
 /** Also serves to keep anything else from being placed in the same
     cache line as the global data items preceding it. */
@@ -113,6 +123,7 @@ static const unsigned Primes[] = {
 unsigned GetPrime ( unsigned seed ) {
     return Primes[seed%(sizeof(Primes)/sizeof(Primes[0]))];
 }
+#endif //__TBB_OLD_PRIMES_RNG
 
 //------------------------------------------------------------------------
 // __TBB_InitOnce
@@ -123,11 +134,19 @@ void __TBB_InitOnce::add_ref() {
         governor::acquire_resources();
 }
 
+#if __TBB_ITT_STRUCTURE_API
+static inline void ITT_fini() { }
+#endif
+
 void __TBB_InitOnce::remove_ref() {
     int k = --count;
     __TBB_ASSERT(k>=0,"removed __TBB_InitOnce ref that was not added?"); 
-    if( k==0 ) 
+    if( k==0 ) {
         governor::release_resources();
+#if __TBB_ITT_STRUCTURE_API
+        ITT_fini();
+#endif
+    }
 }
 
 //------------------------------------------------------------------------
@@ -142,11 +161,60 @@ void Scheduler_OneTimeInitialization ( bool itt_present );
 
 #if DO_ITT_NOTIFY
 
+#if __TBB_ITT_STRUCTURE_API
+
+static __itt_domain *fgt_domain = NULL;
+
+struct resource_string {
+    const char *str;
+    __itt_string_handle *itt_str_handle;
+};
+
+//
+// populate resource strings
+//
+#define TBB_STRING_RESOURCE( index_name, str ) { str, NULL },
+static resource_string strings_for_itt[] = {
+    #include "tbb/internal/_tbb_strings.h"
+    { "num_resource_strings", NULL } 
+};
+#undef TBB_STRING_RESOURCE
+
+static __itt_string_handle *ITT_get_string_handle(int idx) {
+    __TBB_ASSERT(idx >= 0, NULL);
+    return idx < NUM_STRINGS ? strings_for_itt[idx].itt_str_handle : NULL;
+}
+
+static void ITT_init_domains() {
+    fgt_domain = __itt_domain_create( _T("tbb.flow") );
+    fgt_domain->flags = 1;
+}
+
+static void ITT_init_strings() {
+    for ( int i = 0; i < NUM_STRINGS; ++i ) {
+#if _WIN32||_WIN64
+        strings_for_itt[i].itt_str_handle = __itt_string_handle_createA( strings_for_itt[i].str );
+#else
+        strings_for_itt[i].itt_str_handle = __itt_string_handle_create( strings_for_itt[i].str );
+#endif
+    }
+}
+
+static void ITT_init() {
+    ITT_init_domains();
+    ITT_init_strings();
+}
+
+#endif // __TBB_ITT_STRUCTURE_API
+
 /** Thread-unsafe lazy one-time initialization of tools interop.
     Used by both dummy handlers and general TBB one-time initialization routine. **/
 void ITT_DoUnsafeOneTimeInitialization () {
     if ( !ITT_InitializationDone ) {
         ITT_Present = (__TBB_load_ittnotify()!=0);
+#if __TBB_ITT_STRUCTURE_API
+        if (ITT_Present) ITT_init();
+#endif
         ITT_InitializationDone = true;
         ITT_SYNC_CREATE(&market::theMarketMutex, SyncType_GlobalLock, SyncObj_SchedulerInitialization);
     }
@@ -235,6 +303,104 @@ void call_itt_notify_v5(int t, void *ptr) {
 #else
 void call_itt_notify_v5(int /*t*/, void* /*ptr*/) {}
 #endif
+
+#if __TBB_ITT_STRUCTURE_API
+
+#if DO_ITT_NOTIFY
+
+const __itt_id itt_null_id = {0, 0, 0};
+
+static inline __itt_domain* get_itt_domain( itt_domain_enum idx ) {
+    return ( idx == ITT_DOMAIN_FLOW ) ? fgt_domain : NULL;
+}
+
+static inline void itt_id_make(__itt_id *id, void* addr, unsigned long long extra) {
+    *id = __itt_id_make(addr, extra);
+}
+
+static inline void itt_id_create(const __itt_domain *domain, __itt_id id) {
+    ITTNOTIFY_VOID_D1(id_create, domain, id);
+}
+
+void itt_make_task_group_v7( itt_domain_enum domain, void *group, unsigned long long group_extra, 
+                             void *parent, unsigned long long parent_extra, string_index name_index ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id group_id = itt_null_id;
+        __itt_id parent_id = itt_null_id;
+        itt_id_make( &group_id, group, group_extra );
+        itt_id_create( d, group_id );
+        if ( parent ) {
+            itt_id_make( &parent_id, parent, parent_extra );
+        }
+        __itt_string_handle *n = ITT_get_string_handle(name_index);
+        ITTNOTIFY_VOID_D3(task_group, d, group_id, parent_id, n);
+    }
+}
+
+void itt_metadata_str_add_v7( itt_domain_enum domain, void *addr, unsigned long long addr_extra, 
+                              string_index key, const char *value ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id id = itt_null_id;
+        itt_id_make( &id, addr, addr_extra );
+        __itt_string_handle *k = ITT_get_string_handle(key);
+       size_t value_length = strlen( value );
+#if _WIN32||_WIN64
+        ITTNOTIFY_VOID_D4(metadata_str_addA, d, id, k, value, value_length);
+#else
+        ITTNOTIFY_VOID_D4(metadata_str_add, d, id, k, value, value_length);
+#endif
+    }
+}
+
+void itt_relation_add_v7( itt_domain_enum domain, void *addr0, unsigned long long addr0_extra, 
+                          itt_relation relation, void *addr1, unsigned long long addr1_extra ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id id0 = itt_null_id; 
+        __itt_id id1 = itt_null_id;
+        itt_id_make( &id0, addr0, addr0_extra );
+        itt_id_make( &id1, addr1, addr1_extra );
+        ITTNOTIFY_VOID_D3(relation_add, d, id0, (__itt_relation)relation, id1); 
+    }
+}
+
+void itt_task_begin_v7( itt_domain_enum domain, void *task, unsigned long long task_extra, 
+                        void *parent, unsigned long long parent_extra, string_index /* name_index */ ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id task_id = itt_null_id;
+        __itt_id parent_id = itt_null_id;
+        itt_id_make( &task_id, task, task_extra );
+        if ( parent ) {
+            itt_id_make( &parent_id, parent, parent_extra );
+        }
+        ITTNOTIFY_VOID_D3(task_begin, d, task_id, parent_id, NULL );
+    }
+}
+
+void itt_task_end_v7( itt_domain_enum domain ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        ITTNOTIFY_VOID_D0(task_end, d);
+    }
+}
+
+#else // DO_ITT_NOTIFY
+
+void itt_make_task_group_v7( itt_domain_enum domain, void *group, unsigned long long group_extra, 
+                             void *parent, unsigned long long parent_extra, string_index name_index ) { }
+
+void itt_metadata_str_add_v7( itt_domain_enum domain, void *addr, unsigned long long addr_extra, 
+                              string_index key, const char *value ) { }
+
+void itt_relation_add_v7( itt_domain_enum domain, void *addr0, unsigned long long addr0_extra, 
+                          itt_relation relation, void *addr1, unsigned long long addr1_extra ) { }
+
+void itt_task_begin_v7( itt_domain_enum domain, void *task, unsigned long long task_extra, 
+                        void * /*parent*/, unsigned long long /* parent_extra */, string_index /* name_index */ ) { }
+
+void itt_task_end_v7( itt_domain_enum domain ) { }
+
+#endif // DO_ITT_NOTIFY
+
+#endif // __TBB_ITT_STRUCTURE_API
 
 void* itt_load_pointer_v3( const void* src ) {
     void* result = *static_cast<void*const*>(src);

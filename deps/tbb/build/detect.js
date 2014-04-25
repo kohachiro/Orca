@@ -1,4 +1,4 @@
-// Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+// Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 //
 // This file is part of Threading Building Blocks.
 //
@@ -80,14 +80,14 @@ function doWork() {
 		if ( WScript.Arguments(0) == "/arch" ) {
 			//detect target architecture
 			var intel64=/AMD64|EM64T|x64/mgi;
-			var ia64=/IA-64|Itanium/mgi;
 			var ia32=/[80|\s]x86/mgi;
+			var arm=/ARM/mgi;
 			if ( clVersion.match(intel64) ) {
 				WScript.Echo( "intel64" );
-			} else if ( clVersion.match(ia64) ) {
-				WScript.Echo( "ia64" );
 			} else if ( clVersion.match(ia32) ) {
 				WScript.Echo( "ia32" );
+			} else if ( clVersion.match(arm) ) {
+				WScript.Echo( "armv7" );
 			} else {
 				WScript.Echo( "unknown" );
 			}
@@ -106,6 +106,7 @@ function doWork() {
 			var vc90=/MSVCR90\.DLL/mgi;
 			var vc100=/MSVCR100\.DLL/mgi;
 			var vc110=/MSVCR110\.DLL/mgi;
+			var vc120=/MSVCR120\.DLL/mgi;
 			var psdk=/MSVCRT\.DLL/mgi;
 			if ( mapContext.match(vc71) ) {
 				WScript.Echo( "vc7.1" );
@@ -117,6 +118,8 @@ function doWork() {
 				WScript.Echo( "vc10" );
 			} else if ( mapContext.match(vc110) ) {
 				WScript.Echo( "vc11" );
+			} else if ( mapContext.match(vc120) ) {
+				WScript.Echo( "vc12" );
 			} else {
 				WScript.Echo( "unknown" );
 			}

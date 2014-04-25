@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -32,13 +32,17 @@ else
   test_dir:=.
 endif
 
+# A convenience wrapper for calls to detect.js.
+# $(1) is the full command line for the script, e.g. /minversion icl 12
+detect_js = $(shell cmd /C "cscript /nologo /E:jscript $(tbb_root)/build/detect.js $(1)")
+
 # TODO give an error if archs doesn't match
 ifndef arch
-  export arch:=$(shell cmd /C "cscript /nologo /E:jscript $(tbb_root)/build/detect.js /arch $(compiler)")
+  export arch:=$(call detect_js, /arch $(compiler))
 endif
 
 ifndef runtime
-  export runtime:=$(shell cmd /C "cscript /nologo /E:jscript $(tbb_root)/build/detect.js /runtime $(compiler)")
+  export runtime:=$(call detect_js, /runtime $(compiler))
 endif
 
 native_compiler := cl
@@ -62,20 +66,22 @@ DLL = dll
 LIBEXT = lib
 ASMEXT = asm
 
-def_prefix = $(if $(findstring ia32,$(arch)),win32,win64)
+def_prefix = $(if $(findstring intel64,$(arch)),win64,win32)
 
-# Target Windows version. Do not increase beyond 0x0501 without prior discussion!
+# Target Windows version. Do not increase beyond 0x0502 without prior discussion!
 # Used as the value for macro definition opiton in windows.cl.inc etc.
-_WIN32_WINNT=0x0501
+# For tests, we need at least Windows XP SP2 for sake of enabling stack backtraces.
+_WIN32_WINNT=0x0502
 
 TBB.LST = $(tbb_root)/src/tbb/$(def_prefix)-tbb-export.lst
 TBB.DEF = $(TBB.LST:.lst=.def)
 TBB.DLL = tbb$(CPF_SUFFIX)$(DEBUG_SUFFIX).$(DLL)
 TBB.LIB = tbb$(CPF_SUFFIX)$(DEBUG_SUFFIX).$(LIBEXT)
 TBB.RES = tbb_resource.res
-# On Windows, we use #pragma comment to set the proper TBB lib to link with
-# But for cross-configuration testing, need to link explicitly
-LINK_TBB.LIB = $(if $(crosstest),$(TBB.LIB))
+# On Windows, we use #pragma comment to set the proper TBB lib to link with.
+# But for cross-configuration testing, need to link explicitly.
+# Tests use this variable to detect dependency on TBB binary, so have to be non-empty. 
+LINK_TBB.LIB = $(if $(crosstest),$(TBB.LIB),$(DEFINE_KEY)__TBB_IMPLICITLY_LINKED)
 TBB.MANIFEST =
 ifneq ($(filter vc8 vc9,$(runtime)),)
     TBB.MANIFEST = tbbmanifest.exe.manifest
@@ -93,6 +99,7 @@ LINK_MALLOC.LIB = $(MALLOC.LIB)
 
 MALLOCPROXY.DLL = tbbmalloc_proxy$(DEBUG_SUFFIX).$(DLL)
 MALLOCPROXY.LIB = tbbmalloc_proxy$(DEBUG_SUFFIX).$(LIBEXT)
+LINK_MALLOCPROXY.LIB = $(MALLOCPROXY.LIB)
 
 PROXY.LIB = tbbproxy$(DEBUG_SUFFIX).$(LIBEXT)
 
@@ -104,7 +111,7 @@ ifneq ($(filter vc8 vc9,$(runtime)),)
 RML.MANIFEST = tbbmanifest.exe.manifest
 endif
 
-MAKE_VERSIONS = cmd /C cscript /nologo /E:jscript $(subst \,/,$(tbb_root))/build/version_info_windows.js $(compiler) $(arch) $(subst \,/,"$(CPLUS) $(CPLUS_FLAGS)") > version_string.ver
+MAKE_VERSIONS = cmd /C cscript /nologo /E:jscript $(subst \,/,$(tbb_root))/build/version_info_windows.js $(compiler) $(arch) $(subst \,/,"$(VERSION_FLAGS)") > version_string.ver
 MAKE_TBBVARS  = cmd /C "$(subst /,\,$(tbb_root))\build\generate_tbbvars.bat"
 
-TEST_LAUNCHER =  $(subst /,\,$(tbb_root))\build\test_launcher.bat
+TEST_LAUNCHER = $(subst /,\,$(tbb_root))\build\test_launcher.bat $(largs)

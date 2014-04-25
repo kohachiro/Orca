@@ -1,4 +1,4 @@
-# Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks.
 #
@@ -40,13 +40,11 @@ DYLIB_KEY = -shared
 EXPORT_KEY = -Wl,--version-script,
 LIBDL = -ldl
 
-TBB_NOSTRICT = 1
-
 CPLUS = g++
 CONLY = gcc
 LIB_LINK_FLAGS = $(DYLIB_KEY) -Wl,-soname=$(BUILDING_LIBRARY)
 LIBS += -lpthread -lrt
-LINK_FLAGS = -Wl,-rpath-link=.
+LINK_FLAGS = -Wl,-rpath-link=. -rdynamic
 C_FLAGS = $(CPLUS_FLAGS)
 # gcc 4.4 and higher support -std=c++0x
 ifneq (,$(shell gcc -dumpversion | egrep  "^(4\.[4-9]|[5-9])"))
@@ -58,7 +56,16 @@ ifneq (,$(shell gcc -dumpversion | egrep  "^(4\.[2-9]|[5-9])"))
     OPENMP_FLAG = -fopenmp
 endif
 
-ITT_NOTIFY = -DDO_ITT_NOTIFY
+# gcc 4.4 is particularly zealous about strict aliasing rules; suppress it for library builds
+ifneq (,$(shell gcc -dumpversion | egrep  "^4\.4"))
+    WARNING_SUPPRESS += -Wno-strict-aliasing
+endif
+
+# gcc 4.8 and later support TSX intrinsics, but require command line switch to enable them
+ifneq (,$(shell gcc -dumpversion | egrep  "^4\.[8-9]"))
+    ENABLE_RTM += -mrtm
+endif
+
 ifeq ($(cfg), release)
         CPLUS_FLAGS = $(ITT_NOTIFY) -g -O2 -DUSE_PTHREAD
 endif
@@ -74,18 +81,19 @@ TBB_ASM.OBJ=
 MALLOC_ASM.OBJ=
 
 ifeq (ia64,$(arch))
-    ITT_NOTIFY =
-# Position-independent code (PIC) is a must on IA-64, even for regular (not shared) executables
+# Position-independent code (PIC) is a must on IA-64 architecture, even for regular (not shared) executables
     CPLUS_FLAGS += $(PIC_KEY)
 endif
 
 ifeq (intel64,$(arch))
-    CPLUS_FLAGS += -m64
+    ITT_NOTIFY = -DDO_ITT_NOTIFY
+    CPLUS_FLAGS += -m64 $(ENABLE_RTM)
     LIB_LINK_FLAGS += -m64
 endif
 
 ifeq (ia32,$(arch))
-    CPLUS_FLAGS += -m32 -march=pentium4
+    ITT_NOTIFY = -DDO_ITT_NOTIFY
+    CPLUS_FLAGS += -m32 -march=pentium4 $(ENABLE_RTM)
     LIB_LINK_FLAGS += -m32
 endif
 
@@ -99,7 +107,7 @@ ifeq (ppc32,$(arch))
     LIB_LINK_FLAGS += -m32
 endif
 
-ifeq (bgp,$(arch))
+ifeq (bg,$(arch))
     CPLUS = mpicxx
     CONLY = mpicc
 endif
@@ -108,6 +116,11 @@ endif
 ifeq (sparc,$(arch))
     CPLUS_FLAGS    += -mcpu=v9 -m64
     LIB_LINK_FLAGS += -mcpu=v9 -m64
+endif
+
+# automatically generate "IT" instructions when compiling for Thumb ISA
+ifeq (armv7,$(arch))
+    CPLUS_FLAGS    += -Wa,-mimplicit-it=thumb
 endif
 
 #------------------------------------------------------------------------------

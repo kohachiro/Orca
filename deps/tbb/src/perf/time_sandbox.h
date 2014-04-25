@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -34,7 +34,7 @@
 #define INJECT_TBB5 namespace tbb { namespace interface5 { using namespace ::tbb::interface5; namespace internal { using namespace ::tbb::interface5::internal; } } }
 
 #ifndef INJECT_BOX_NAMES
-#if defined(__TBB_task_H) || defined(__TBB_concurrent_unordered_internal_H) || defined(__TBB_reader_writer_lock_H)
+#if defined(__TBB_task_H) || defined(__TBB_concurrent_unordered_internal_H) || defined(__TBB_reader_writer_lock_H) || defined(__TBB__concurrent_unordered_impl_H)
 #define INJECT_BOX_NAMES INJECT_TBB INJECT_TBB5
 #else
 #define INJECT_BOX_NAMES INJECT_TBB

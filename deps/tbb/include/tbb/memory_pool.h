@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -36,7 +36,8 @@
 
 #include "scalable_allocator.h"
 #include "tbb_stddef.h"
-#include "tbb_machine.h" // TODO: avoid linkage with libtbb on IA-64
+#include "tbb_machine.h" // TODO: avoid linkage with libtbb on IA-64 architecture
+#include "tbb/atomic.h" // for as_atomic
 #include <new> // std::bad_alloc
 #if __TBB_CPP11_RVALUE_REF_PRESENT && !__TBB_CPP11_STD_FORWARD_BROKEN
 #include <utility> // std::forward
@@ -136,17 +137,17 @@ public:
         return (max > 0 ? max : 1);
     }
     //! Copy-construct value at location pointed to by p.
-#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
-    template<typename... Args>
-    void construct(pointer p, Args&&... args)
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    template<typename U, typename... Args>
+    void construct(U *p, Args&&... args)
  #if __TBB_CPP11_STD_FORWARD_BROKEN
-        { ::new((void *)p) T((args)...); }
+        { ::new((void *)p) U((args)...); }
  #else
-        { ::new((void *)p) T(std::forward<Args>(args)...); }
+        { ::new((void *)p) U(std::forward<Args>(args)...); }
  #endif
-#else // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#else // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
     void construct( pointer p, const value_type& value ) { ::new((void*)(p)) value_type(value); }
-#endif // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#endif // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
 
     //! Destroy value at location pointed to by p.
     void destroy( pointer p ) { p->~value_type(); }
@@ -239,6 +240,12 @@ void *memory_pool<Alloc>::allocate_request(intptr_t pool_id, size_t & bytes) {
     __TBB_CATCH(...) { return 0; }
     return ptr;
 }
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    // Workaround for erroneous "unreachable code" warning in the template below.
+    // Specific for VC++ 17-18 compiler
+    #pragma warning (push)
+    #pragma warning (disable: 4702)
+#endif
 template <typename Alloc>
 int memory_pool<Alloc>::deallocate_request(intptr_t pool_id, void* raw_ptr, size_t raw_bytes) {
     memory_pool<Alloc> &self = *reinterpret_cast<memory_pool<Alloc>*>(pool_id);
@@ -247,6 +254,9 @@ int memory_pool<Alloc>::deallocate_request(intptr_t pool_id, void* raw_ptr, size
     self.my_alloc.deallocate( static_cast<typename Alloc::value_type*>(raw_ptr), raw_bytes/unit_size );
     return 0;
 }
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    #pragma warning (pop)
+#endif
 inline fixed_pool::fixed_pool(void *buf, size_t size) : my_buffer(buf), my_size(size) {
     rml::MemPoolPolicy args(allocate_request, 0, size, /*fixedPool=*/true);
     rml::MemPoolError res = rml::pool_create_v1(intptr_t(this), &args, &my_pool);
@@ -254,7 +264,9 @@ inline fixed_pool::fixed_pool(void *buf, size_t size) : my_buffer(buf), my_size(
 }
 inline void *fixed_pool::allocate_request(intptr_t pool_id, size_t & bytes) {
     fixed_pool &self = *reinterpret_cast<fixed_pool*>(pool_id);
-    if( !__TBB_CompareAndSwapW(&self.my_size, 0, (bytes=self.my_size)) )
+    // TODO: we can implement "buffer for fixed pools used only once" policy
+    // on low-level side, thus eliminate atomics here
+    if( !tbb::internal::as_atomic(self.my_size).compare_and_swap(0, (bytes=self.my_size)) )
         return 0; // all the memory was given already
     return self.my_buffer;
 }

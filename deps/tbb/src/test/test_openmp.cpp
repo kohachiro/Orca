@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -29,7 +29,7 @@
 // Test mixing OpenMP and TBB
 
 /* SCR #471 
- Bellow is workaround to compile test within enviroment of Intel Compiler
+ Below is workaround to compile test within enviroment of Intel Compiler
  but by Microsoft Compiler. So, there is wrong "omp.h" file included and
  manifest section is missed from .exe file - restoring here.
 

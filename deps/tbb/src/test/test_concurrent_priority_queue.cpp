@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,10 +26,13 @@
     the GNU General Public License.
 */
 
+#include "harness_defs.h"
 #include "tbb/concurrent_priority_queue.h"
 #include "tbb/atomic.h"
+#include "tbb/blocked_range.h"
 #include "harness.h"
 #include <functional>
+#include <algorithm>
 #include <vector>
 
 #if _MSC_VER==1500 && !__INTEL_COMPILER
@@ -153,6 +156,48 @@ public:
     }
 };
 
+namespace equality_comparison_helpers {
+    struct to_vector{
+        template <typename element_type>
+        std::vector<element_type> operator()(tbb::concurrent_priority_queue<element_type> const& source) const{
+            tbb::concurrent_priority_queue<element_type>  cpq((source));
+            std::vector<element_type> v; v.reserve(cpq.size());
+            element_type element;
+            while (cpq.try_pop(element)){ v.push_back(element);}
+            std::reverse(v.begin(),v.end());
+            return v;
+        }
+    };
+}
+//TODO: make CPQ more testable instead of hacking ad-hoc operator ==
+//operator == is required for __TBB_TEST_INIT_LIST_SUITE
+template <typename element_type>
+bool operator==(tbb::concurrent_priority_queue<element_type> const& lhs, tbb::concurrent_priority_queue<element_type> const& rhs){
+    using equality_comparison_helpers::to_vector;
+    return to_vector()(lhs) == to_vector()(rhs);
+}
+
+template <typename element_type, typename  range>
+bool operator==(tbb::concurrent_priority_queue<element_type> const& lhs, range const & rhs ){
+    using equality_comparison_helpers::to_vector;
+    return to_vector()(lhs) == std::vector<element_type>(rhs.begin(),rhs.end());
+}
+
+void TestToVector(){
+    using equality_comparison_helpers::to_vector;
+    int array[] = {1,5,6,8,4,7};
+    tbb::blocked_range<int *> range =  Harness::make_blocked_range(array);
+    std::vector<int> source(range.begin(),range.end());
+    tbb::concurrent_priority_queue<int> q(source.begin(),source.end());
+    std::vector<int> from_cpq = to_vector()(q);
+    std::sort(source.begin(),source.end());
+    ASSERT(source == from_cpq,"equality_comparison_helpers::to_vector incorrectly copied items from CPQ?");
+}
+
+void TestHelpers(){
+    TestToVector();
+}
+
 void TestConstructorsDestructorsAccessors() {
     std::vector<int> v;
     std::allocator<int> a;
@@ -203,12 +248,15 @@ void TestConstructorsDestructorsAccessors() {
     REMARK("Iterator filler constructor complete.\n");
     ASSERT(q->size()==42, "FAILED vector/size test.");
     ASSERT(!q->empty(), "FAILED vector/empty test.");
+    ASSERT(*q == v, "FAILED vector/equality test.");
 
     REMARK("Testing copy constructor.\n");
     qo = new concurrent_priority_queue<int, std::less<int> >(*q);
     REMARK("Copy constructor complete.\n");
-    ASSERT(qo->size()==42, "FAILED vector/size test.");
-    ASSERT(!qo->empty(), "FAILED vector/empty test.");
+    ASSERT(qo->size()==42, "FAILED cpq/size test.");
+    ASSERT(!qo->empty(), "FAILED cpq/empty test.");
+    ASSERT(*q == *qo, "FAILED cpq/equality test.");
+
     REMARK("Testing destructor.\n");
     delete q;
     delete qo;
@@ -216,20 +264,30 @@ void TestConstructorsDestructorsAccessors() {
 }
 
 void TestAssignmentClearSwap() {
+    typedef concurrent_priority_queue<int, std::less<int> > cpq_type;
     std::vector<int> v;
-    concurrent_priority_queue<int, std::less<int> > *q, *qo;
+    cpq_type *q, *qo;
     int e;
 
     for (int i=0; i<42; ++i)
         v.push_back(i);
-    q = new concurrent_priority_queue<int, std::less<int> >(v.begin(), v.end());
-    qo = new concurrent_priority_queue<int, std::less<int> >();
+    q = new cpq_type(v.begin(), v.end());
+    qo = new cpq_type();
 
     REMARK("Testing assignment (1).\n");
     *qo = *q; 
     REMARK("Assignment complete.\n");
     ASSERT(qo->size()==42, "FAILED assignment/size test.");
     ASSERT(!qo->empty(), "FAILED assignment/empty test.");
+    ASSERT(*qo == v,"FAILED assignment/equality test");
+
+    cpq_type assigned_q;
+    REMARK("Testing assign(begin,end) (2).\n");
+    assigned_q.assign(v.begin(), v.end());
+    REMARK("Assignment complete.\n");
+    ASSERT(assigned_q.size()==42, "FAILED assignment/size test.");
+    ASSERT(!assigned_q.empty(), "FAILED assignment/empty test.");
+    ASSERT(assigned_q == v,"FAILED assignment/equality test");
 
     REMARK("Testing clear.\n");
     q->clear();
@@ -240,7 +298,7 @@ void TestAssignmentClearSwap() {
     for (size_t i=0; i<5; ++i)
         (void) qo->try_pop(e);
 
-    REMARK("Testing assignment (2).\n");
+    REMARK("Testing assignment (3).\n");
     *q = *qo;
     REMARK("Assignment complete.\n");
     ASSERT(q->size()==37, "FAILED assignment/size test.");
@@ -460,9 +518,26 @@ void TestCpqOnNThreads(int nThreads) {
 #endif
 }
 
+#if __TBB_INITIALIZER_LISTS_PRESENT
+#include "test_initializer_list.h"
+
+void TestInitList(){
+    REMARK("testing initializer_list methods \n");
+    using namespace initializer_list_support_tests;
+    TestInitListSupport<tbb::concurrent_priority_queue<char> >({1,2,3,4,5});
+    TestInitListSupport<tbb::concurrent_priority_queue<int> >({});
+}
+#endif //if __TBB_INITIALIZER_LISTS_PRESENT
+
 int TestMain() {
     if (MinThread < 1)
         MinThread = 1;
+
+    TestHelpers();
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    TestInitList();
+#endif
+
     for (int p = MinThread; p <= MaxThread; ++p) {
         REMARK("Testing on %d threads.\n", p);
         TestCpqOnNThreads(p);

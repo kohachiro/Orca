@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -30,7 +30,6 @@
 #define TBB_PREVIEW_GRAPH_NODES 1
 #include "tbb/flow_graph.h"
 
-#if !__SUNPRO_CC
 //
 // Tests
 //
@@ -142,7 +141,7 @@ struct getval_helper {
 
     typedef typename ONT::output_type OT;
     static int get_integer_val(OT &o) {
-        return int(std::get<ELEM-1>(o.result));
+        return int(tbb::flow::get<ELEM-1>(o.result));
     }
 };
 
@@ -155,7 +154,7 @@ class source_node_helper {
 public:
     typedef ONT or_node_type;
     typedef typename or_node_type::output_type TT;
-    typedef typename std::tuple_element<ELEM-1,typename ONT::tuple_types>::type IT;
+    typedef typename tbb::flow::tuple_element<ELEM-1,typename ONT::tuple_types>::type IT;
     typedef typename tbb::flow::source_node<IT> my_source_node_type;
     static void print_remark() {
         source_node_helper<ELEM-1,ONT>::print_remark();
@@ -197,7 +196,7 @@ template<typename ONT>
 class source_node_helper<1, ONT> {
     typedef ONT or_node_type;
     typedef typename or_node_type::output_type TT;
-    typedef typename std::tuple_element<0, typename ONT::tuple_types>::type IT;
+    typedef typename tbb::flow::tuple_element<0, typename ONT::tuple_types>::type IT;
     typedef typename tbb::flow::source_node<IT> my_source_node_type;
 public:
     static void print_remark() {
@@ -231,7 +230,7 @@ class parallel_test {
 public:
     typedef typename OType::output_type TType;
     typedef typename OType::tuple_types union_types;
-    static const int SIZE = std::tuple_size<union_types>::value;
+    static const int SIZE = tbb::flow::tuple_size<union_types>::value;
     static void test() {
         TType v;
         source_node_helper<SIZE,OType>::print_remark();
@@ -287,7 +286,7 @@ class serial_queue_helper {
 public:
     typedef typename OType::output_type OT;
     typedef typename OType::tuple_types TT;
-    typedef typename std::tuple_element<ELEM-1,TT>::type IT;
+    typedef typename tbb::flow::tuple_element<ELEM-1,TT>::type IT;
     static void print_remark() {
         serial_queue_helper<ELEM-1,OType>::print_remark();
         REMARK(", %s", name_of<IT>::name());
@@ -322,7 +321,7 @@ class serial_queue_helper<1, OType> {
 public:
     typedef typename OType::output_type OT;
     typedef typename OType::tuple_types TT;
-    typedef typename std::tuple_element<0,TT>::type IT;
+    typedef typename tbb::flow::tuple_element<0,TT>::type IT;
     static void print_remark() {
         REMARK("Serial test of or_node< %s", name_of<IT>::name());
     }
@@ -392,7 +391,7 @@ template<typename OType>
 class serial_test {
     typedef typename OType::output_type TType;  // this is the union
     typedef typename OType::tuple_types union_types;
-    static const int SIZE = std::tuple_size<union_types>::value;
+    static const int SIZE = tbb::flow::tuple_size<union_types>::value;
 public:
 static void test() {
     tbb::flow::graph g;
@@ -434,25 +433,32 @@ int TestMain() {
 #endif
 
    for (int p = 0; p < 2; ++p) {
-       generate_test<serial_test, std::tuple<float, test_class> >::do_test();
-       generate_test<serial_test, std::tuple<float, double, int, long> >::do_test();
-       generate_test<serial_test, std::tuple<double, double, int, long, int, short> >::do_test();
-#if COMPREHENSIVE_TEST
-       generate_test<serial_test, std::tuple<float, double, double, double, float, int, float, long> >::do_test();
-       generate_test<serial_test, std::tuple<float, double, int, double, double, float, long, int, float, long> >::do_test();
+       generate_test<serial_test, tbb::flow::tuple<float, test_class> >::do_test();
+#if MAX_TUPLE_TEST_SIZE >= 4
+       generate_test<serial_test, tbb::flow::tuple<float, double, int, long> >::do_test();
 #endif
-       generate_test<parallel_test, std::tuple<float, double> >::do_test();
-       generate_test<parallel_test, std::tuple<float, int, long> >::do_test();
-       generate_test<parallel_test, std::tuple<double, double, int, int, short> >::do_test();
-#if COMPREHENSIVE_TEST
-       generate_test<parallel_test, std::tuple<float, int, double, float, long, float, long> >::do_test();
-       generate_test<parallel_test, std::tuple<float, double, int, double, double, long, int, float, long> >::do_test();
+#if MAX_TUPLE_TEST_SIZE >= 6
+       generate_test<serial_test, tbb::flow::tuple<double, double, int, long, int, short> >::do_test();
+#endif
+#if MAX_TUPLE_TEST_SIZE >= 8
+       generate_test<serial_test, tbb::flow::tuple<float, double, double, double, float, int, float, long> >::do_test();
+#endif
+#if MAX_TUPLE_TEST_SIZE >= 10
+       generate_test<serial_test, tbb::flow::tuple<float, double, int, double, double, float, long, int, float, long> >::do_test();
+#endif
+       generate_test<parallel_test, tbb::flow::tuple<float, double> >::do_test();
+#if MAX_TUPLE_TEST_SIZE >= 3
+       generate_test<parallel_test, tbb::flow::tuple<float, int, long> >::do_test();
+#endif
+#if MAX_TUPLE_TEST_SIZE >= 5
+       generate_test<parallel_test, tbb::flow::tuple<double, double, int, int, short> >::do_test();
+#endif
+#if MAX_TUPLE_TEST_SIZE >= 7
+       generate_test<parallel_test, tbb::flow::tuple<float, int, double, float, long, float, long> >::do_test();
+#endif
+#if MAX_TUPLE_TEST_SIZE >= 9
+       generate_test<parallel_test, tbb::flow::tuple<float, double, int, double, double, long, int, float, long> >::do_test();
 #endif
    }
    return Harness::Done;
 }
-#else  // __SUNPRO_CC
-int TestMain() {
-    return Harness::Skipped;
-}
-#endif  // __SUNPRO_CC

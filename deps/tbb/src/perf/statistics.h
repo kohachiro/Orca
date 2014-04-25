@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -47,7 +47,7 @@ typedef double value_t;
 
 /*
    Statistical collector class.
-  
+
    Resulting table output:
         +---------------------------------------------------------------------------+
         | [Date] <Title>...                                                         |
@@ -63,7 +63,7 @@ typedef double value_t;
         +---------------------------------------------------------------------------+
         | [Date] <TestName>, Threads: <N>, Mode: <M>; for <Title>...                |
         +----------+----v----+--v---+----------------+------------+-..-+------------+
-        
+
 */
 
 class StatisticsCollector
@@ -85,11 +85,11 @@ protected:
     };
 
     // internal members
-	//bool OpenFile;
+    //bool OpenFile;
     StatisticResults *CurrentKey;
     string Title;
     const char /**Name,*/ *ResultsFmt;
-	string Name;
+    string Name;
     //! Data
     typedef map<string, StatisticResults*> Statistics_t;
     Statistics_t Statistics;
@@ -181,7 +181,7 @@ private:
 };
 
 //! using: Func(const char *fmt, ...) { vargf2buff(buff, 128, fmt);...
-#define vargf2buff(name, size, fmt) \ 
+#define vargf2buff(name, size, fmt) \
     char name[size]; memset(name, 0, size); \
     va_list args; va_start(args, fmt); \
     vsnprintf(name, size-1, fmt, args); \

@@ -68,14 +68,20 @@ static bool BackRefMatchesNoCase(Canonicalize* interp_canonicalize,
                                  int from,
                                  int current,
                                  int len,
-                                 Vector<const char> subject) {
+                                 Vector<const uint8_t> subject) {
   for (int i = 0; i < len; i++) {
     unsigned int old_char = subject[from++];
     unsigned int new_char = subject[current++];
     if (old_char == new_char) continue;
-    if (old_char - 'A' <= 'Z' - 'A') old_char |= 0x20;
-    if (new_char - 'A' <= 'Z' - 'A') new_char |= 0x20;
+    // Convert both characters to lower case.
+    old_char |= 0x20;
+    new_char |= 0x20;
     if (old_char != new_char) return false;
+    // Not letters in the ASCII range and Latin-1 range.
+    if (!(old_char - 'a' <= 'z' - 'a') &&
+        !(old_char - 224 <= 254 - 224 && old_char != 247)) {
+      return false;
+    }
   }
   return true;
 }
@@ -152,25 +158,12 @@ static int32_t Load16Aligned(const byte* pc) {
 // matching terminates.
 class BacktrackStack {
  public:
-  explicit BacktrackStack(Isolate* isolate) : isolate_(isolate) {
-    if (isolate->irregexp_interpreter_backtrack_stack_cache() != NULL) {
-      // If the cache is not empty reuse the previously allocated stack.
-      data_ = isolate->irregexp_interpreter_backtrack_stack_cache();
-      isolate->set_irregexp_interpreter_backtrack_stack_cache(NULL);
-    } else {
-      // Cache was empty. Allocate a new backtrack stack.
-      data_ = NewArray<int>(kBacktrackStackSize);
-    }
+  explicit BacktrackStack() {
+    data_ = NewArray<int>(kBacktrackStackSize);
   }
 
   ~BacktrackStack() {
-    if (isolate_->irregexp_interpreter_backtrack_stack_cache() == NULL) {
-      // The cache is empty. Keep this backtrack stack around.
-      isolate_->set_irregexp_interpreter_backtrack_stack_cache(data_);
-    } else {
-      // A backtrack stack was already cached, just release this one.
-      DeleteArray(data_);
-    }
+    DeleteArray(data_);
   }
 
   int* data() const { return data_; }
@@ -181,7 +174,6 @@ class BacktrackStack {
   static const int kBacktrackStackSize = 10000;
 
   int* data_;
-  Isolate* isolate_;
 
   DISALLOW_COPY_AND_ASSIGN(BacktrackStack);
 };
@@ -198,7 +190,7 @@ static RegExpImpl::IrregexpResult RawMatch(Isolate* isolate,
   // BacktrackStack ensures that the memory allocated for the backtracking stack
   // is returned to the system or cached if there is no stack being cached at
   // the moment.
-  BacktrackStack backtrack_stack(isolate);
+  BacktrackStack backtrack_stack;
   int* backtrack_stack_base = backtrack_stack.data();
   int* backtrack_sp = backtrack_stack_base;
   int backtrack_stack_space = backtrack_stack.max_size();
@@ -612,12 +604,12 @@ RegExpImpl::IrregexpResult IrregexpInterpreter::Match(
     int start_position) {
   ASSERT(subject->IsFlat());
 
-  AssertNoAllocation a;
+  DisallowHeapAllocation no_gc;
   const byte* code_base = code_array->GetDataStartAddress();
   uc16 previous_char = '\n';
   String::FlatContent subject_content = subject->GetFlatContent();
   if (subject_content.IsAscii()) {
-    Vector<const char> subject_vector = subject_content.ToAsciiVector();
+    Vector<const uint8_t> subject_vector = subject_content.ToOneByteVector();
     if (start_position != 0) previous_char = subject_vector[start_position - 1];
     return RawMatch(isolate,
                     code_base,

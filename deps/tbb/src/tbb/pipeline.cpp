@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -57,7 +57,7 @@ struct task_info {
 };
 //! A buffer of input items for a filter.
 /** Each item is a task_info, inserted into a position in the buffer corresponding to a Token. */
-class input_buffer {
+class input_buffer : no_copy {
     friend class tbb::internal::pipeline_root_task;
     friend class tbb::filter;
     friend class tbb::thread_bound_filter;
@@ -728,6 +728,7 @@ thread_bound_filter::result_type thread_bound_filter::try_process_item() {
 }
 
 thread_bound_filter::result_type thread_bound_filter::internal_process_item(bool is_blocking) {
+    __TBB_ASSERT(my_pipeline != NULL,"It's not supposed that process_item is called for a filter that is not in a pipeline.");
     internal::task_info info;
     info.reset();
 

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -373,7 +373,7 @@ public:
     //! Grow by "delta" elements.
     /** Returns old size. */
     size_type grow_by( size_type delta ) {
-        return delta ? internal_grow_by( delta, sizeof(T), &initialize_array ) : my_early_size;
+        return delta ? internal_grow_by( delta, sizeof(T), &initialize_array ) : my_early_size.load();
     }
 
     //! Grow array until it has at least n elements.

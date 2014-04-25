@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -26,8 +26,10 @@
     the GNU General Public License.
 */
 
-// Works on windows only
-#ifdef _WIN32
+#include "tbb/tbb_config.h"
+
+#if !__TBB_WIN8UI_SUPPORT && defined(_WIN32)
+
 #define _CRT_SECURE_NO_DEPRECATE 1
 #define __TBB_NO_IMPLICIT_LINKAGE 1
 
@@ -63,7 +65,7 @@ inline bool IsInDistance(UINT_PTR addr1, UINT_PTR addr2, __int64 dist)
 
 /*
  * When inserting a probe in 64 bits process the distance between the insertion
- * point and the target may be bigger than 2^32. In this case we are using 
+ * point and the target may be bigger than 2^32. In this case we are using
  * indirect jump through memory where the offset to this memory location
  * is smaller than 2^32 and it contains the absolute address (8 bytes).
  *
@@ -138,22 +140,22 @@ MemoryBuffer *CreateBuffer(UINT_PTR addr)
     }
 
 public:
-    MemoryProvider() 
-    { 
+    MemoryProvider()
+    {
         SYSTEM_INFO sysInfo;
         GetSystemInfo(&sysInfo);
-        m_allocSize = sysInfo.dwAllocationGranularity; 
+        m_allocSize = sysInfo.dwAllocationGranularity;
         m_lastBuffer = &m_pages[0];
     }
 
     // We can't free the pages in the destructor because the trampolines
     // are using these memory locations and a replaced function might be called
     // after the destructor was called.
-    ~MemoryProvider() 
+    ~MemoryProvider()
     {
     }
 
-    // Return a memory location in distance less than 2^31 from input address 
+    // Return a memory location in distance less than 2^31 from input address
     UINT_PTR GetLocation(UINT_PTR addr)
     {
         MemoryBuffer *pBuff = m_pages;
@@ -201,7 +203,7 @@ size_t compareStrings( const char *str1, const char *str2 )
 // inpAddr - pointer to function prologue
 // Dictionary contains opcodes for several full asm instructions
 // + one opcode byte for the next asm instruction for safe address processing
-// RETURN: number of bytes for safe bytes replacement 
+// RETURN: number of bytes for safe bytes replacement
 // (matched_pattern/2-1)
 UINT CheckOpcodes( const char ** opcodes, void *inpAddr )
 {
@@ -216,7 +218,7 @@ UINT CheckOpcodes( const char ** opcodes, void *inpAddr )
     // max length and number of patterns
     if( !opcodesStringsCount || opcodes_pointer != (size_t)opcodes ){
         while( *(opcodes + opcodesStringsCount)!= NULL ){
-            if( (i=strlen(*(opcodes + opcodesStringsCount))) > maxOpcodesLength ) 
+            if( (i=strlen(*(opcodes + opcodesStringsCount))) > maxOpcodesLength )
                 maxOpcodesLength = i;
             opcodesStringsCount++;
         }
@@ -226,14 +228,14 @@ UINT CheckOpcodes( const char ** opcodes, void *inpAddr )
 
     // Translate prologue opcodes to string format to compare
     for( i=0; i< maxOpcodesLength/2; i++ ){
-        sprintf( opcodeString + 2*i, "%.2X", *((unsigned char*)inpAddr+i) ); 
+        sprintf( opcodeString + 2*i, "%.2X", *((unsigned char*)inpAddr+i) );
     }
     opcodeString[maxOpcodesLength] = 0;
-    
+
     // Compare translated opcodes with patterns
     for( i=0; i< opcodesStringsCount; i++ ){
         result = compareStrings( opcodes[i],opcodeString );
-        if( result ) 
+        if( result )
             return (UINT)(result/2-1);
     }
     // TODO: to add more stuff to patterns
@@ -396,7 +398,7 @@ static bool InsertTrampoline(void *inpAddr, void *targetAddr, const char ** opco
 FRR_TYPE ReplaceFunctionA(const char *dllName, const char *funcName, FUNCPTR newFunc, const char ** opcodes, FUNCPTR* origFunc)
 {
     // Cache the results of the last search for the module
-    // Assume that there was no DLL unload between 
+    // Assume that there was no DLL unload between
     static char cachedName[MAX_PATH+1];
     static HMODULE cachedHM = 0;
 
@@ -436,7 +438,7 @@ FRR_TYPE ReplaceFunctionA(const char *dllName, const char *funcName, FUNCPTR new
 FRR_TYPE ReplaceFunctionW(const wchar_t *dllName, const char *funcName, FUNCPTR newFunc, const char ** opcodes, FUNCPTR* origFunc)
 {
     // Cache the results of the last search for the module
-    // Assume that there was no DLL unload between 
+    // Assume that there was no DLL unload between
     static wchar_t cachedName[MAX_PATH+1];
     static HMODULE cachedHM = 0;
 
@@ -473,4 +475,4 @@ FRR_TYPE ReplaceFunctionW(const wchar_t *dllName, const char *funcName, FUNCPTR 
     return FRR_OK;
 }
 
-#endif //_WIN32
+#endif /* !__TBB_WIN8UI_SUPPORT && defined(_WIN32) */

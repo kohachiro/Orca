@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -53,6 +53,9 @@
 #include "tbb_exception.h"
 #include "tbb_profiling.h"
 #include "internal/_concurrent_unordered_impl.h" // Need tbb_hasher
+#if __TBB_INITIALIZER_LISTS_PRESENT
+#include <initializer_list>
+#endif
 #if TBB_USE_PERFORMANCE_WARNINGS || __TBB_STATISTICS
 #include <typeinfo>
 #endif
@@ -76,6 +79,7 @@ namespace interface5 {
 
     //! @cond INTERNAL
     namespace internal {
+    using namespace tbb::internal;
 
 
     //! Type of a hash code.
@@ -285,8 +289,9 @@ namespace interface5 {
             if( sz >= mask ) { // TODO: add custom load_factor
                 segment_index_t new_seg = __TBB_Log2( mask+1 ); //optimized segment_index_of
                 __TBB_ASSERT( is_valid(my_table[new_seg-1]), "new allocations must not publish new mask until segment has allocated");
+                static const segment_ptr_t is_allocating = (segment_ptr_t)2;
                 if( !itt_hide_load_word(my_table[new_seg])
-                  && __TBB_CompareAndSwapW(&my_table[new_seg], 2, 0) == 0 )
+                  && as_atomic(my_table[new_seg]).compare_and_swap(is_allocating, NULL) == NULL )
                     return new_seg; // The value must be processed
             }
             return 0;
@@ -301,12 +306,13 @@ namespace interface5 {
         }
         //! Swap hash_map_bases
         void internal_swap(hash_map_base &table) {
-            std::swap(this->my_mask, table.my_mask);
-            std::swap(this->my_size, table.my_size);
+            using std::swap;
+            swap(this->my_mask, table.my_mask);
+            swap(this->my_size, table.my_size);
             for(size_type i = 0; i < embedded_buckets; i++)
-                std::swap(this->my_embedded_segment[i].node_list, table.my_embedded_segment[i].node_list);
+                swap(this->my_embedded_segment[i].node_list, table.my_embedded_segment[i].node_list);
             for(size_type i = embedded_block; i < pointers_per_table; i++)
-                std::swap(this->my_table[i], table.my_table[i]);
+                swap(this->my_table[i], table.my_table[i]);
         }
     };
 
@@ -596,7 +602,7 @@ protected:
             return ptr;
         }
         // match placement-new form above to be called if exception thrown in constructor
-        void operator delete( void *ptr, node_allocator_type &a ) {return a.deallocate(static_cast<node*>(ptr),1); }
+        void operator delete( void *ptr, node_allocator_type &a ) { a.deallocate(static_cast<node*>(ptr),1); }
     };
 
     void delete_node( node_base *n ) {
@@ -760,6 +766,17 @@ public:
         internal_copy(first, last);
     }
 
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! Construct empty table with n preallocated buckets. This number serves also as initial concurrency level.
+    concurrent_hash_map(const std::initializer_list<value_type> &il, const allocator_type &a = allocator_type())
+        : my_allocator(a)
+    {
+        reserve(il.size());
+        internal_copy(il.begin(), il.end());
+    }
+
+#endif //__TBB_INITIALIZER_LISTS_PRESENT
+
     //! Assignment
     concurrent_hash_map& operator=( const concurrent_hash_map& table ) {
         if( this!=&table ) {
@@ -768,6 +785,16 @@ public:
         }
         return *this;
     }
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    //! Assignment
+    concurrent_hash_map& operator=( const std::initializer_list<value_type> &il ) {
+        clear();
+        reserve(il.size());
+        internal_copy(il.begin(), il.end());
+        return *this;
+    }
+#endif //__TBB_INITIALIZER_LISTS_PRESENT
 
 
     //! Rehashes and optionally resizes the whole table.
@@ -924,7 +951,7 @@ protected:
         hashcode_t m = (hashcode_t) itt_load_word_with_acquire( my_mask );
         node *n;
     restart:
-        __TBB_ASSERT((m&(m+1))==0, NULL);
+        __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
         bucket *b = get_bucket( h & m );
         // TODO: actually, notification is unnecessary here, just hiding double-check
         if( itt_load_word_with_acquire(b->node_list) == internal::rehash_req )
@@ -962,7 +989,7 @@ bool concurrent_hash_map<Key,T,HashCompare,A>::lookup( bool op_insert, const Key
     node *n, *tmp_n = 0;
     restart:
     {//lock scope
-        __TBB_ASSERT((m&(m+1))==0, NULL);
+        __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
         return_value = false;
         // get bucket
         bucket_accessor b( this, h & m );
@@ -1004,10 +1031,9 @@ bool concurrent_hash_map<Key,T,HashCompare,A>::lookup( bool op_insert, const Key
         // TODO: the following seems as generic/regular operation
         // acquire the item
         if( !result->try_acquire( n->mutex, write ) ) {
-            // we are unlucky, prepare for longer wait
-            tbb::internal::atomic_backoff trials;
-            do {
-                if( !trials.bounded_pause() ) {
+            for( tbb::internal::atomic_backoff backoff(true);; ) {
+                if( result->try_acquire( n->mutex, write ) ) break;
+                if( !backoff.bounded_pause() ) {
                     // the wait takes really long, restart the operation
                     b.release();
                     __TBB_ASSERT( !op_insert || !return_value, "Can't acquire new item in locked bucket?" );
@@ -1015,7 +1041,7 @@ bool concurrent_hash_map<Key,T,HashCompare,A>::lookup( bool op_insert, const Key
                     m = (hashcode_t) itt_load_word_with_acquire( my_mask );
                     goto restart;
                 }
-            } while( !result->try_acquire( n->mutex, write ) );
+            }
         }
     }//lock scope
     result->my_node = n;
@@ -1038,7 +1064,7 @@ template<typename I>
 std::pair<I, I> concurrent_hash_map<Key,T,HashCompare,A>::internal_equal_range( const Key& key, I end_ ) const {
     hashcode_t h = my_hash_compare.hash( key );
     hashcode_t m = my_mask;
-    __TBB_ASSERT((m&(m+1))==0, NULL);
+    __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
     h &= m;
     bucket *b = get_bucket( h );
     while( b->node_list == internal::rehash_req ) {
@@ -1121,8 +1147,9 @@ restart:
 
 template<typename Key, typename T, typename HashCompare, typename A>
 void concurrent_hash_map<Key,T,HashCompare,A>::swap(concurrent_hash_map<Key,T,HashCompare,A> &table) {
-    std::swap(this->my_allocator, table.my_allocator);
-    std::swap(this->my_hash_compare, table.my_hash_compare);
+    using std::swap;
+    swap(this->my_allocator, table.my_allocator);
+    swap(this->my_hash_compare, table.my_hash_compare);
     internal_swap(table);
 }
 
@@ -1195,7 +1222,7 @@ void concurrent_hash_map<Key,T,HashCompare,A>::rehash(size_type sz) {
 template<typename Key, typename T, typename HashCompare, typename A>
 void concurrent_hash_map<Key,T,HashCompare,A>::clear() {
     hashcode_t m = my_mask;
-    __TBB_ASSERT((m&(m+1))==0, NULL);
+    __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
 #if TBB_USE_ASSERT || TBB_USE_PERFORMANCE_WARNINGS || __TBB_STATISTICS
 #if TBB_USE_PERFORMANCE_WARNINGS || __TBB_STATISTICS
     int current_size = int(my_size), buckets = int(m)+1, empty_buckets = 0, overpopulated_buckets = 0; // usage statistics

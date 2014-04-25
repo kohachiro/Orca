@@ -19,31 +19,19 @@
  * IN THE SOFTWARE.
  */
 
+
+/* This test does not pretend to be cross-platform. */
+#ifndef _WIN32
+
 #include "uv.h"
 #include "task.h"
 
-#ifdef _WIN32
-
-TEST_IMPL(we_get_signal) {
-  return 0;
-}
-
-
-TEST_IMPL(we_get_signals) {
-  return 0;
-}
-
-#else /* !_WIN32 */
-
+#include <errno.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
-#include <errno.h>
-
-/* This test does not pretend to be cross-platform. */
-#include <pthread.h>
-#include <signal.h>
 #include <unistd.h>
 
 #define NSIGNALS  10
@@ -77,7 +65,7 @@ static void signal_cb(uv_signal_t* handle, int signum) {
 }
 
 
-static void timer_cb(uv_timer_t* handle, int status) {
+static void timer_cb(uv_timer_t* handle) {
   struct timer_ctx* ctx = container_of(handle, struct timer_ctx, handle);
 
   raise(ctx->signum);
@@ -113,12 +101,12 @@ TEST_IMPL(we_get_signal) {
   start_timer(loop, SIGCHLD, &tc);
   start_watcher(loop, SIGCHLD, &sc);
   sc.stop_or_close = STOP; /* stop, don't close the signal handle */
-  ASSERT(0 == uv_run(loop));
+  ASSERT(0 == uv_run(loop, UV_RUN_DEFAULT));
   ASSERT(tc.ncalls == NSIGNALS);
   ASSERT(sc.ncalls == NSIGNALS);
 
   start_timer(loop, SIGCHLD, &tc);
-  ASSERT(0 == uv_run(loop));
+  ASSERT(0 == uv_run(loop, UV_RUN_DEFAULT));
   ASSERT(tc.ncalls == NSIGNALS);
   ASSERT(sc.ncalls == NSIGNALS);
 
@@ -127,10 +115,11 @@ TEST_IMPL(we_get_signal) {
   uv_signal_start(&sc.handle, signal_cb, SIGCHLD);
 
   start_timer(loop, SIGCHLD, &tc);
-  ASSERT(0 == uv_run(loop));
+  ASSERT(0 == uv_run(loop, UV_RUN_DEFAULT));
   ASSERT(tc.ncalls == NSIGNALS);
   ASSERT(sc.ncalls == NSIGNALS);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 
@@ -148,7 +137,7 @@ TEST_IMPL(we_get_signals) {
   start_watcher(loop, SIGUSR2, sc + 3);
   start_timer(loop, SIGUSR1, tc + 0);
   start_timer(loop, SIGUSR2, tc + 1);
-  ASSERT(0 == uv_run(loop));
+  ASSERT(0 == uv_run(loop, UV_RUN_DEFAULT));
 
   for (i = 0; i < ARRAY_SIZE(sc); i++)
     ASSERT(sc[i].ncalls == NSIGNALS);
@@ -156,6 +145,7 @@ TEST_IMPL(we_get_signals) {
   for (i = 0; i < ARRAY_SIZE(tc); i++)
     ASSERT(tc[i].ncalls == NSIGNALS);
 
+  MAKE_VALGRIND_HAPPY();
   return 0;
 }
 

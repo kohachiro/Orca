@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2012 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks.
 
@@ -69,7 +69,7 @@ class __TBB_InitOnce {
 public:
     static void lock()   { __TBB_LockByte( InitializationLock ); }
 
-    static void unlock() { __TBB_UnlockByte( InitializationLock, 0 ); }
+    static void unlock() { __TBB_UnlockByte( InitializationLock ); }
 
     static bool initialization_done() { return __TBB_load_with_acquire(InitializationDone); }
 
