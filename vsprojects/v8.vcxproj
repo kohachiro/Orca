@@ -11,385 +11,515 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{62ABC0DA-809B-4F93-A04D-7AA52B0E3B26}</ProjectGuid>
-    <RootNamespace>v8</RootNamespace>
+    <ProjectGuid>{0CBE6378-71C2-7B1A-664F-C5584F1973ED}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>v8_base.ia32</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+  <PropertyGroup Label="Configuration">
+    <CharacterSet>Unicode</CharacterSet>
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <PlatformToolset>v110</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="PropertySheets">
+    <Import Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>..\$(Configuration)\</OutDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IntDir>$(ProjectName)\$(Configuration)\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>$(ProjectName)_debug</TargetName>
-    <OutDir>..\$(Configuration)\</OutDir>
-    <IntDir>$(Configuration)\$(ProjectName)\</IntDir>
+  <PropertyGroup>
+    <ExecutablePath>$(ExecutablePath);$(MSBuildProjectDirectory)\.\bin\;$(MSBuildProjectDirectory)\.\bin\</ExecutablePath>
+    <OutDir>$(SolutionDir)ia32\$(Configuration)\</OutDir>
+    <IntDir>$(OutDir)obj\$(ProjectName)\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <TargetName>$(ProjectName)</TargetName>
+    <TargetPath>$(OutDir)lib\$(ProjectName)$(TargetExt)</TargetPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_V8_SHARED=1;BUILDING_UV_SHARED=1;ENABLE_DEBUGGER_SUPPORT;ENABLE_EXTRA_CHECKS;V8_TARGET_ARCH_IA32;DEBUG;_DEBUG;ENABLE_DISASSEMBLER;V8_ENABLE_CHECKS;OBJECT_PRINT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <DisableSpecificWarnings>4351;4355;4800;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\deps\v8\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <StringPooling>true</StringPooling>
-      <MinimalRebuild>false</MinimalRebuild>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4351;4355;4800;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <MinimalRebuild>false</MinimalRebuild>
+      <OmitFramePointers>false</OmitFramePointers>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>OPENSSL_NO_SSL2=1;WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_V8_SHARED=1;BUILDING_UV_SHARED=1;V8_TARGET_ARCH_IA32;ENABLE_DEBUGGER_SUPPORT;V8_USE_DEFAULT_PLATFORM;_CRT_RAND_S;ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_SHARED;DEBUG;_DEBUG;ENABLE_DISASSEMBLER;V8_ENABLE_CHECKS;OBJECT_PRINT;VERIFY_HEAP;ENABLE_EXTRA_CHECKS;ENABLE_HANDLE_ZAPPING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <StringPooling>true</StringPooling>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)lib\$(ProjectName)$(TargetExt)</OutputFile>
+    </Lib>
     <Link>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
+      <AllowIsolation>true</AllowIsolation>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>..\deps\v8\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>OPENSSL_NO_SSL2=1;WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_V8_SHARED=1;BUILDING_UV_SHARED=1;V8_TARGET_ARCH_IA32;ENABLE_DEBUGGER_SUPPORT;V8_USE_DEFAULT_PLATFORM;_CRT_RAND_S;ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_SHARED;DEBUG;_DEBUG;ENABLE_DISASSEMBLER;V8_ENABLE_CHECKS;OBJECT_PRINT;VERIFY_HEAP;ENABLE_EXTRA_CHECKS;ENABLE_HANDLE_ZAPPING;%(PreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\deps\v8\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_V8_SHARED=1;BUILDING_UV_SHARED=1;ENABLE_DEBUGGER_SUPPORT;ENABLE_EXTRA_CHECKS;V8_TARGET_ARCH_IA32;DEBUG;_DEBUG;ENABLE_DISASSEMBLER;V8_ENABLE_CHECKS;OBJECT_PRINT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/MP %(AdditionalOptions)</AdditionalOptions>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4351;4355;4800;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <OmitFramePointers>true</OmitFramePointers>
-      <StringPooling>true</StringPooling>
       <ExceptionHandling>false</ExceptionHandling>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <OmitFramePointers>true</OmitFramePointers>
+      <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>OPENSSL_NO_SSL2=1;WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_V8_SHARED=1;BUILDING_UV_SHARED=1;V8_TARGET_ARCH_IA32;ENABLE_DEBUGGER_SUPPORT;V8_USE_DEFAULT_PLATFORM;_CRT_RAND_S;ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_SHARED;ENABLE_HANDLE_ZAPPING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <StringPooling>true</StringPooling>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <WarningLevel>Level3</WarningLevel>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
     </ClCompile>
+    <Lib>
+      <AdditionalOptions>/LTCG %(AdditionalOptions)</AdditionalOptions>
+      <OutputFile>$(OutDir)lib\$(ProjectName)$(TargetExt)</OutputFile>
+    </Lib>
     <Link>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
+      <AllowIsolation>true</AllowIsolation>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>..\deps\v8\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>OPENSSL_NO_SSL2=1;WIN32;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;BUILDING_V8_SHARED=1;BUILDING_UV_SHARED=1;V8_TARGET_ARCH_IA32;ENABLE_DEBUGGER_SUPPORT;V8_USE_DEFAULT_PLATFORM;_CRT_RAND_S;ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_SHARED;ENABLE_HANDLE_ZAPPING;%(PreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\deps\v8\src\circular-queue.cc" />
-    <ClCompile Include="..\deps\v8\src\full-codegen.cc" />
-    <ClCompile Include="..\deps\v8\src\execution.cc" />
-    <ClCompile Include="..\deps\v8\src\optimizing-compiler-thread.cc" />
-    <ClCompile Include="..\deps\v8\src\hydrogen.cc" />
-    <ClCompile Include="..\deps\v8\src\debug.cc" />
-    <ClCompile Include="..\deps\v8\src\builtins.cc" />
-    <ClCompile Include="..\deps\v8\src\global-handles.cc" />
-    <ClCompile Include="..\deps\v8\src\platform-win32.cc" />
-    <ClCompile Include="..\deps\v8\src\regexp-macro-assembler-irregexp.cc" />
-    <ClCompile Include="..\deps\v8\src\dtoa.cc" />
-    <ClCompile Include="..\deps\v8\src\debug-agent.cc" />
-    <ClCompile Include="..\deps\v8\src\objects-printer.cc" />
-    <ClCompile Include="..\deps\v8\src\token.cc" />
-    <ClCompile Include="..\deps\v8\src\code-stubs.cc" />
-    <ClCompile Include="..\deps\v8\src\win32-math.cc" />
-    <ClCompile Include="..\deps\v8\src\serialize.cc" />
-    <ClCompile Include="..\deps\v8\src\store-buffer.cc" />
-    <ClCompile Include="..\deps\v8\src\type-info.cc" />
-    <ClCompile Include="..\deps\v8\src\runtime-profiler.cc" />
-    <ClCompile Include="..\deps\v8\src\disassembler.cc" />
-    <ClCompile Include="..\deps\v8\src\scopes.cc" />
-    <ClCompile Include="..\deps\v8\src\factory.cc" />
-    <ClCompile Include="..\deps\v8\src\api.cc" />
-    <ClCompile Include="..\deps\v8\src\date.cc" />
-    <ClCompile Include="..\deps\v8\src\accessors.cc" />
-    <ClCompile Include="..\deps\v8\src\dateparser.cc" />
-    <ClCompile Include="..\deps\v8\src\func-name-inferrer.cc" />
-    <ClCompile Include="..\deps\v8\src\scopeinfo.cc" />
-    <ClCompile Include="..\deps\v8\src\string-stream.cc" />
-    <ClCompile Include="..\deps\v8\src\bootstrapper.cc" />
-    <ClCompile Include="..\deps\v8\src\fixed-dtoa.cc" />
-    <ClCompile Include="..\deps\v8\src\log.cc" />
-    <ClCompile Include="..\deps\v8\src\frames.cc" />
-    <ClCompile Include="..\deps\v8\src\compiler.cc" />
-    <ClCompile Include="..\deps\v8\src\preparse-data.cc" />
-    <ClCompile Include="..\deps\v8\src\regexp-stack.cc" />
-    <ClCompile Include="..\deps\v8\src\cpu-profiler.cc" />
-    <ClCompile Include="..\deps\v8\src\counters.cc" />
-    <ClCompile Include="..\deps\v8\src\string-search.cc" />
-    <ClCompile Include="..\deps\v8\src\log-utils.cc" />
-    <ClCompile Include="..\deps\v8\src\lithium-allocator.cc" />
-    <ClCompile Include="..\deps\v8\src\version.cc" />
-    <ClCompile Include="..\deps\v8\src\utils.cc" />
-    <ClCompile Include="..\deps\v8\src\incremental-marking.cc" />
-    <ClCompile Include="..\deps\v8\src\deoptimizer.cc" />
-    <ClCompile Include="..\deps\v8\src\assembler.cc" />
-    <ClCompile Include="..\deps\v8\src\handles.cc" />
-    <ClCompile Include="..\deps\v8\src\allocation.cc" />
-    <ClCompile Include="..\deps\v8\src\liveobjectlist.cc" />
-    <ClCompile Include="..\deps\v8\src\preparser.cc" />
-    <ClCompile Include="..\deps\v8\src\ic.cc" />
-    <ClCompile Include="..\deps\v8\src\spaces.cc" />
-    <ClCompile Include="..\deps\v8\src\v8-counters.cc" />
-    <ClCompile Include="..\deps\v8\src\isolate.cc" />
-    <ClCompile Include="..\deps\v8\src\cached-powers.cc" />
-    <ClCompile Include="..\deps\v8\src\property.cc" />
-    <ClCompile Include="..\deps\v8\src\safepoint-table.cc" />
-    <ClCompile Include="..\deps\v8\src\stub-cache.cc" />
-    <ClCompile Include="..\deps\v8\src\compilation-cache.cc" />
-    <ClCompile Include="..\deps\v8\src\data-flow.cc" />
-    <ClCompile Include="..\deps\v8\src\checks.cc" />
-    <ClCompile Include="..\deps\v8\src\conversions.cc" />
-    <ClCompile Include="..\deps\v8\src\bignum.cc" />
-    <ClCompile Include="..\deps\v8\src\heap-profiler.cc" />
-    <ClCompile Include="..\deps\v8\src\ast.cc" />
-    <ClCompile Include="..\deps\v8\src\snapshot-common.cc" />
-    <ClCompile Include="..\deps\v8\src\interface.cc" />
-    <ClCompile Include="..\deps\v8\src\jsregexp.cc" />
-    <ClCompile Include="..\deps\v8\src\regexp-macro-assembler.cc" />
-    <ClCompile Include="..\deps\v8\src\v8utils.cc" />
-    <ClCompile Include="..\deps\v8\src\liveedit.cc" />
-    <ClCompile Include="..\deps\v8\src\scanner.cc" />
-    <ClCompile Include="..\deps\v8\src\objects-debug.cc" />
-    <ClCompile Include="..\deps\v8\src\interpreter-irregexp.cc" />
-    <ClCompile Include="..\deps\v8\src\heap.cc" />
-    <ClCompile Include="..\deps\v8\src\elements-kind.cc" />
-    <ClCompile Include="..\deps\v8\src\scanner-character-streams.cc" />
-    <ClCompile Include="..\deps\v8\src\parser.cc" />
-    <ClCompile Include="..\deps\v8\src\variables.cc" />
-    <ClCompile Include="..\deps\v8\src\v8conversions.cc" />
-    <ClCompile Include="..\deps\v8\src\unicode.cc" />
-    <ClCompile Include="..\deps\v8\src\objects-visiting.cc" />
-    <ClCompile Include="..\deps\v8\src\flags.cc" />
-    <ClCompile Include="..\deps\v8\src\objects.cc" />
-    <ClCompile Include="..\deps\v8\src\prettyprinter.cc" />
-    <ClCompile Include="..\deps\v8\src\hydrogen-instructions.cc" />
-    <ClCompile Include="..\deps\v8\src\runtime.cc" />
-    <ClCompile Include="..\deps\v8\src\codegen.cc" />
-    <ClCompile Include="..\deps\v8\src\bignum-dtoa.cc" />
-    <ClCompile Include="..\deps\v8\src\zone.cc" />
-    <ClCompile Include="..\deps\v8\src\elements.cc" />
-    <ClCompile Include="..\deps\v8\src\regexp-macro-assembler-tracer.cc" />
-    <ClCompile Include="..\deps\v8\src\messages.cc" />
-    <ClCompile Include="..\deps\v8\src\v8.cc" />
-    <ClCompile Include="..\deps\v8\src\profile-generator.cc" />
-    <ClCompile Include="..\deps\v8\src\lithium.cc" />
-    <ClCompile Include="..\deps\v8\src\v8threads.cc" />
-    <ClCompile Include="..\deps\v8\src\once.cc" />
-    <ClCompile Include="..\deps\v8\src\inspector.cc" />
-    <ClCompile Include="..\deps\v8\src\fast-dtoa.cc" />
-    <ClCompile Include="..\deps\v8\src\diy-fp.cc" />
-    <ClCompile Include="..\deps\v8\src\transitions.cc" />
-    <ClCompile Include="..\deps\v8\src\strtod.cc" />
-    <ClCompile Include="..\deps\v8\src\contexts.cc" />
-    <ClCompile Include="..\deps\v8\src\rewriter.cc" />
-    <ClCompile Include="..\deps\v8\src\mark-compact.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\ic-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\debug-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\cpu-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\lithium-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\macro-assembler-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\frames-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\code-stubs-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\lithium-codegen-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\regexp-macro-assembler-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\full-codegen-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\builtins-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\disasm-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\codegen-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\deoptimizer-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\stub-cache-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\lithium-gap-resolver-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\ia32\assembler-ia32.cc" />
-    <ClCompile Include="..\deps\v8\src\extensions\externalize-string-extension.cc" />
-    <ClCompile Include="..\deps\v8\src\extensions\statistics-extension.cc" />
-    <ClCompile Include="..\deps\v8\src\extensions\gc-extension.cc" />
+    <None Include="v8.gyp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\deps\v8\src\atomicops_internals_x86_msvc.h" />
-    <ClInclude Include="..\deps\v8\src\runtime-profiler.h" />
-    <ClInclude Include="..\deps\v8\src\preparser.h" />
-    <ClInclude Include="..\deps\v8\src\dtoa.h" />
-    <ClInclude Include="..\deps\v8\src\checks.h" />
-    <ClInclude Include="..\deps\v8\src\store-buffer-inl.h" />
-    <ClInclude Include="..\deps\v8\src\liveedit.h" />
-    <ClInclude Include="..\deps\v8\src\disasm.h" />
-    <ClInclude Include="..\deps\v8\src\elements-kind.h" />
-    <ClInclude Include="..\deps\v8\src\char-predicates-inl.h" />
-    <ClInclude Include="..\deps\v8\src\hydrogen.h" />
-    <ClInclude Include="..\deps\v8\src\debug-agent.h" />
-    <ClInclude Include="..\deps\v8\src\profile-generator-inl.h" />
-    <ClInclude Include="..\deps\v8\src\cached-powers.h" />
-    <ClInclude Include="..\deps\v8\src\conversions.h" />
-    <ClInclude Include="..\deps\v8\src\scanner.h" />
-    <ClInclude Include="..\deps\v8\src\builtins.h" />
-    <ClInclude Include="..\deps\v8\src\factory.h" />
-    <ClInclude Include="..\deps\v8\src\handles-inl.h" />
-    <ClInclude Include="..\deps\v8\src\zone-inl.h" />
-    <ClInclude Include="..\deps\v8\src\messages.h" />
-    <ClInclude Include="..\deps\v8\src\list.h" />
     <ClInclude Include="..\deps\v8\src\accessors.h" />
-    <ClInclude Include="..\deps\v8\src\interpreter-irregexp.h" />
-    <ClInclude Include="..\deps\v8\src\snapshot.h" />
-    <ClInclude Include="..\deps\v8\src\ast.h" />
-    <ClInclude Include="..\deps\v8\src\circular-queue.h" />
-    <ClInclude Include="..\deps\v8\src\ic-inl.h" />
-    <ClInclude Include="..\deps\v8\src\unicode.h" />
-    <ClInclude Include="..\deps\v8\src\contexts.h" />
-    <ClInclude Include="..\deps\v8\src\interface.h" />
-    <ClInclude Include="..\deps\v8\src\inspector.h" />
-    <ClInclude Include="..\deps\v8\src\dateparser-inl.h" />
-    <ClInclude Include="..\deps\v8\src\spaces.h" />
-    <ClInclude Include="..\deps\v8\src\platform-tls-win32.h" />
-    <ClInclude Include="..\deps\v8\src\jsregexp.h" />
-    <ClInclude Include="..\deps\v8\src\unbound-queue.h" />
-    <ClInclude Include="..\deps\v8\src\heap-inl.h" />
-    <ClInclude Include="..\deps\v8\src\lithium.h" />
-    <ClInclude Include="..\deps\v8\src\global-handles.h" />
-    <ClInclude Include="..\deps\v8\src\compilation-cache.h" />
-    <ClInclude Include="..\deps\v8\src\version.h" />
-    <ClInclude Include="..\deps\v8\src\store-buffer.h" />
-    <ClInclude Include="..\deps\v8\src\elements.h" />
-    <ClInclude Include="..\deps\v8\src\date.h" />
-    <ClInclude Include="..\deps\v8\src\variables.h" />
-    <ClInclude Include="..\deps\v8\src\circular-queue-inl.h" />
-    <ClInclude Include="..\deps\v8\src\platform-tls.h" />
+    <ClInclude Include="..\deps\v8\src\allocation.h" />
+    <ClInclude Include="..\deps\v8\src\allocation-site-scopes.h" />
+    <ClInclude Include="..\deps\v8\src\allocation-tracker.h" />
     <ClInclude Include="..\deps\v8\src\api.h" />
-    <ClInclude Include="..\deps\v8\src\v8.h" />
-    <ClInclude Include="..\deps\v8\src\cpu.h" />
-    <ClInclude Include="..\deps\v8\src\transitions.h" />
-    <ClInclude Include="..\deps\v8\src\objects.h" />
-    <ClInclude Include="..\deps\v8\src\serialize.h" />
-    <ClInclude Include="..\deps\v8\src\v8utils.h" />
-    <ClInclude Include="..\deps\v8\src\isolate.h" />
-    <ClInclude Include="..\deps\v8\src\rewriter.h" />
-    <ClInclude Include="..\deps\v8\src\bignum-dtoa.h" />
-    <ClInclude Include="..\deps\v8\src\objects-visiting.h" />
     <ClInclude Include="..\deps\v8\src\arguments.h" />
-    <ClInclude Include="..\deps\v8\src\preparse-data.h" />
+    <ClInclude Include="..\deps\v8\src\assembler.h" />
+    <ClInclude Include="..\deps\v8\src\assert-scope.h" />
+    <ClInclude Include="..\deps\v8\src\ast.h" />
+    <ClInclude Include="..\deps\v8\src\atomicops.h" />
+    <ClInclude Include="..\deps\v8\src\bignum-dtoa.h" />
+    <ClInclude Include="..\deps\v8\src\bignum.h" />
+    <ClInclude Include="..\deps\v8\src\bootstrapper.h" />
+    <ClInclude Include="..\deps\v8\src\builtins.h" />
+    <ClInclude Include="..\deps\v8\src\bytecodes-irregexp.h" />
+    <ClInclude Include="..\deps\v8\src\cached-powers.h" />
+    <ClInclude Include="..\deps\v8\src\char-predicates-inl.h" />
+    <ClInclude Include="..\deps\v8\src\char-predicates.h" />
+    <ClInclude Include="..\deps\v8\src\checks.h" />
+    <ClInclude Include="..\deps\v8\src\circular-queue-inl.h" />
+    <ClInclude Include="..\deps\v8\src\circular-queue.h" />
+    <ClInclude Include="..\deps\v8\src\code-stubs.h" />
+    <ClInclude Include="..\deps\v8\src\code.h" />
+    <ClInclude Include="..\deps\v8\src\codegen.h" />
+    <ClInclude Include="..\deps\v8\src\compilation-cache.h" />
+    <ClInclude Include="..\deps\v8\src\compiler.h" />
+    <ClInclude Include="..\deps\v8\src\contexts.h" />
+    <ClInclude Include="..\deps\v8\src\conversions-inl.h" />
+    <ClInclude Include="..\deps\v8\src\conversions.h" />
+    <ClInclude Include="..\deps\v8\src\counters.h" />
+    <ClInclude Include="..\deps\v8\src\cpu-profiler-inl.h" />
+    <ClInclude Include="..\deps\v8\src\cpu-profiler.h" />
+    <ClInclude Include="..\deps\v8\src\cpu.h" />
+    <ClInclude Include="..\deps\v8\src\data-flow.h" />
+    <ClInclude Include="..\deps\v8\src\date.h" />
+    <ClInclude Include="..\deps\v8\src\dateparser-inl.h" />
+    <ClInclude Include="..\deps\v8\src\dateparser.h" />
+    <ClInclude Include="..\deps\v8\src\debug-agent.h" />
+    <ClInclude Include="..\deps\v8\src\debug.h" />
+    <ClInclude Include="..\deps\v8\src\deoptimizer.h" />
+    <ClInclude Include="..\deps\v8\src\disasm.h" />
+    <ClInclude Include="..\deps\v8\src\disassembler.h" />
+    <ClInclude Include="..\deps\v8\src\diy-fp.h" />
+    <ClInclude Include="..\deps\v8\src\double.h" />
+    <ClInclude Include="..\deps\v8\src\dtoa.h" />
+    <ClInclude Include="..\deps\v8\src\effects.h" />
+    <ClInclude Include="..\deps\v8\src\elements-kind.h" />
+    <ClInclude Include="..\deps\v8\src\elements.h" />
+    <ClInclude Include="..\deps\v8\src\execution.h" />
+    <ClInclude Include="..\deps\v8\src\extensions\externalize-string-extension.h" />
+    <ClInclude Include="..\deps\v8\src\extensions\free-buffer-extension.h" />
+    <ClInclude Include="..\deps\v8\src\extensions\gc-extension.h" />
+    <ClInclude Include="..\deps\v8\src\extensions\statistics-extension.h" />
+    <ClInclude Include="..\deps\v8\src\extensions\trigger-failure-extension.h" />
+    <ClInclude Include="..\deps\v8\src\factory.h" />
+    <ClInclude Include="..\deps\v8\src\fast-dtoa.h" />
+    <ClInclude Include="..\deps\v8\src\feedback-slots.h" />
+    <ClInclude Include="..\deps\v8\src\fixed-dtoa.h" />
+    <ClInclude Include="..\deps\v8\src\flag-definitions.h" />
+    <ClInclude Include="..\deps\v8\src\flags.h" />
+    <ClInclude Include="..\deps\v8\src\frames-inl.h" />
+    <ClInclude Include="..\deps\v8\src\frames.h" />
+    <ClInclude Include="..\deps\v8\src\full-codegen.h" />
+    <ClInclude Include="..\deps\v8\src\func-name-inferrer.h" />
+    <ClInclude Include="..\deps\v8\src\gdb-jit.h" />
+    <ClInclude Include="..\deps\v8\src\global-handles.h" />
+    <ClInclude Include="..\deps\v8\src\globals.h" />
+    <ClInclude Include="..\deps\v8\src\handles-inl.h" />
+    <ClInclude Include="..\deps\v8\src\handles.h" />
+    <ClInclude Include="..\deps\v8\src\hashmap.h" />
+    <ClInclude Include="..\deps\v8\src\heap-inl.h" />
+    <ClInclude Include="..\deps\v8\src\heap-profiler.h" />
+    <ClInclude Include="..\deps\v8\src\heap-snapshot-generator-inl.h" />
+    <ClInclude Include="..\deps\v8\src\heap-snapshot-generator.h" />
+    <ClInclude Include="..\deps\v8\src\heap.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-alias-analysis.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-bce.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-bch.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-canonicalize.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-check-elimination.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-dce.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-dehoist.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-environment-liveness.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-escape-analysis.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-flow-engine.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-instructions.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-gvn.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-infer-representation.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-infer-types.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-load-elimination.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-mark-deoptimize.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-mark-unreachable.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-osr.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-range-analysis.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-redundant-phi.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-removable-simulates.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-representation-changes.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-sce.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-store-elimination.h" />
+    <ClInclude Include="..\deps\v8\src\hydrogen-uint32-analysis.h" />
+    <ClInclude Include="..\deps\v8\src\icu_util.h" />
+    <ClInclude Include="..\deps\v8\src\ic-inl.h" />
+    <ClInclude Include="..\deps\v8\src\ic.h" />
+    <ClInclude Include="..\deps\v8\src\incremental-marking.h" />
+    <ClInclude Include="..\deps\v8\src\interface.h" />
+    <ClInclude Include="..\deps\v8\src\interpreter-irregexp.h" />
+    <ClInclude Include="..\deps\v8\src\isolate.h" />
+    <ClInclude Include="..\deps\v8\src\json-parser.h" />
+    <ClInclude Include="..\deps\v8\src\json-stringifier.h" />
+    <ClInclude Include="..\deps\v8\src\jsregexp-inl.h" />
+    <ClInclude Include="..\deps\v8\src\jsregexp.h" />
+    <ClInclude Include="..\deps\v8\src\lazy-instance.h" />
+    <ClInclude Include="..\deps\v8\src\libplatform\default-platform.h" />
+    <ClInclude Include="..\deps\v8\src\libplatform\task-queue.h" />
+    <ClInclude Include="..\deps\v8\src\libplatform\worker-thread.h" />
+    <ClInclude Include="..\deps\v8\src\list-inl.h" />
+    <ClInclude Include="..\deps\v8\src\list.h" />
+    <ClInclude Include="..\deps\v8\src\lithium-allocator-inl.h" />
+    <ClInclude Include="..\deps\v8\src\lithium-allocator.h" />
+    <ClInclude Include="..\deps\v8\src\lithium-codegen.h" />
+    <ClInclude Include="..\deps\v8\src\lithium.h" />
+    <ClInclude Include="..\deps\v8\src\liveedit.h" />
+    <ClInclude Include="..\deps\v8\src\log-inl.h" />
+    <ClInclude Include="..\deps\v8\src\log-utils.h" />
+    <ClInclude Include="..\deps\v8\src\log.h" />
+    <ClInclude Include="..\deps\v8\src\macro-assembler.h" />
+    <ClInclude Include="..\deps\v8\src\mark-compact.h" />
+    <ClInclude Include="..\deps\v8\src\messages.h" />
+    <ClInclude Include="..\deps\v8\src\natives.h" />
+    <ClInclude Include="..\deps\v8\src\objects-inl.h" />
+    <ClInclude Include="..\deps\v8\src\objects-visiting.h" />
+    <ClInclude Include="..\deps\v8\src\objects.h" />
     <ClInclude Include="..\deps\v8\src\once.h" />
     <ClInclude Include="..\deps\v8\src\optimizing-compiler-thread.h" />
-    <ClInclude Include="..\deps\v8\src\log-utils.h" />
-    <ClInclude Include="..\deps\v8\src\data-flow.h" />
-    <ClInclude Include="..\deps\v8\src\strtod.h" />
-    <ClInclude Include="..\deps\v8\src\allocation.h" />
-    <ClInclude Include="..\deps\v8\src\unicode-inl.h" />
-    <ClInclude Include="..\deps\v8\src\string-search.h" />
-    <ClInclude Include="..\deps\v8\src\spaces-inl.h" />
-    <ClInclude Include="..\deps\v8\src\handles.h" />
-    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler-tracer.h" />
-    <ClInclude Include="..\deps\v8\src\liveobjectlist.h" />
-    <ClInclude Include="..\deps\v8\src\objects-inl.h" />
-    <ClInclude Include="..\deps\v8\src\scopeinfo.h" />
-    <ClInclude Include="..\deps\v8\src\type-info.h" />
-    <ClInclude Include="..\deps\v8\src\regexp-stack.h" />
-    <ClInclude Include="..\deps\v8\src\heap.h" />
-    <ClInclude Include="..\deps\v8\src\bignum.h" />
-    <ClInclude Include="..\deps\v8\src\flags.h" />
-    <ClInclude Include="..\deps\v8\src\profile-generator.h" />
-    <ClInclude Include="..\deps\v8\src\transitions-inl.h" />
-    <ClInclude Include="..\deps\v8\src\token.h" />
-    <ClInclude Include="..\deps\v8\src\v8globals.h" />
-    <ClInclude Include="..\deps\v8\src\cpu-profiler-inl.h" />
-    <ClInclude Include="..\deps\v8\src\heap-profiler.h" />
-    <ClInclude Include="..\deps\v8\src\vm-state-inl.h" />
-    <ClInclude Include="..\deps\v8\src\string-stream.h" />
-    <ClInclude Include="..\deps\v8\src\platform.h" />
-    <ClInclude Include="..\deps\v8\src\debug.h" />
-    <ClInclude Include="..\deps\v8\src\macro-assembler.h" />
-    <ClInclude Include="..\deps\v8\src\runtime.h" />
-    <ClInclude Include="..\deps\v8\src\platform-posix.h" />
-    <ClInclude Include="..\deps\v8\src\smart-pointers.h" />
-    <ClInclude Include="..\deps\v8\src\lithium-allocator-inl.h" />
-    <ClInclude Include="..\deps\v8\src\execution.h" />
-    <ClInclude Include="..\deps\v8\src\counters.h" />
-    <ClInclude Include="..\deps\v8\src\liveobjectlist-inl.h" />
-    <ClInclude Include="..\deps\v8\src\win32-math.h" />
-    <ClInclude Include="..\deps\v8\src\dateparser.h" />
-    <ClInclude Include="..\deps\v8\src\ic.h" />
-    <ClInclude Include="..\deps\v8\src\double.h" />
-    <ClInclude Include="..\deps\v8\src\cpu-profiler.h" />
-    <ClInclude Include="..\deps\v8\src\hydrogen-instructions.h" />
-    <ClInclude Include="..\deps\v8\src\json-parser.h" />
-    <ClInclude Include="..\deps\v8\src\compiler.h" />
-    <ClInclude Include="..\deps\v8\src\disassembler.h" />
-    <ClInclude Include="..\deps\v8\src\list-inl.h" />
-    <ClInclude Include="..\deps\v8\src\platform-tls-mac.h" />
-    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler-irregexp.h" />
-    <ClInclude Include="..\deps\v8\src\log-inl.h" />
-    <ClInclude Include="..\deps\v8\src\safepoint-table.h" />
-    <ClInclude Include="..\deps\v8\src\frames-inl.h" />
-    <ClInclude Include="..\deps\v8\src\assembler.h" />
-    <ClInclude Include="..\deps\v8\src\deoptimizer.h" />
-    <ClInclude Include="..\deps\v8\src\apiutils.h" />
-    <ClInclude Include="..\deps\v8\src\property-details.h" />
-    <ClInclude Include="..\deps\v8\src\lithium-allocator.h" />
-    <ClInclude Include="..\deps\v8\src\full-codegen.h" />
-    <ClInclude Include="..\deps\v8\src\preparse-data-format.h" />
-    <ClInclude Include="..\deps\v8\src\func-name-inferrer.h" />
-    <ClInclude Include="..\deps\v8\src\mark-compact.h" />
-    <ClInclude Include="..\deps\v8\src\char-predicates.h" />
-    <ClInclude Include="..\deps\v8\src\bootstrapper.h" />
-    <ClInclude Include="..\deps\v8\src\fixed-dtoa.h" />
-    <ClInclude Include="..\deps\v8\src\fast-dtoa.h" />
-    <ClInclude Include="..\deps\v8\src\conversions-inl.h" />
-    <ClInclude Include="..\deps\v8\src\property.h" />
-    <ClInclude Include="..\deps\v8\src\atomicops.h" />
-    <ClInclude Include="..\deps\v8\src\globals.h" />
-    <ClInclude Include="..\deps\v8\src\hashmap.h" />
     <ClInclude Include="..\deps\v8\src\parser.h" />
-    <ClInclude Include="..\deps\v8\src\diy-fp.h" />
-    <ClInclude Include="..\deps\v8\src\incremental-marking.h" />
-    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler-irregexp-inl.h" />
-    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler.h" />
-    <ClInclude Include="..\deps\v8\src\scopes.h" />
-    <ClInclude Include="..\deps\v8\src\v8threads.h" />
-    <ClInclude Include="..\deps\v8\src\scanner-character-streams.h" />
-    <ClInclude Include="..\deps\v8\src\vm-state.h" />
-    <ClInclude Include="..\deps\v8\src\bytecodes-irregexp.h" />
-    <ClInclude Include="..\deps\v8\src\code-stubs.h" />
-    <ClInclude Include="..\deps\v8\src\utils.h" />
+    <ClInclude Include="..\deps\v8\src\platform\elapsed-timer.h" />
+    <ClInclude Include="..\deps\v8\src\platform\time.h" />
+    <ClInclude Include="..\deps\v8\src\platform.h" />
+    <ClInclude Include="..\deps\v8\src\platform\condition-variable.h" />
+    <ClInclude Include="..\deps\v8\src\platform\mutex.h" />
+    <ClInclude Include="..\deps\v8\src\platform\semaphore.h" />
+    <ClInclude Include="..\deps\v8\src\platform\socket.h" />
+    <ClInclude Include="..\deps\v8\src\preparse-data-format.h" />
+    <ClInclude Include="..\deps\v8\src\preparse-data.h" />
+    <ClInclude Include="..\deps\v8\src\preparser.h" />
     <ClInclude Include="..\deps\v8\src\prettyprinter.h" />
-    <ClInclude Include="..\deps\v8\src\utils-inl.h" />
-    <ClInclude Include="..\deps\v8\src\log.h" />
-    <ClInclude Include="..\deps\v8\src\v8checks.h" />
-    <ClInclude Include="..\deps\v8\src\zone.h" />
-    <ClInclude Include="..\deps\v8\src\v8memory.h" />
-    <ClInclude Include="..\deps\v8\src\unbound-queue-inl.h" />
-    <ClInclude Include="..\deps\v8\src\code.h" />
+    <ClInclude Include="..\deps\v8\src\profile-generator-inl.h" />
+    <ClInclude Include="..\deps\v8\src\profile-generator.h" />
+    <ClInclude Include="..\deps\v8\src\property-details.h" />
+    <ClInclude Include="..\deps\v8\src\property.h" />
+    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler-irregexp-inl.h" />
+    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler-irregexp.h" />
+    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler-tracer.h" />
+    <ClInclude Include="..\deps\v8\src\regexp-macro-assembler.h" />
+    <ClInclude Include="..\deps\v8\src\regexp-stack.h" />
+    <ClInclude Include="..\deps\v8\src\rewriter.h" />
+    <ClInclude Include="..\deps\v8\src\runtime-profiler.h" />
+    <ClInclude Include="..\deps\v8\src\runtime.h" />
+    <ClInclude Include="..\deps\v8\src\safepoint-table.h" />
+    <ClInclude Include="..\deps\v8\src\sampler.h" />
+    <ClInclude Include="..\deps\v8\src\scanner-character-streams.h" />
+    <ClInclude Include="..\deps\v8\src\scanner.h" />
+    <ClInclude Include="..\deps\v8\src\scopeinfo.h" />
+    <ClInclude Include="..\deps\v8\src\scopes.h" />
+    <ClInclude Include="..\deps\v8\src\serialize.h" />
     <ClInclude Include="..\deps\v8\src\small-pointer-list.h" />
-    <ClInclude Include="..\deps\v8\src\codegen.h" />
-    <ClInclude Include="..\deps\v8\src\flag-definitions.h" />
-    <ClInclude Include="..\deps\v8\src\frames.h" />
-    <ClInclude Include="..\deps\v8\src\natives.h" />
-    <ClInclude Include="..\deps\v8\src\v8conversions.h" />
+    <ClInclude Include="..\deps\v8\src\smart-pointers.h" />
+    <ClInclude Include="..\deps\v8\src\snapshot.h" />
+    <ClInclude Include="..\deps\v8\src\spaces-inl.h" />
+    <ClInclude Include="..\deps\v8\src\spaces.h" />
+    <ClInclude Include="..\deps\v8\src\store-buffer-inl.h" />
+    <ClInclude Include="..\deps\v8\src\store-buffer.h" />
+    <ClInclude Include="..\deps\v8\src\string-search.h" />
+    <ClInclude Include="..\deps\v8\src\string-stream.h" />
+    <ClInclude Include="..\deps\v8\src\strtod.h" />
     <ClInclude Include="..\deps\v8\src\stub-cache.h" />
-    <ClInclude Include="..\deps\v8\src\lazy-instance.h" />
+    <ClInclude Include="..\deps\v8\src\sweeper-thread.h" />
+    <ClInclude Include="..\deps\v8\src\token.h" />
+    <ClInclude Include="..\deps\v8\src\transitions-inl.h" />
+    <ClInclude Include="..\deps\v8\src\transitions.h" />
+    <ClInclude Include="..\deps\v8\src\type-info.h" />
+    <ClInclude Include="..\deps\v8\src\types.h" />
+    <ClInclude Include="..\deps\v8\src\typing.h" />
+    <ClInclude Include="..\deps\v8\src\unbound-queue-inl.h" />
+    <ClInclude Include="..\deps\v8\src\unbound-queue.h" />
+    <ClInclude Include="..\deps\v8\src\unicode-inl.h" />
+    <ClInclude Include="..\deps\v8\src\unicode.h" />
+    <ClInclude Include="..\deps\v8\src\unique.h" />
+    <ClInclude Include="..\deps\v8\src\uri.h" />
+    <ClInclude Include="..\deps\v8\src\utils-inl.h" />
+    <ClInclude Include="..\deps\v8\src\utils.h" />
+    <ClInclude Include="..\deps\v8\src\utils\random-number-generator.h" />
     <ClInclude Include="..\deps\v8\src\v8-counters.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\frames-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\lithium-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\code-stubs-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\lithium-gap-resolver-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\v8.h" />
+    <ClInclude Include="..\deps\v8\src\v8checks.h" />
+    <ClInclude Include="..\deps\v8\src\v8conversions.h" />
+    <ClInclude Include="..\deps\v8\src\v8globals.h" />
+    <ClInclude Include="..\deps\v8\src\v8memory.h" />
+    <ClInclude Include="..\deps\v8\src\v8threads.h" />
+    <ClInclude Include="..\deps\v8\src\v8utils.h" />
+    <ClInclude Include="..\deps\v8\src\variables.h" />
+    <ClInclude Include="..\deps\v8\src\version.h" />
+    <ClInclude Include="..\deps\v8\src\vm-state-inl.h" />
+    <ClInclude Include="..\deps\v8\src\vm-state.h" />
+    <ClInclude Include="..\deps\v8\src\zone-inl.h" />
+    <ClInclude Include="..\deps\v8\src\zone.h" />
     <ClInclude Include="..\deps\v8\src\ia32\assembler-ia32-inl.h" />
     <ClInclude Include="..\deps\v8\src\ia32\assembler-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\regexp-macro-assembler-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\macro-assembler-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\ia32\lithium-codegen-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\code-stubs-ia32.h" />
     <ClInclude Include="..\deps\v8\src\ia32\codegen-ia32.h" />
-    <ClInclude Include="..\deps\v8\src\extensions\statistics-extension.h" />
-    <ClInclude Include="..\deps\v8\src\extensions\externalize-string-extension.h" />
-    <ClInclude Include="..\deps\v8\src\extensions\gc-extension.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\frames-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\lithium-codegen-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\lithium-gap-resolver-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\lithium-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\macro-assembler-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\ia32\regexp-macro-assembler-ia32.h" />
+    <ClInclude Include="..\deps\v8\src\win32-math.h" />
+    <ClInclude Include="..\deps\v8\src\i18n.h">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\deps\v8\src\accessors.cc" />
+    <ClCompile Include="..\deps\v8\src\allocation.cc" />
+    <ClCompile Include="..\deps\v8\src\allocation-site-scopes.cc" />
+    <ClCompile Include="..\deps\v8\src\allocation-tracker.cc" />
+    <ClCompile Include="..\deps\v8\src\api.cc" />
+    <ClCompile Include="..\deps\v8\src\arguments.cc" />
+    <ClCompile Include="..\deps\v8\src\assembler.cc" />
+    <ClCompile Include="..\deps\v8\src\assert-scope.cc" />
+    <ClCompile Include="..\deps\v8\src\ast.cc" />
+    <ClCompile Include="..\deps\v8\src\atomicops_internals_x86_gcc.cc" />
+    <ClCompile Include="..\deps\v8\src\bignum-dtoa.cc" />
+    <ClCompile Include="..\deps\v8\src\bignum.cc" />
+    <ClCompile Include="..\deps\v8\src\bootstrapper.cc" />
+    <ClCompile Include="..\deps\v8\src\builtins.cc" />
+    <ClCompile Include="..\deps\v8\src\cached-powers.cc" />
+    <ClCompile Include="..\deps\v8\src\checks.cc" />
+    <ClCompile Include="..\deps\v8\src\code-stubs.cc" />
+    <ClCompile Include="..\deps\v8\src\code-stubs-hydrogen.cc" />
+    <ClCompile Include="..\deps\v8\src\codegen.cc" />
+    <ClCompile Include="..\deps\v8\src\compilation-cache.cc" />
+    <ClCompile Include="..\deps\v8\src\compiler.cc" />
+    <ClCompile Include="..\deps\v8\src\contexts.cc" />
+    <ClCompile Include="..\deps\v8\src\conversions.cc" />
+    <ClCompile Include="..\deps\v8\src\counters.cc" />
+    <ClCompile Include="..\deps\v8\src\cpu-profiler.cc" />
+    <ClCompile Include="..\deps\v8\src\cpu.cc" />
+    <ClCompile Include="..\deps\v8\src\data-flow.cc" />
+    <ClCompile Include="..\deps\v8\src\date.cc" />
+    <ClCompile Include="..\deps\v8\src\dateparser.cc" />
+    <ClCompile Include="..\deps\v8\src\debug-agent.cc" />
+    <ClCompile Include="..\deps\v8\src\debug.cc" />
+    <ClCompile Include="..\deps\v8\src\deoptimizer.cc" />
+    <ClCompile Include="..\deps\v8\src\disassembler.cc" />
+    <ClCompile Include="..\deps\v8\src\diy-fp.cc" />
+    <ClCompile Include="..\deps\v8\src\dtoa.cc" />
+    <ClCompile Include="..\deps\v8\src\elements-kind.cc" />
+    <ClCompile Include="..\deps\v8\src\elements.cc" />
+    <ClCompile Include="..\deps\v8\src\execution.cc" />
+    <ClCompile Include="..\deps\v8\src\extensions\externalize-string-extension.cc" />
+    <ClCompile Include="..\deps\v8\src\extensions\free-buffer-extension.cc" />
+    <ClCompile Include="..\deps\v8\src\extensions\gc-extension.cc" />
+    <ClCompile Include="..\deps\v8\src\extensions\statistics-extension.cc" />
+    <ClCompile Include="..\deps\v8\src\extensions\trigger-failure-extension.cc" />
+    <ClCompile Include="..\deps\v8\src\factory.cc" />
+    <ClCompile Include="..\deps\v8\src\fast-dtoa.cc" />
+    <ClCompile Include="..\deps\v8\src\fixed-dtoa.cc" />
+    <ClCompile Include="..\deps\v8\src\flags.cc" />
+    <ClCompile Include="..\deps\v8\src\frames.cc" />
+    <ClCompile Include="..\deps\v8\src\full-codegen.cc" />
+    <ClCompile Include="..\deps\v8\src\func-name-inferrer.cc" />
+    <ClCompile Include="..\deps\v8\src\gdb-jit.cc" />
+    <ClCompile Include="..\deps\v8\src\global-handles.cc" />
+    <ClCompile Include="..\deps\v8\src\handles.cc" />
+    <ClCompile Include="..\deps\v8\src\heap-profiler.cc" />
+    <ClCompile Include="..\deps\v8\src\heap-snapshot-generator.cc" />
+    <ClCompile Include="..\deps\v8\src\heap.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-bce.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-bch.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-canonicalize.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-check-elimination.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-dce.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-dehoist.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-environment-liveness.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-escape-analysis.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-instructions.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-gvn.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-infer-representation.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-infer-types.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-load-elimination.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-mark-deoptimize.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-mark-unreachable.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-osr.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-range-analysis.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-redundant-phi.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-removable-simulates.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-representation-changes.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-sce.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-store-elimination.cc" />
+    <ClCompile Include="..\deps\v8\src\hydrogen-uint32-analysis.cc" />
+    <ClCompile Include="..\deps\v8\src\icu_util.cc" />
+    <ClCompile Include="..\deps\v8\src\ic.cc" />
+    <ClCompile Include="..\deps\v8\src\incremental-marking.cc" />
+    <ClCompile Include="..\deps\v8\src\interface.cc" />
+    <ClCompile Include="..\deps\v8\src\interpreter-irregexp.cc" />
+    <ClCompile Include="..\deps\v8\src\isolate.cc" />
+    <ClCompile Include="..\deps\v8\src\jsregexp.cc" />
+    <ClCompile Include="..\deps\v8\src\libplatform\default-platform.cc" />
+    <ClCompile Include="..\deps\v8\src\libplatform\task-queue.cc" />
+    <ClCompile Include="..\deps\v8\src\libplatform\worker-thread.cc" />
+    <ClCompile Include="..\deps\v8\src\lithium-allocator.cc" />
+    <ClCompile Include="..\deps\v8\src\lithium-codegen.cc" />
+    <ClCompile Include="..\deps\v8\src\lithium.cc" />
+    <ClCompile Include="..\deps\v8\src\liveedit.cc" />
+    <ClCompile Include="..\deps\v8\src\log-utils.cc" />
+    <ClCompile Include="..\deps\v8\src\log.cc" />
+    <ClCompile Include="..\deps\v8\src\mark-compact.cc" />
+    <ClCompile Include="..\deps\v8\src\messages.cc" />
+    <ClCompile Include="..\deps\v8\src\objects-debug.cc" />
+    <ClCompile Include="..\deps\v8\src\objects-printer.cc" />
+    <ClCompile Include="..\deps\v8\src\objects-visiting.cc" />
+    <ClCompile Include="..\deps\v8\src\objects.cc" />
+    <ClCompile Include="..\deps\v8\src\once.cc" />
+    <ClCompile Include="..\deps\v8\src\optimizing-compiler-thread.cc" />
+    <ClCompile Include="..\deps\v8\src\parser.cc" />
+    <ClCompile Include="..\deps\v8\src\platform\time.cc" />
+    <ClCompile Include="..\deps\v8\src\platform\condition-variable.cc" />
+    <ClCompile Include="..\deps\v8\src\platform\mutex.cc" />
+    <ClCompile Include="..\deps\v8\src\platform\semaphore.cc" />
+    <ClCompile Include="..\deps\v8\src\platform\socket.cc" />
+    <ClCompile Include="..\deps\v8\src\preparse-data.cc" />
+    <ClCompile Include="..\deps\v8\src\preparser.cc" />
+    <ClCompile Include="..\deps\v8\src\prettyprinter.cc" />
+    <ClCompile Include="..\deps\v8\src\profile-generator.cc" />
+    <ClCompile Include="..\deps\v8\src\property.cc" />
+    <ClCompile Include="..\deps\v8\src\regexp-macro-assembler-irregexp.cc" />
+    <ClCompile Include="..\deps\v8\src\regexp-macro-assembler-tracer.cc" />
+    <ClCompile Include="..\deps\v8\src\regexp-macro-assembler.cc" />
+    <ClCompile Include="..\deps\v8\src\regexp-stack.cc" />
+    <ClCompile Include="..\deps\v8\src\rewriter.cc" />
+    <ClCompile Include="..\deps\v8\src\runtime-profiler.cc" />
+    <ClCompile Include="..\deps\v8\src\runtime.cc" />
+    <ClCompile Include="..\deps\v8\src\safepoint-table.cc" />
+    <ClCompile Include="..\deps\v8\src\sampler.cc" />
+    <ClCompile Include="..\deps\v8\src\scanner-character-streams.cc" />
+    <ClCompile Include="..\deps\v8\src\scanner.cc" />
+    <ClCompile Include="..\deps\v8\src\scopeinfo.cc" />
+    <ClCompile Include="..\deps\v8\src\scopes.cc" />
+    <ClCompile Include="..\deps\v8\src\serialize.cc" />
+    <ClCompile Include="..\deps\v8\src\snapshot-common.cc" />
+    <ClCompile Include="..\deps\v8\src\spaces.cc" />
+    <ClCompile Include="..\deps\v8\src\store-buffer.cc" />
+    <ClCompile Include="..\deps\v8\src\string-search.cc" />
+    <ClCompile Include="..\deps\v8\src\string-stream.cc" />
+    <ClCompile Include="..\deps\v8\src\strtod.cc" />
+    <ClCompile Include="..\deps\v8\src\stub-cache.cc" />
+    <ClCompile Include="..\deps\v8\src\sweeper-thread.cc" />
+    <ClCompile Include="..\deps\v8\src\token.cc" />
+    <ClCompile Include="..\deps\v8\src\transitions.cc" />
+    <ClCompile Include="..\deps\v8\src\type-info.cc" />
+    <ClCompile Include="..\deps\v8\src\types.cc" />
+    <ClCompile Include="..\deps\v8\src\typing.cc" />
+    <ClCompile Include="..\deps\v8\src\unicode.cc" />
+    <ClCompile Include="..\deps\v8\src\utils.cc" />
+    <ClCompile Include="..\deps\v8\src\utils\random-number-generator.cc" />
+    <ClCompile Include="..\deps\v8\src\v8-counters.cc" />
+    <ClCompile Include="..\deps\v8\src\v8.cc" />
+    <ClCompile Include="..\deps\v8\src\v8conversions.cc" />
+    <ClCompile Include="..\deps\v8\src\v8threads.cc" />
+    <ClCompile Include="..\deps\v8\src\v8utils.cc" />
+    <ClCompile Include="..\deps\v8\src\variables.cc" />
+    <ClCompile Include="..\deps\v8\src\version.cc" />
+    <ClCompile Include="..\deps\v8\src\zone.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\assembler-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\builtins-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\code-stubs-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\codegen-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\cpu-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\debug-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\deoptimizer-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\disasm-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\frames-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\full-codegen-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\ic-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\lithium-codegen-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\lithium-gap-resolver-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\lithium-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\macro-assembler-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\regexp-macro-assembler-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\ia32\stub-cache-ia32.cc" />
+    <ClCompile Include="..\deps\v8\src\platform-win32.cc" />
+    <ClCompile Include="..\deps\v8\src\win32-math.cc" />
+    <ClCompile Include="..\deps\v8\src\i18n.cc">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
 </Project>
